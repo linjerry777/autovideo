@@ -1,0 +1,27 @@
+
+=== news_collector.py ===
+📡 Google News 搜尋：籃球
+  Google News 搜尋：籃球
+  共取得 9 則原始新聞
+🤖 Claude 整理 3 則精選新聞...
+Traceback (most recent call last):
+  File "C:\Users\User\Documents\GitHub\AutoVideo\scripts\news_collector.py", line 191, in <module>
+    main()
+  File "C:\Users\User\Documents\GitHub\AutoVideo\scripts\news_collector.py", line 167, in main
+    news_items = select_news_with_claude(raw_items)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\User\Documents\GitHub\AutoVideo\scripts\news_collector.py", line 107, in select_news_with_claude
+    prompt = f"""以下是搜尋「{keyword}」得到的新聞列表。請挑出 3 則最具爆點、最能引起共鳴的新聞，適合在短影音（Shorts/Reels/TikTok）分享。
+                              ^^^^^^^
+NameError: name 'keyword' is not defined. Did you forget to import 'keyword'?
+
+
+[FAILED] news_collector 失敗:
+ocuments\GitHub\AutoVideo\scripts\news_collector.py", line 167, in main
+    news_items = select_news_with_claude(raw_items)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\User\Documents\GitHub\AutoVideo\scripts\news_collector.py", line 107, in select_news_with_claude
+    prompt = f"""以下是搜尋「{keyword}」得到的新聞列表。請挑出 3 則最具爆點、最能引起共鳴的新聞，適合在短影音（Shorts/Reels/TikTok）分享。
+                              ^^^^^^^
+NameError: name 'keyword' is not defined. Did you forget to import 'keyword'?
+

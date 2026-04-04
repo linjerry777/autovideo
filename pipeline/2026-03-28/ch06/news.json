@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-28/ch06",
+  "items": [
+    {
+      "hook": "500 on /api/checkout",
+      "title": "500 on /api/checkout",
+      "summary": "登入成功，點購課，白畫面，500 error。Vercel log什麼都沒顯示。這種debug才是真實開發的日常。",
+      "script": "登入成功，點購課，白畫面，500 error。Vercel log什麼都沒顯示。這種debug才是真實開發的日常。",
+      "source_url": "",
+      "source_name": "ch06"
+    },
+    {
+      "hook": "debug route救了我",
+      "title": "debug route救了我",
+      "summary": "我建了一個/api/debug，直接回傳當前的user session、env var狀態、Supabase連線狀態。三十秒定位問題。這個習慣，每個專案都要有。",
+      "script": "我建了一個/api/debug，直接回傳當前的user session、env var狀態、Supabase連線狀態。三十秒定位問題。這個習慣，每個專案都要有。",
+      "source_url": "",
+      "source_name": "ch06"
+    },
+    {
+      "hook": "session消失、CORS、cookie不帶",
+      "title": "session消失、CORS、cookie不帶",
+      "summary": "這章整理了這個專案踩過的所有坑：session為什麼在線上不見了、CORS怎麼設、Supabase cookie在不同domain的行為。一章全看完，下次不用再踩。",
+      "script": "這章整理了這個專案踩過的所有坑：session為什麼在線上不見了、CORS怎麼設、Supabase cookie在不同domain的行為。一章全看完，下次不用再踩。",
+      "source_url": "",
+      "source_name": "ch06"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-26/job_28",
+  "items": [
+    {
+      "hook": "真人劇還是AI漫剧?",
+      "title": "AI漫剧能否取代真人短剧？",
+      "summary": "隨著技術進步,有人認為虛擬角色可能成為未來趨勢。",
+      "script": "你相信有一天，看的都是虛擬角色演的故事嗎？科技改變了太多事情，我們來聊聊這個有可能實現的新潮流吧!",
+      "source_url": "https://news.google.com/rss/articles/CBMiakFVX3lxTE03Z1dtbHlTeS1GMzlGX1RUb3A4V29jYjFZb2VaYWNQWk9ndTJkak9NWVkybkpjRzlrZ0xzYkFUWVJ5OEFfZXRtUFFnTFNvRW9ueGlOMVBBWlNrM040dUgwUWsyUFFlM29zSHc?oc=5",
+      "source_name": "chinanews.com.cn"
+    },
+    {
+      "hook": "全自動科研流程",
+      "title": "AI寫論文獲Nature刊出",
+      "summary": "利用AI自動化整個研究過程，從理論構想到文章發表完全由程式自动生成。",
+      "script": "最近有一篇研究報告竟然使用了AI全程協助，從頭到尾都是自動化的流程，太聰明啦！當然這篇文章也被Nature接受刊登。",
+      "source_url": "https://news.google.com/rss/articles/CBMipwFBVV95cUxQSkVzRGxRS0ZKZDdtbW56VkN3aUdaVUprLVp6TDI1ZkhxVFFLVWxRbm5LV2xXcjhMZ1MyTk1icGZLd1phSFEzVzZNMG16UmxjNl8yTjRyQTlJUnNvb3VpMk5CM0VJX3pQeHV0RWotN2JORHFseUZUQ0RXc2RQYXlJMU84MjJlNjVPcTZZcG1VNFloMzUwWVFWc29oRDRTSjJuUTY3VGYtdw?oc=5",
+      "source_name": "新浪網"
+    },
+    {
+      "hook": "AI會搶走工作嗎？",
+      "title": "黃益平：未來人類與AI並存",
+      "summary": "博鳌亚洲论坛专家讨论，AI發展將改變就業市場，但不會完全取代人類。",
+      "script": "AI正快速發展，可能會影響很多行業的工作。專家認為AI和人會合作共存，而非互相取代。",
+      "source_url": "https://news.google.com/rss/articles/CBMiggFBVV95cUxPSGxYa1dqbGxJRWtwVS0zMk1tTEd0cGN1QjFWeDZ4SXBXOGxqZ0lWTDE3SU5LbkwyR1owcEJIWGltVUc0aDljb3BJX0FmbnpDY1hZeU5VNjQzOUNIdUZxT25PWHp1VmlUV0hTZzFTN0NzZjdpMHZFVTRrSjlmNHo2bGhR?oc=5",
+      "source_name": "新华网"
+    }
+  ]
+}

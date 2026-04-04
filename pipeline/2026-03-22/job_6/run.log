@@ -1,0 +1,12 @@
+
+[FAILED] Claude 回傳無效 JSON：Expecting value: line 1 column 1 (char 0)
+原始內容：Based on the article titles and sources, here is the generated content:
+
+```json
+[
+  {
+    "hook": "你的錢包被盯上了！",
+    "title": "OpenClaw開發者遭釣魚攻擊",
+    "summary": "OpenClaw開發者成為加密錢包釣魚攻擊目標，駭客利用社交工程手法竊取數位資產。",
+    "script": "搞OpenClaw的開發者注意了！最近有駭客專門針對你們發動釣魚攻擊，假裝官方騙你連錢包，一不小心加密資產就全沒了，千萬別亂點連結啊！",
+    "sourc

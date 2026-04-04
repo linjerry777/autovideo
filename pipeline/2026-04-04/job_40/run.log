@@ -1,0 +1,2 @@
+
+[FAILED] HTTPConnectionPool(host='localhost', port=11434): Max retries exceeded with url: /v1/chat/completions (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x000001AFB4320CE0>: Failed to establish a new connection: [WinError 10061] 無法連線，因為目標電腦拒絕連線。'))

@@ -1,0 +1,46 @@
+
+=== screenshot_collector.py ===
+  [1] 截圖：http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69c924d35ee34f9fba570...
+  [1] ✅ 截圖成功 (102KB)
+  [2] 截圖：http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69c924d35ee34f9fba570...
+  [2] ✅ 截圖成功 (291KB)
+  [3] 截圖：http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69c924d35ee34f9fba570...
+  [3] ✅ 截圖成功 (485KB)
+✅ 截圖步驟完成
+
+
+=== audio_generator.py ===
+🎙️  生成 3 則語音（Fish Audio 哈基米）...
+  [1] 馬斯克砸250億蓋Terafab晶圓廠 — 1 句...
+      句1: 馬斯克這次玩超大，直接在德州蓋自己的晶圓廠叫Terafab，...
+      ✅ audio_01.mp3，總時長 11.7s
+  [2] Terafab招人年薪破千萬 — 1 句...
+      句1: 馬斯克的Terafab開始搶人了，年薪最高一千萬台幣，但你要...
+      ✅ audio_02.mp3，總時長 9.2s
+  [3] 馬斯克點名看好Google和輝達 — 1 句...
+      句1: 大家都以為馬斯克會推台積電或特斯拉，結果他直接點名Googl...
+      ✅ audio_03.mp3，總時長 10.1s
+
+✅ 語音已存至 C:\Users\User\Documents\GitHub\AutoVideo\pipeline\2026-03-29\job_32\audio
+
+
+=== video_composer.py ===
+🎬 合成 3 個片段...
+  [1] 馬斯克砸250億蓋Terafab晶圓廠... (hue=0°, timing=精確)
+  [2] Terafab招人年薪破千萬... (hue=130°, timing=精確)
+  [3] 馬斯克點名看好Google和輝達... (hue=220°, timing=精確)
+🔗 合併影片...
+  ℹ️  未找到 BGM（C:\Users\User\Documents\GitHub\AutoVideo\assets\music\bgm.mp3），跳過混音
+
+✅ 影片完成：C:\Users\User\Documents\GitHub\AutoVideo\pipeline\2026-03-29\job_32\output.mp4
+
+
+=== publisher.py ===
+📤 準備上傳：output.mp4
+   平台：youtube, instagram, threads, x, facebook, tiktok
+   標題：馬斯克砸250億蓋Terafab晶圓廠 | Terafab招人年薪破千萬 | 馬斯克點名看好Google和輝達...
+   Profile：yt
+
+✅ 上傳成功！request_id = 96c1d316d4b64a5586d8454d776e8c9a
+   上傳為非同步，約 1~5 分鐘後在各平台生效
+

@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-22/job_7",
+  "items": [
+    {
+      "hook": "AI要變白菜價了？",
+      "title": "OpenClaw掀AI商品化危機",
+      "summary": "OpenClaw迎來ChatGPT時刻，業界擔憂AI模型正快速走向商品化，護城河恐消失。",
+      "script": "你知道嗎？OpenClaw最近引爆了一個大討論——AI模型會不會變成跟水電一樣的日用品？如果技術都差不多，那大廠的優勢在哪？這場商品化危機，可能改寫整個產業格局。",
+      "source_url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxQb0N2a3ZOQmZrT2k3d25lRk5HQ2YyS3FSRUdQbXNrdmFtV09HS0s3bEFsSUY5XzRpOGhOM1N5a1dmTEZYYmM0N0tMZlh4NHVEdmhMV1ZidThGSTNRcGFidlBxUkFET2dQVUFybzRBNUFEbUE2MEtJdnBtM0xqUEhMOHJCUTFzZFRWQUZIMzVDX2RzZjQtbV9INjJObHhNSTJzSkNCRVNQeHVOQdIBrwFBVV95cUxPVmVxeFd5UVIwUXJfQTg3ZjByTjVzZnEweEp5QjdidzhPcUF3VkJZa1dteHlfSmRPMno2MFNQLW1oQlkwanUzOHdwemF2dDRXTlBCbjVWcHhjNXFYZ1hENnVaVC1QUnA2N0lGRVlBckZKOVFEblZlV0E3Y29OMFJsMWlRVUxicEtHaUtfdUd2TERkNGxNaXFMOGdnUmxrdFF5YUt4NlV5VFlpblY2T0tB?oc=5",
+      "source_name": "CNBC"
+    },
+    {
+      "hook": "黃仁勳怎麼看？",
+      "title": "黃仁勳的OpenClaw論點",
+      "summary": "NVIDIA黃仁勳提出對OpenClaw的獨到見解，認為開源AI浪潮反而會推升算力需求。",
+      "script": "老黃又說話了！面對OpenClaw掀起的開源風暴，黃仁勳不但不慌，反而認為這會讓更多人用AI、需要更多GPU。越便宜越多人用，算力需求反而爆炸，這邏輯你服不服？",
+      "source_url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTFBZOGhUWG1tWm1Lb1NPZ09mWi1TbjdHTW9SalBXUHBjbVhnelhIcUhhbW9xWUxzTTY2ZEZoLVhzejBndjBERDR2TlpPWG5jOXZaNHZQUDNqZ0l5Z2JkVDM2U0pDLTVONmc?oc=5",
+      "source_name": "exponentialview.co"
+    },
+    {
+      "hook": "Google急了！",
+      "title": "Google重組瀏覽器AI團隊",
+      "summary": "面對OpenClaw熱潮衝擊，Google緊急調整瀏覽器AI代理團隊的戰略佈局。",
+      "script": "OpenClaw火到什麼程度？連Google都坐不住了！據WIRED報導，Google正在大幅重組瀏覽器AI代理團隊，要加速應對這波開源浪潮。看來科技巨頭們真的感受到壓力了。",
+      "source_url": "https://news.google.com/rss/articles/CBMijwFBVV95cUxQRlFjQ0xTNHN4ZU5VNWh3ZTFqM1VFWWlnWC0yb1ZZa0FFcWVITXJGa0NPTmdfQmoyVkw1Y3hLTHlMYlgxakhwR1hIN0lRLTFDQ1QwWWxnNVZqMldiZUNuQmVQa2dYYkZ0Mm5jQWRsbi1Oc3U3QzZRSGU4NU44aDUxLUhQOTQ1b1ZwVkpDNVRPOA?oc=5",
+      "source_name": "WIRED"
+    }
+  ]
+}

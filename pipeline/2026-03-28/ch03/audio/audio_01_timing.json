@@ -1,0 +1,12 @@
+[
+  {
+    "text": "我用echo把Stripe的secret key傳給vercel env add。",
+    "start": 0.0,
+    "end": 3.578688
+  },
+  {
+    "text": "然後Stripe回傳500，說API key無效。",
+    "start": 3.578688,
+    "end": 6.791688000000001
+  }
+]

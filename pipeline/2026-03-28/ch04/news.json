@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-28/ch04",
+  "items": [
+    {
+      "hook": "Stripe串接，沙盒先測",
+      "title": "Stripe串接，沙盒先測",
+      "summary": "付款功能不能直接上線測。Stripe有沙盒環境，用測試卡4242 4242 4242 4242，打多少都不會真的扣錢。",
+      "script": "付款功能不能直接上線測。Stripe有沙盒環境，用測試卡4242 4242 4242 4242，打多少都不會真的扣錢。",
+      "source_url": "",
+      "source_name": "ch04"
+    },
+    {
+      "hook": "webhook是最容易漏的一塊",
+      "title": "webhook是最容易漏的一塊",
+      "summary": "Stripe付款成功，但你的資料庫沒更新。原因是webhook沒設好。這章完整講webhook endpoint的建立、驗證、purchases資料表的寫入。",
+      "script": "Stripe付款成功，但你的資料庫沒更新。原因是webhook沒設好。這章完整講webhook endpoint的建立、驗證、purchases資料表的寫入。",
+      "source_url": "",
+      "source_name": "ch04"
+    },
+    {
+      "hook": "測試卡付一次，全流程跑通",
+      "title": "測試卡付一次，全流程跑通",
+      "summary": "付款完成跳success頁、webhook打進來、purchases表寫入、再次點購課自動跳dashboard。這章帶你把整個收款流程驗收完畢。",
+      "script": "付款完成跳success頁、webhook打進來、purchases表寫入、再次點購課自動跳dashboard。這章帶你把整個收款流程驗收完畢。",
+      "source_url": "",
+      "source_name": "ch04"
+    }
+  ]
+}

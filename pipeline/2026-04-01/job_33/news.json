@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-01/job_33",
+  "items": [
+    {
+      "hook": "兩人三天，四千萬播放！",
+      "title": "AI短片《紙手機》爆紅全網",
+      "summary": "清明節一部AI短片只花三天製作，兩人團隊就衝出四千萬播放量，網友大讚最沒人味的AI拍出最有人味的故事。",
+      "script": "你敢信嗎？兩個人花三天用AI做了一部短片，結果直接爆了四千萬播放！這部叫《紙手機》的清明短片，用的是國產可靈AI，網友說這是最沒人味的技術做出最有人味的故事，AI短劇時代真的來了。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69cd0a1b21b54dc4bf02e7a5a3ba94d9&url=https%3a%2f%2fwww.msn.cn%2fzh-cn%2fentertainment%2f%25E9%2580%259A%25E7%2594%25A8%2fai%25E6%25B8%2585%25E6%2598%258E%25E7%259F%25AD%25E7%2589%2587-%25E7%25BA%25B8%25E6%2589%258B%25E6%259C%25BA-%25E7%2588%2586%25E7%2581%25AB-ai%25E7%259F%25AD%25E5%2589%25A7%25E5%25B4%259B%25E8%25B5%25B7%25E8%2583%25BD%25E5%2590%25A6%25E6%2594%25B9%25E5%2586%2599%25E5%25B8%2582%25E5%259C%25BA%25E6%25A0%25BC%25E5%25B1%2580%2far-AA1ZTsQo&c=12525198151225751581&mkt=zh-tw",
+      "source_name": "MSN"
+    },
+    {
+      "hook": "凌晨一封信，三萬人失業",
+      "title": "甲骨文裁員三萬人為AI燒錢",
+      "summary": "甲骨文凌晨發裁員信，砍掉三萬員工佔總數18%，只為省下百億美元投資AI數據中心。",
+      "script": "甲骨文凌晨偷偷發了裁員通知，一口氣砍掉三萬人，佔全公司快兩成！為什麼？因為要擠出一千億蓋AI數據中心。最諷刺的是，89%的公司說因為AI裁員，但只有2%確認AI真的能接手工作，這波操作到底值不值？",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69cd0a1b21b54dc4bf02e7a5a3ba94d9&url=https%3a%2f%2fnews.qq.com%2frain%2fa%2f20260401A039ZQ00%3fadChannelId%3dtech&c=4016745853023083403&mkt=zh-tw",
+      "source_name": "騰訊新聞"
+    },
+    {
+      "hook": "一天講140兆個字！",
+      "title": "AI日產140萬億Token的背後",
+      "summary": "中國AI每天Token調用量突破140萬億，兩年暴漲千倍，超級Token工廠正在成形。",
+      "script": "你知道現在AI一天要講多少話嗎？140萬億個Token！比兩年前暴漲超過一千倍，中國的調用量甚至連續超越美國。這背後需要多大的算力工廠來撐？AI已經從實驗品變成真正的生產力了。",
+      "source_url": "https://news.google.com/rss/articles/CBMiYEFVX3lxTE43czhWaGpxejJ1UFNSNGt0ZEoySHdHVVFFS0JoQXd6TmRFaVpkcjJ2VVc4OHh3Y2VrXzRMN1VrOGhrdmxSYjdGVG5KZGJQQlp5ZjdnWFd0RG1qTmNmbzE1cg?oc=5",
+      "source_name": "澎湃新聞"
+    }
+  ]
+}

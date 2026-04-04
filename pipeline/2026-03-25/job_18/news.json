@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-25/job_18",
+  "items": [
+    {
+      "hook": "AI正在製造新階級！",
+      "title": "AI素養成美國新階級戰爭",
+      "summary": "美國下一場階級戰不是貧富差距，而是你會不會用AI，懂AI的人正在拉開差距。",
+      "script": "你以為AI只是搶工作？錯了！真正的危機是——會用AI的人跟不會用的人，差距正在爆炸性擴大。Anthropic數據顯示，AI高手跟菜鳥之間的鴻溝，才是未來最大的階級分裂。",
+      "source_url": "https://news.google.com/rss/articles/CBMiZ0FVX3lxTE0xZ21DRFBNZDlFb0pWRXNTRHYzamdiTTk1MGdadTZOZmZuRklVTzc5UlU0bnZEN0R1bWRxc0NTSkVxUVFqdUdoRkROOUIyLXlnUUJOak1hblFQZXMteDEtWGhQSGMwVUk?oc=5",
+      "source_name": "Axios"
+    },
+    {
+      "hook": "Google讓你用講的寫程式！",
+      "title": "Google推出全端氛圍編程",
+      "summary": "Google AI Studio整合Antigravity引擎，打字描述需求就能自動生成完整全端應用程式。",
+      "script": "Google放大招了！AI Studio現在可以直接用講的生成整個App，前端後端資料庫一次搞定。背後靠的是Antigravity引擎，還能自動接Firebase，連不會寫程式的人都能做出完整應用。",
+      "source_url": "https://news.google.com/rss/articles/CBMiqgFBVV95cUxOWEdxS1B2dVFEY3hOMnNud21TT3BlcnlOOXlDcEZxRlBOV29UOHhILTRjaUF5czJlMzVqMGllNmlBak14eGZxR3RDZ2xIZHdiNXFpcTBZU2piSHBva01xUEJtVkZfdGo4cFlEaThCM2tWa2RyZWt4MWFhV2ZjOVRpYWhxOFNWQUF4OUd2cEVJdmxZQ3F4U2ljWGJ2U3VNbUdzdnNwZkVZZ05LZw?oc=5",
+      "source_name": "blog.google"
+    },
+    {
+      "hook": "AI直接操控你的電腦！",
+      "title": "Claude能幫你操作電腦了",
+      "summary": "Anthropic發表新功能，Claude可以直接開啟應用程式、操作瀏覽器、填寫表格，幫你完成工作。",
+      "script": "Anthropic搞了個超狂功能！你只要用手機跟Claude說一聲，它就會自己打開你電腦上的App、操作瀏覽器、填表格，幫你把事情做完。開會快遲到？叫Claude幫你匯出簡報附到會議邀請裡，它真的會做到。",
+      "source_url": "https://news.google.com/rss/articles/CBMikgFBVV95cUxOUjI0ZnpMRjJlSTc1ampPUW5kRlJ2dktsMGhVMmFtYmlpSEd5RjZzRkxxdG9fYnIxZVZSVlZXQlBzOF9VRXdkVmJrcHQ3ajFEV1pIMUxNQzRTQmRzR3NVQ3FFcDJxa29tUU8tS21BTTIwZnl6WC1CYzhLdFZoMzBsV1hOeDN2aEFKV3ppZ2ZPTTBhQdIBlwFBVV95cUxQSWNYT1JYME5aQ0JuejlBY3Jab01NS1V2Z0pIOFZIZlBDWjZnc183SmdpaXMyNk01STBmbzIxM0ZOZktRRkNTdHhKcHZJNTNoeFZjTWNVcVZRN1hTVGRKRmN3ZDY3R3ZyUEZ5UmpWQmY5WmhTazZOQVI0MHA3SGNqbTFaNmI3cDRkRUQ1a092RGZfaVFZcndV?oc=5",
+      "source_name": "CNBC"
+    }
+  ]
+}

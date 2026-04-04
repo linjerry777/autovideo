@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-04/job_42",
+  "items": [
+    {
+      "hook": "AI員工正在搶灘！",
+      "title": "2026年12家AI代理新創崛起",
+      "summary": "今年最值得關注的Agentic AI新創出爐，多數聚焦資安與自動化，搶攻企業AI代理商機。",
+      "script": "你知道嗎？AI不只會聊天了，現在它還能自己做決策、自己行動。今年有12家新創專門做AI代理的安全跟管理，從身份驗證到漏洞偵測全包，這個賽道真的要爆發了。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d08f7a730b4083b6770fed205ddfbc&url=https%3a%2f%2fwww.crn.com%2fnews%2fsecurity%2f2026%2f12-agentic-ai-startups-to-watch-in-2026&c=1442939166088341460&mkt=zh-tw",
+      "source_name": "Bing · "
+    },
+    {
+      "hook": "微軟正面硬剛OpenAI",
+      "title": "微軟發布三款自研AI模型",
+      "summary": "微軟推出語音轉錄、語音辨識和圖像生成三款自家AI模型，直接在Azure Foundry上架，和合作夥伴OpenAI正面競爭。",
+      "script": "微軟一口氣丟出三個自研AI模型，搞語音轉錄、語音辨識跟圖片生成，全部放上Azure Foundry平台。重點是，這不就是在跟自家好夥伴OpenAI搶生意嗎？合作關係越來越微妙了。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d08f7a730b4083b6770fed205ddfbc&url=https%3a%2f%2fwww.businessinsider.com%2fmicrosoft-ai-models-azure-mai-transcribe-voice-image-foundry-openai-2026-4&c=13604572123740056850&mkt=zh-tw",
+      "source_name": "Business Insider"
+    },
+    {
+      "hook": "中國AI代理炸翻全場",
+      "title": "Manus爆紅但問題不少",
+      "summary": "中國通用AI代理Manus引爆討論，操作直覺強、潛力大，但實測中出現系統崩潰和伺服器過載的狀況。",
+      "script": "最近AI圈都在聊Manus，這個來自中國的通用AI代理。實測下來呢，操作真的很直覺，潛力也很大，但老實說還是會當機、伺服器也會爆掉。不過以現階段來說，已經很有看頭了。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d08f7a730b4083b6770fed205ddfbc&url=https%3a%2f%2fwww.technologyreview.com%2f2025%2f03%2f11%2f1113133%2fmanus-ai-review%2f&c=15592873988966501390&mkt=zh-tw",
+      "source_name": "MIT Technology Review"
+    }
+  ]
+}

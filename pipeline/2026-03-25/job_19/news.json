@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-25/job_19",
+  "items": [
+    {
+      "hook": "你的病歷正在被AI偷看",
+      "title": "AI聊天機器人盯上你的健康資料",
+      "summary": "越來越多人把病歷丟給ChatGPT分析，但這些資料不受隱私法保護，可能被拿去訓練AI或投放廣告。",
+      "script": "現在超多人把自己的病歷上傳給AI聊天機器人，想讓它幫忙看報告。但你知道嗎？這些科技公司根本不受醫療隱私法規範，你的資料可能被拿去訓練模型，甚至被駭客盯上。",
+      "source_url": "https://www.axios.com/2026/03/24/ai-use-inequality-class",
+      "source_name": "The New York Times"
+    },
+    {
+      "hook": "美國政府要全民學AI了",
+      "title": "美勞工部推AI就業準備計畫",
+      "summary": "美國勞工部啟動「讓美國為AI做好準備」計畫，用聯邦資金幫勞工培訓AI技能，應對職場變革。",
+      "script": "美國勞工部剛宣布一個大計畫，要用聯邦經費幫全國勞工學AI。從AI素養培訓到技能升級，目標就是讓美國工人不會被AI淘汰，反而能靠AI找到更好的工作。",
+      "source_url": "https://news.google.com/rss/articles/CBMiZkFVX3lxTE5pOWNJM1UzRlozTXNZVXg3SlZqd0VLbVV5RUhOOEttbmdZY0VCNTVsWUlpNUNjV1ZDM2pPVW5LQ0FPTC1SNm1LQTktcUVLVVRUTHFMV1ZoVUJ5S2ZlUXFzbmhCZDZfQQ?oc=5",
+      "source_name": "U.S. Department of Labor"
+    },
+    {
+      "hook": "AI投資正在分裂成兩派",
+      "title": "AI投資分兩路，你選對邊了嗎",
+      "summary": "AI市場正分成「訓練派」和「推論派」，推論市場成長更快，Broadcom等晶片商可能比Nvidia更值得關注。",
+      "script": "AI投資圈現在分成兩大陣營：一邊是訓練模型的，像Nvidia；另一邊是負責推論運算的，像Broadcom。專家說推論市場成長更猛，選對邊的人2026年可能賺更多。",
+      "source_url": "https://news.google.com/rss/articles/CBMilwFBVV95cUxQbWFrTDJ3Sm40MXZkWVJ0bkpBYXdVMVI2QmtXVlpPZWNaNUhiYjFURmVKMVFrNXhMRVNRMWVpRUNNUVlqZkt0RDJVakU5dll6ci1zQWhiMW5DN0w3di01TExNaGVYZmJuaHg1TmNnZjRJRndBeHU4Q2VKa29OSkgzWDZCV2hOVFkwSjdrN0lsUWhHR3pwQW9B?oc=5",
+      "source_name": "The Motley Fool"
+    }
+  ]
+}

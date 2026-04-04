@@ -1,0 +1,29 @@
+{
+  "date": "2026-03-28/job_course_promo",
+  "items": [
+    {
+      "hook": "花NT$2,940學AI？",
+      "title": "你買過這種課嗎",
+      "summary": "市面上的AI課程教你Todo List、給你指令大全，學完還是做不出東西。每堂三千起跳，買了一堂還要再買下一堂。",
+      "script": "你有沒有買過那種AI課程，花了快三千塊，看完了全是工具介紹，然後示範永遠是Todo List？我有。然後我決定做一件事。",
+      "source_url": "",
+      "source_name": "ai_lesson"
+    },
+    {
+      "hook": "一個下午做了這個",
+      "title": "Claude Code 實戰：完整課程平台",
+      "summary": "用Claude Code從零建立課程銷售平台：Next.js + Supabase Google登入 + Stripe付款 + Vercel部署，全程記錄包含所有踩坑過程。",
+      "script": "我用Claude Code，一個下午，建了一個完整的課程銷售平台。Google登入、Stripe收款、Vercel部署，全端搞定。然後把這整個過程，做成了課程。",
+      "source_url": "",
+      "source_name": "ai_lesson"
+    },
+    {
+      "hook": "課程內容就是這個網站",
+      "title": "比別人便宜一成，還更實在",
+      "summary": "七章節完整記錄建站過程，包含環境變數地獄、OAuth踩坑、Stripe除錯全紀錄。一次買斷NT$2,640，比市面上同類課程便宜10%。",
+      "script": "這堂課的內容，就是你現在看到的這個網站是怎麼做出來的。七章，從Landing Page到付款到部署，連debug的過程都在裡面。比市面上便宜一成。因為我不需要分三堂課割你。",
+      "source_url": "",
+      "source_name": "ai_lesson"
+    }
+  ]
+}
