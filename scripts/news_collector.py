@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 """
 News Collector (Windows版)
-流程：RSS抓新聞 → Claude整理3則 → Playwright截圖 → 存news.json
+流程：RSS抓新聞 → Groq LLM整理3則 → Playwright截圖 → 存news.json
 """
-import io, json, os, re, subprocess, sys, time
+import io, json, os, re, sys, time
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 from datetime import date
 from pathlib import Path
 import feedparser
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 import argparse as _ap
 _parser = _ap.ArgumentParser()
@@ -24,9 +28,11 @@ PIPE_DIR  = BASE_DIR / "pipeline" / _job_key
 SHOTS_DIR = PIPE_DIR / "screenshots"
 NEWS_FILE = PIPE_DIR / "news.json"
 
-CLAUDE_EXE = str(Path.home() / ".local" / "bin" / "claude.exe")
-
 DEFAULT_KEYWORD = "AI artificial intelligence technology"
+
+# ── Groq 客戶端 ──────────────────────────────────────────────────────
+_groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
+GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 
 def _google_news_url(keyword: str, days: int = 3) -> str:
@@ -36,40 +42,15 @@ def _google_news_url(keyword: str, days: int = 3) -> str:
 
 # ── 工具 ────────────────────────────────────────────────────────────
 
-def find_claude() -> str:
-    import shutil
-    if shutil.which("claude"):
-        return "claude"
-    candidates = [
-        Path.home() / ".local" / "bin" / "claude.exe",
-        Path(r"C:\Users\User\AppData\Local\Programs\claude\claude.exe"),
-    ]
-    for c in candidates:
-        if c.exists():
-            return str(c)
-    raise RuntimeError("找不到 claude.exe，請確認 Claude Code 已安裝")
-
-
-def call_claude(prompt: str) -> str:
-    """用 claude --print 呼叫，避免 nested session 問題"""
-    exe = find_claude()
-    env = os.environ.copy()
-    env.pop("CLAUDECODE", None)          # 解除 nested session 限制
-    env["PYTHONIOENCODING"] = "utf-8"
-
-    result = subprocess.run(
-        [exe, "--print"],
-        input=prompt,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-        timeout=120,
+def call_groq(prompt: str) -> str:
+    """呼叫 Groq API，回傳純文字"""
+    resp = _groq_client.chat.completions.create(
+        model=GROQ_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=2048,
     )
-    if result.returncode != 0:
-        raise RuntimeError(f"Claude 錯誤：{result.stderr[:500]}")
-    return result.stdout.strip()
+    return resp.choices[0].message.content.strip()
 
 
 def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dict]:
@@ -124,8 +105,8 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
 
 請直接回傳只有 3 則的 JSON 陣列，不要加任何其他文字或 markdown。"""
 
-    print("  呼叫 Claude 整理新聞...")
-    raw = call_claude(prompt)
+    print(f"  呼叫 Groq ({GROQ_MODEL}) 整理新聞...")
+    raw = call_groq(prompt)
 
     # 清除可能的 markdown 包裹
     raw = re.sub(r"^```[a-z]*\n?", "", raw.strip())
@@ -164,7 +145,7 @@ def main():
         print("❌ RSS 抓取全部失敗", file=sys.stderr)
         sys.exit(1)
 
-    print("🤖 Claude 整理 3 則精選新聞...")
+    print("🤖 Groq 整理 3 則精選新聞...")
     news_items = select_news_with_claude(raw_items)
 
     print("📸 Playwright 截圖新聞來源頁面...")
