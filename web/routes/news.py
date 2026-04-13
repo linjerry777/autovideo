@@ -2,8 +2,11 @@
 web/routes/news.py — 多來源新聞/內容聚合 + 快取
 """
 import logging
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import quote_plus
 
 from fastapi import APIRouter, HTTPException, Query
@@ -22,18 +25,33 @@ LANG_CONFIG = {
     "en":    {"hl": "en-US", "gl": "US",  "ceid": "US:en"},
 }
 
+_LAST30DAYS_SCRIPT = (
+    Path.home() / ".claude/plugins/cache/last30days-skill/last30days/3.0.0/scripts/last30days.py"
+)
+_SOCIAL_LABELS = {
+    "reddit":     "Reddit",
+    "hackernews": "Hacker News",
+    "youtube":    "YouTube",
+    "tiktok":     "TikTok",
+    "instagram":  "Instagram",
+    "x":          "X / Twitter",
+    "bluesky":    "Bluesky",
+    "threads":    "Threads",
+}
+
 # 所有支援的來源定義
 ALL_SOURCES = {
-    "google":    {"label": "Google News",  "icon": "🔍", "default": True},
-    "bing":      {"label": "Bing News",    "icon": "🔎", "default": True},
-    "bilibili":  {"label": "Bilibili 熱榜","icon": "📺", "default": True},
-    "zhihu":     {"label": "知乎熱搜",     "icon": "💬", "default": True},
-    "hackernews":{"label": "Hacker News",  "icon": "🦊", "default": False},
-    "v2ex":      {"label": "V2EX",         "icon": "💻", "default": False},
-    "36kr":      {"label": "36氪",         "icon": "📰", "default": False},
-    "sspai":     {"label": "少數派",       "icon": "✏️", "default": False},
-    "ithome":    {"label": "IT之家",       "icon": "🏠", "default": False},
-    "huxiu":     {"label": "虎嗅",         "icon": "🐯", "default": False},
+    "google":     {"label": "Google News",       "icon": "🔍", "default": True},
+    "bing":       {"label": "Bing News",         "icon": "🔎", "default": True},
+    "bilibili":   {"label": "Bilibili 熱榜",     "icon": "📺", "default": True},
+    "zhihu":      {"label": "知乎熱搜",           "icon": "💬", "default": True},
+    "hackernews": {"label": "Hacker News",       "icon": "🦊", "default": False},
+    "last30days": {"label": "Social (Reddit·HN)", "icon": "🌐", "default": False},
+    "v2ex":       {"label": "V2EX",              "icon": "💻", "default": False},
+    "36kr":       {"label": "36氪",              "icon": "📰", "default": False},
+    "sspai":      {"label": "少數派",            "icon": "✏️", "default": False},
+    "ithome":     {"label": "IT之家",            "icon": "🏠", "default": False},
+    "huxiu":      {"label": "虎嗅",              "icon": "🐯", "default": False},
 }
 
 DEFAULT_SOURCES = [k for k, v in ALL_SOURCES.items() if v["default"]]
@@ -189,6 +207,46 @@ def _fetch_hackernews(keyword: str = None, limit: int = 20) -> list[dict]:
         return []
 
 
+def _fetch_last30days(keyword: str, limit: int = 20) -> list[dict]:
+    if not _LAST30DAYS_SCRIPT.exists():
+        log.warning("last30days: script not found, skipping")
+        return []
+    try:
+        import json as _json
+        result = subprocess.run(
+            [sys.executable, str(_LAST30DAYS_SCRIPT), keyword,
+             "--emit", "json", "--quick", "--search", "reddit,hackernews"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, encoding="utf-8", timeout=25,
+        )
+        if result.returncode != 0:
+            log.warning("last30days: non-zero exit")
+            return []
+        data = _json.loads(result.stdout)
+        items = []
+        for c in data.get("ranked_candidates", [])[:limit]:
+            src = c.get("source", "")
+            url = c.get("url", "") or next(iter(c.get("candidate_ids", [])), "")
+            title = c.get("title", "")
+            if not title or not url:
+                continue
+            items.append({
+                "title":       title,
+                "summary":     c.get("snippet", "")[:300],
+                "url":         url,
+                "source":      _SOCIAL_LABELS.get(src, src.capitalize()),
+                "source_type": src,
+            })
+        log.info(f"last30days: {len(items)} items for '{keyword}'")
+        return items
+    except subprocess.TimeoutExpired:
+        log.warning("last30days: timeout")
+        return []
+    except Exception as e:
+        log.warning(f"last30days: {e}")
+        return []
+
+
 def _fetch_rss_source(source_id: str, rss_url: str, keyword: str = None, limit: int = 15) -> list[dict]:
     import feedparser
     try:
@@ -243,6 +301,7 @@ def _fetch_all(keyword: str, lang: str, sources: list[str], limit_per: int = 20)
     add("bilibili",   lambda: _fetch_bilibili(keyword, limit_per))
     add("zhihu",      lambda: _fetch_zhihu(keyword, limit_per))
     add("hackernews", lambda: _fetch_hackernews(keyword, limit_per))
+    add("last30days", lambda: _fetch_last30days(keyword, limit_per))
     for sid, rss_url in CURATED_RSS.items():
         add(sid, lambda u=rss_url, s=sid: _fetch_rss_source(s, u, keyword, limit_per))
 

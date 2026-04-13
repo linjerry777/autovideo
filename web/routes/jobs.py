@@ -155,16 +155,35 @@ def job_screenshots(job_id: int):
         except Exception:
             pass
 
+    broll_dir = pipe_dir / "broll"
     result = []
     for i in range(1, count + 1):
-        fname  = f"news_{i:02d}.png"
-        exists = (shots_dir / fname).exists()
-        result.append({
-            "index":    i,
-            "filename": fname,
-            "url":      f"/api/media/jobs/{job_id}/screenshots/{fname}" if exists else None,
-            "exists":   exists,
-        })
+        png   = f"news_{i:02d}.png"
+        mp4   = f"broll_{i:02d}.mp4"
+        if (broll_dir / mp4).exists():
+            result.append({
+                "index":    i,
+                "filename": mp4,
+                "url":      f"/api/media/jobs/{job_id}/broll/{mp4}",
+                "exists":   True,
+                "type":     "broll",
+            })
+        elif (shots_dir / png).exists():
+            result.append({
+                "index":    i,
+                "filename": png,
+                "url":      f"/api/media/jobs/{job_id}/screenshots/{png}",
+                "exists":   True,
+                "type":     "screenshot",
+            })
+        else:
+            result.append({
+                "index":    i,
+                "filename": png,
+                "url":      None,
+                "exists":   False,
+                "type":     "screenshot",
+            })
     return result
 
 

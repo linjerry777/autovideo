@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-12/job_47",
+  "items": [
+    {
+      "hook": "AI反過來保護你了？",
+      "title": "Anthropic推最強防禦模型Mythos",
+      "summary": "Anthropic發布Mythos模型專打AI駭客攻擊，Google、NVIDIA等大廠搶先測試",
+      "script": "欸你知道嗎，現在駭客也開始用AI攻擊了，超可怕。Anthropic直接推出一個叫Mythos的防禦模型來反制，Google、微軟、蘋果全都搶著要用，這根本是AI界的軍備競賽啊！",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69dbbbb738664e19bc52ebdeac067984&url=https%3a%2f%2fwww.techbang.com%2fposts%2f128772-anthropic-mythos-ai-defense&c=8683859250844580162&mkt=zh-tw",
+      "source_name": "T客邦"
+    },
+    {
+      "hook": "AI報告全是假的？",
+      "title": "台大生用ChatGPT做報告慘翻車",
+      "summary": "台大生用ChatGPT查併購案資料，結果整份都是AI瞎掰的，差點交出去",
+      "script": "有個台大生用ChatGPT做報告，AI秒生一堆併購案資料，他還覺得超好用。結果組員一查，全部都是編的！所以說啊，AI強項是整理跟寫作，不是幫你查資料，千萬要自己驗證！",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69dbbbb738664e19bc52ebdeac067984&url=https%3a%2f%2fwww.mirrormedia.mg%2fstory%2f20260412edi018&c=4127596578171466631&mkt=zh-tw",
+      "source_name": "鏡週刊"
+    },
+    {
+      "hook": "伊朗要炸AI資料中心？",
+      "title": "伊朗威脅摧毀OpenAI數據中心",
+      "summary": "伊朗揚言要徹底摧毀OpenAI在阿布達比價值300億美元的Stargate資料中心",
+      "script": "這個猛，伊朗直接放話要把OpenAI蓋在阿布達比的Stargate資料中心炸掉，那可是三百億美金的超級AI基地欸！地緣政治跟AI發展現在整個綁在一起了，這劇情比電影還扯。",
+      "source_url": "https://www.reddit.com/r/technology/comments/1sdjh66/iran_threatens_complete_and_utter_annihilation_of/",
+      "source_name": "Reddit"
+    }
+  ]
+}

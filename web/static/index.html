@@ -1,0 +1,1379 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="h-full">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoVideo — AI 短影音自動化</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  [x-cloak] { display: none !important; }
+  body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+  textarea { resize: vertical; }
+
+  .glass {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .glow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(22,163,74,0.3); border-radius:4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(22,163,74,0.5); }
+
+  @keyframes ping { 75%,100% { transform:scale(2); opacity:0; } }
+  .animate-ping { animation: ping 1s cubic-bezier(0,0,0.2,1) infinite; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.5; } }
+  .animate-pulse { animation: pulse 2s cubic-bezier(0.4,0,0.6,1) infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .animate-spin { animation: spin 1s linear infinite; }
+</style>
+</head>
+<body class="bg-[#f9fafb] text-gray-900 h-full">
+
+<div x-data="app()" x-init="init()" x-cloak class="flex h-screen overflow-hidden">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+  <aside class="w-[220px] shrink-0 flex flex-col bg-white border-r border-gray-200 h-screen">
+
+    <!-- Logo -->
+    <div class="px-5 pt-6 pb-5">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-green-600 flex items-center justify-center flex-shrink-0">
+          <svg viewBox="0 0 24 24" fill="white" class="w-4 h-4"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <div>
+          <p class="font-semibold text-sm text-gray-900 tracking-tight">AutoVideo</p>
+          <p class="text-[10px] text-gray-400 leading-tight">AI 短影音平台</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="mx-4 h-px bg-gray-100"></div>
+
+    <!-- Nav -->
+    <nav class="flex-1 px-3 py-4 space-y-0.5">
+      <button @click="page='dashboard'; loadDashboard()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='dashboard' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='dashboard'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <!-- LayoutDashboard -->
+        <svg class="w-[15px] h-[15px] flex-shrink-0 transition-colors" :class="page==='dashboard' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="font-medium" :class="page==='dashboard' ? 'text-green-700' : ''">控制台</span>
+      </button>
+
+      <button @click="startNewVideo()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='new' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='new'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <!-- Clapperboard / play -->
+        <svg class="w-[15px] h-[15px] flex-shrink-0 transition-colors" :class="page==='new'||page==='job' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        <span class="font-medium" :class="page==='new'||page==='job' ? 'text-green-700' : ''">生成影片</span>
+      </button>
+
+      <button @click="page='settings'; loadSettings()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='settings' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='settings'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <!-- Settings -->
+        <svg class="w-[15px] h-[15px] flex-shrink-0 transition-colors" :class="page==='settings' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="font-medium" :class="page==='settings' ? 'text-green-700' : ''">設定</span>
+      </button>
+    </nav>
+
+    <div class="mx-4 h-px bg-gray-100"></div>
+
+    <!-- Footer status -->
+    <div class="px-5 py-4">
+      <div class="flex items-center gap-2.5">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span class="text-[11px] text-gray-400 font-medium">系統運行中</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────────────── -->
+  <main class="flex-1 overflow-y-auto bg-[#f9fafb]">
+
+    <!-- ── Dashboard ─────────────────────────────────────────────────── -->
+    <div x-show="page==='dashboard'" class="p-8 max-w-6xl mx-auto space-y-8">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-gray-900">控制台</h1>
+          <p class="text-sm text-gray-500 mt-1">管理 AI 短影音生成流程</p>
+        </div>
+        <button @click="startNewVideo()"
+          class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all duration-150 glow-sm">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M8 5v14l11-7z"/></svg>
+          生成新影片
+        </button>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Total -->
+        <div class="glass rounded-2xl p-5 hover:border-gray-300 transition-all duration-200">
+          <div class="flex items-start justify-between mb-4">
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">總影片數</p>
+            <div class="w-8 h-8 rounded-xl bg-green-500/[0.08] flex items-center justify-center flex-shrink-0">
+              <svg class="w-[15px] h-[15px] text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"/></svg>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 tabular-nums" x-text="stats.total ?? '—'"></p>
+          <p class="text-xs text-gray-400 mt-1.5">累計生成</p>
+        </div>
+        <!-- Success rate -->
+        <div class="glass rounded-2xl p-5 hover:border-gray-300 transition-all duration-200">
+          <div class="flex items-start justify-between mb-4">
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">成功率</p>
+            <div class="w-8 h-8 rounded-xl bg-emerald-500/[0.08] flex items-center justify-center flex-shrink-0">
+              <svg class="w-[15px] h-[15px] text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 tabular-nums" x-text="stats.total ? Math.round((stats.done / stats.total) * 100) + '%' : '—'"></p>
+          <p class="text-xs text-gray-400 mt-1.5">任務完成率</p>
+        </div>
+        <!-- Done -->
+        <div class="glass rounded-2xl p-5 hover:border-gray-300 transition-all duration-200">
+          <div class="flex items-start justify-between mb-4">
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">成功完成</p>
+            <div class="w-8 h-8 rounded-xl bg-sky-500/[0.08] flex items-center justify-center flex-shrink-0">
+              <svg class="w-[15px] h-[15px] text-sky-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 tabular-nums" x-text="stats.done ?? '—'"></p>
+          <p class="text-xs text-gray-400 mt-1.5">成功產出</p>
+        </div>
+        <!-- Running -->
+        <div class="glass rounded-2xl p-5 hover:border-gray-300 transition-all duration-200">
+          <div class="flex items-start justify-between mb-4">
+            <p class="text-xs font-medium text-gray-400 uppercase tracking-wide">執行中</p>
+            <div class="w-8 h-8 rounded-xl bg-amber-500/[0.08] flex items-center justify-center flex-shrink-0">
+              <svg class="w-[15px] h-[15px] text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
+          <p class="text-3xl font-bold text-gray-900 tabular-nums" x-text="stats.running ?? '—'"></p>
+          <p class="text-xs text-gray-400 mt-1.5">任務進行中</p>
+        </div>
+      </div>
+
+      <!-- Running job banner -->
+      <template x-if="jobs.find(j => j.status === 'running')">
+        <div x-data="{ activeJob: jobs.find(j => j.status === 'running') }" class="glass rounded-2xl p-5 border-green-500/20">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <div class="relative w-4 h-4 flex-shrink-0">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-50"></span>
+                <span class="relative inline-flex rounded-full h-4 w-4 bg-green-500 items-center justify-center">
+                  <span class="w-1.5 h-1.5 bg-white rounded-full"></span>
+                </span>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-900">
+                  任務進行中
+                  <span x-show="activeJob.topic" class="text-gray-500 font-normal ml-2" x-text="'— ' + activeJob.topic"></span>
+                </p>
+                <p class="text-xs text-gray-400 mt-0.5" x-text="activeJob.date"></p>
+              </div>
+            </div>
+            <button @click="openJob(activeJob.id)"
+              class="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 transition-colors font-medium">
+              詳情 →
+            </button>
+          </div>
+          <!-- Step bars -->
+          <div class="flex gap-2">
+            <template x-for="[key, label] in [['news','抓新聞'],['screenshot','截圖'],['audio','語音'],['video','影片'],['upload','上傳']]" :key="key">
+              <div class="flex-1">
+                <div class="h-1.5 w-full rounded-full mb-1.5 transition-all duration-500 overflow-hidden"
+                  :class="{
+                    'bg-emerald-500': activeJob['step_'+key]==='done',
+                    'bg-green-500':   activeJob['step_'+key]==='running',
+                    'bg-red-500':     activeJob['step_'+key]==='failed',
+                    'bg-gray-100':    !['done','running','failed'].includes(activeJob['step_'+key])
+                  }">
+                  <div x-show="activeJob['step_'+key]==='running'" class="h-full w-1/2 bg-green-300/50 rounded-full animate-pulse"></div>
+                </div>
+                <p class="text-[10px] font-medium"
+                  :class="{
+                    'text-emerald-600': activeJob['step_'+key]==='done',
+                    'text-green-600':   activeJob['step_'+key]==='running',
+                    'text-red-500':     activeJob['step_'+key]==='failed',
+                    'text-gray-300':    !['done','running','failed'].includes(activeJob['step_'+key])
+                  }" x-text="label"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Recent jobs table -->
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">最近記錄</h2>
+          <button @click="loadDashboard()" class="text-xs text-green-600 hover:text-green-700 transition-colors font-medium">重新整理</button>
+        </div>
+        <div class="glass rounded-2xl overflow-hidden">
+          <div x-show="jobs.length === 0" class="py-16 text-center">
+            <p class="text-gray-400 text-sm">尚無記錄</p>
+            <p class="text-gray-300 text-xs mt-1">開始生成第一支影片吧</p>
+          </div>
+          <table x-show="jobs.length > 0" class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-200">
+                <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">#</th>
+                <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">日期</th>
+                <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">主題</th>
+                <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">狀態</th>
+                <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">步驟</th>
+                <th class="px-5 py-3.5"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              <template x-for="j in jobs" :key="j.id">
+                <tr @click="openJob(j.id)" class="hover:bg-gray-50 transition-colors cursor-pointer group">
+                  <td class="px-5 py-3.5 text-xs text-gray-400 font-mono" x-text="'#'+j.id"></td>
+                  <td class="px-5 py-3.5 text-sm text-gray-600 font-mono tabular-nums" x-text="j.date"></td>
+                  <td class="px-5 py-3.5">
+                    <span class="text-sm text-gray-500 truncate max-w-[160px] block" x-text="j.topic || 'AI 科技快訊'"></span>
+                  </td>
+                  <td class="px-5 py-3.5">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                      :class="{
+                        'bg-emerald-500/10 text-emerald-600 border-emerald-500/20 ring-1 ring-emerald-500/10': j.status==='done',
+                        'bg-green-500/10 text-green-700 border-green-500/20 ring-1 ring-green-500/10':     j.status==='running',
+                        'bg-red-500/10 text-red-600 border-red-500/20 ring-1 ring-red-500/10':             j.status==='failed',
+                        'bg-amber-500/10 text-amber-600 border-amber-500/20 ring-1 ring-amber-500/10':     ['queued','news_ready'].includes(j.status),
+                        'bg-zinc-500/10 text-zinc-500 border-zinc-500/20 ring-1 ring-zinc-500/10':         j.status==='cancelled',
+                        'bg-gray-50 text-gray-400 border-gray-200': !['done','running','failed','queued','news_ready','cancelled'].includes(j.status)
+                      }">
+                      <span x-text="{done:'完成',running:'執行中',failed:'失敗',queued:'排隊中',news_ready:'等待確認',cancelled:'已取消'}[j.status] ?? j.status"></span>
+                    </span>
+                  </td>
+                  <td class="px-5 py-3.5">
+                    <div class="flex gap-1 items-center">
+                      <template x-for="key in ['news','screenshot','audio','video','upload']" :key="key">
+                        <div :title="key" class="w-1.5 h-5 rounded-sm transition-colors"
+                          :class="{
+                            'bg-emerald-500': j['step_'+key]==='done',
+                            'bg-red-500':     j['step_'+key]==='failed',
+                            'bg-green-500 animate-pulse': j['step_'+key]==='running',
+                            'bg-gray-100':    !['done','failed','running'].includes(j['step_'+key])
+                          }"></div>
+                      </template>
+                    </div>
+                  </td>
+                  <td class="px-5 py-3.5 text-right">
+                    <span x-show="j.status==='done'" class="text-xs text-green-600 hover:text-green-700 font-medium opacity-0 group-hover:opacity-100 transition-opacity">預覽 →</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── New Video (all-in-one) ──────────────────────────────────── -->
+    <div x-show="page==='new'" class="p-8 max-w-3xl mx-auto">
+
+      <!-- Header (always visible) -->
+      <div class="flex items-start justify-between mb-6">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-gray-900">生成新影片</h1>
+          <p class="text-sm text-gray-500 mt-1">搜尋新聞、選取內容、一鍵產出短影音</p>
+        </div>
+        <!-- Re-search bar (shown after news loaded) -->
+        <div x-show="['select','pipeline'].includes(newStep)" class="flex items-center gap-2 mt-1">
+          <span class="text-xs text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg font-mono truncate max-w-[140px]" x-text="newTopic || 'AI 人工智慧 科技'"></span>
+          <button @click="newStep='config'"
+            class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-all hover:border-gray-300">
+            重新搜尋
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 1: Config -->
+      <div x-show="newStep==='config'" class="glass rounded-2xl p-6 space-y-5">
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5">主題關鍵字</label>
+          <input x-model="newTopic" type="text" placeholder="AI 人工智慧 科技"
+            @keydown.enter="fetchNews()"
+            class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-2">語言（可多選，同時抓取）</label>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="[val, label, color] in [['zh-TW','繁中','bg-blue-50 border-blue-200 text-blue-700'],['zh-CN','简中','bg-purple-50 border-purple-200 text-purple-700'],['en','EN','bg-green-50 border-green-200 text-green-700']]" :key="val">
+              <button type="button"
+                @click="toggleLang(val)"
+                :class="newLangs.has(val)
+                  ? color + ' ring-1 ring-offset-0'
+                  : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                class="border rounded-lg px-4 py-2 text-sm font-medium transition-all">
+                <span x-show="newLangs.has(val)" class="mr-1">✓</span>
+                <span x-text="label"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-2">額外來源</label>
+          <button type="button" @click="useSocial = !useSocial"
+            :class="useSocial ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+            class="border rounded-lg px-4 py-2 text-sm font-medium transition-all">
+            <span x-show="useSocial" class="mr-1">✓</span>🌐 Social (Reddit · HN)
+          </button>
+          <span x-show="useSocial" class="ml-2 text-xs text-gray-400">搜尋時間約 +20 秒</span>
+        </div>
+        <button @click="fetchNews()"
+          :disabled="newLangs.size === 0"
+          :class="newLangs.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
+          <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M8 5v14l11-7z"/></svg>
+          抓取新聞
+          <span x-show="newLangs.size > 1" class="bg-green-500 rounded-md px-1.5 py-0.5 text-xs" x-text="newLangs.size + ' 語言'"></span>
+        </button>
+      </div>
+
+      <!-- Step 2: Fetching -->
+      <div x-show="newStep==='fetching'" class="glass rounded-2xl p-12 text-center">
+        <div class="w-10 h-10 rounded-full border-2 border-green-600 border-t-transparent animate-spin mx-auto mb-4"></div>
+        <p class="text-sm text-gray-500">正在搜尋最新新聞…</p>
+      </div>
+
+      <!-- Step 3: Select news (scrollable list + sticky button) -->
+      <div x-show="newStep==='select'" class="space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="text-sm text-gray-500">選擇要做成影片的新聞（最多 5 篇）</p>
+          <span class="text-xs text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full" x-text="selectedIds.size + '/5 已選'"></span>
+        </div>
+
+        <!-- Append more news bar -->
+        <div class="glass rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+          <span class="text-xs text-gray-400 font-medium">追加搜尋：</span>
+          <template x-for="[val, label, color] in [['zh-TW','繁中','bg-blue-50 border-blue-200 text-blue-700'],['zh-CN','简中','bg-purple-50 border-purple-200 text-purple-700'],['en','EN','bg-green-50 border-green-200 text-green-700']]" :key="val">
+            <button type="button"
+              @click="toggleAppendLang(val)"
+              :class="appendLangs.has(val)
+                ? color + ' ring-1'
+                : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+              class="border rounded-lg px-3 py-1.5 text-xs font-medium transition-all">
+              <span x-show="appendLangs.has(val)" class="mr-0.5">✓</span>
+              <span x-text="label"></span>
+            </button>
+          </template>
+          <button @click="appendNews()"
+            :disabled="appendLangs.size === 0 || appending"
+            :class="appendLangs.size === 0 || appending ? 'opacity-40 cursor-not-allowed' : 'hover:bg-gray-100'"
+            class="border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 transition-all flex items-center gap-1.5">
+            <span x-show="appending" class="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin"></span>
+            <span x-text="appending ? '抓取中…' : '+ 追加'"></span>
+          </button>
+          <span x-show="newsPool.length > 0" class="text-[11px] text-gray-400 ml-auto" x-text="newsPool.length + ' 則可選'"></span>
+        </div>
+
+        <!-- Grouped grid: each source = its own scroll box -->
+        <div class="grid grid-cols-2 gap-3">
+          <template x-for="group in groupedNews()" :key="group.source_type">
+            <div class="border border-gray-200 rounded-2xl overflow-hidden bg-white">
+              <!-- Source header -->
+              <div class="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50/60">
+                <span :class="'text-[11px] font-semibold border px-2 py-0.5 rounded-full ' + group.cls" x-text="group.label"></span>
+                <span class="text-[11px] text-gray-400" x-text="group.items.length + ' 則'"></span>
+              </div>
+              <!-- Scrollable cards -->
+              <div class="overflow-y-auto max-h-[260px] p-2 space-y-1.5">
+                <template x-for="item in group.items" :key="item.cache_id">
+                  <div @click="toggleSelect(item.cache_id)"
+                    class="rounded-xl p-3 cursor-pointer border transition-all duration-150"
+                    :class="selectedIds.has(item.cache_id) ? 'border-green-500 ring-1 ring-green-500/20 bg-green-50/40' : 'border-gray-100 hover:border-gray-300 hover:bg-gray-50'">
+                    <div class="flex items-start gap-2">
+                      <div class="mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-all"
+                        :class="selectedIds.has(item.cache_id) ? 'border-green-600 bg-green-600' : 'border-gray-300'">
+                        <svg x-show="selectedIds.has(item.cache_id)" class="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-gray-900 leading-snug line-clamp-2" x-text="item.title"></p>
+                        <div class="flex gap-1 mt-1.5 flex-wrap">
+                          <span class="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full truncate max-w-[120px]" x-text="item.source"></span>
+                          <span x-show="item._lang === 'zh-TW'" class="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded-full">繁中</span>
+                          <span x-show="item._lang === 'zh-CN'" class="text-[10px] text-purple-600 bg-purple-50 border border-purple-100 px-1.5 py-0.5 rounded-full">简中</span>
+                          <span x-show="item._lang === 'en'" class="text-[10px] text-green-600 bg-green-50 border border-green-100 px-1.5 py-0.5 rounded-full">EN</span>
+                          <span x-show="item.screenshot_blocked" class="text-[10px] text-orange-500 bg-orange-50 px-1.5 py-0.5 rounded-full">⚠</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Always-visible trigger button -->
+        <div class="pt-1">
+          <button @click="triggerJob()"
+            :disabled="selectedIds.size === 0"
+            :class="selectedIds.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm"
+            x-text="'產生影片（' + selectedIds.size + ' 篇）'">
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 4: Triggering -->
+      <div x-show="newStep==='triggering'" class="glass rounded-2xl p-12 text-center">
+        <div class="w-10 h-10 rounded-full border-2 border-green-600 border-t-transparent animate-spin mx-auto mb-4"></div>
+        <p class="text-sm text-gray-500">正在啟動 pipeline…</p>
+      </div>
+
+      <!-- Step 5: Pipeline (all inline) -->
+      <div x-show="newStep==='pipeline'" class="space-y-5">
+
+        <!-- Status + Step bars -->
+        <div class="glass rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+              <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                :class="{
+                  'bg-emerald-500/10 text-emerald-600 border-emerald-500/20': currentJob?.status==='done',
+                  'bg-green-500/10 text-green-700 border-green-500/20 ring-1 ring-green-500/10': currentJob?.status==='running',
+                  'bg-red-500/10 text-red-600 border-red-500/20': currentJob?.status==='failed',
+                  'bg-zinc-500/10 text-zinc-500 border-zinc-500/20': currentJob?.status==='cancelled',
+                  'bg-amber-500/10 text-amber-600 border-amber-500/20': !['done','running','failed','cancelled'].includes(currentJob?.status)
+                }" x-text="{done:'完成',running:'執行中',failed:'失敗',cancelled:'已取消',queued:'準備中'}[currentJob?.status] ?? currentJob?.status ?? '準備中'">
+              </span>
+              <span class="text-sm text-gray-400" x-text="'Job #' + (currentJob?.id ?? '...')"></span>
+            </div>
+            <button x-show="currentJob?.status==='running'" @click="cancelInlineJob()"
+              class="text-xs text-red-500 hover:text-red-600 border border-red-200 rounded-lg px-3 py-1.5 transition-all">取消</button>
+          </div>
+          <div class="flex gap-3">
+            <template x-for="[key, label] in [['news','抓新聞'],['screenshot','截圖'],['audio','語音'],['video','影片'],['upload','上傳']]" :key="key">
+              <div class="flex-1">
+                <div class="h-1.5 w-full rounded-full mb-2 overflow-hidden"
+                  :class="{
+                    'bg-emerald-500': currentJob?.['step_'+key]==='done',
+                    'bg-green-500':   currentJob?.['step_'+key]==='running',
+                    'bg-red-500':     currentJob?.['step_'+key]==='failed',
+                    'bg-blue-400':    ['script_review','review'].includes(currentJob?.['step_'+key]),
+                    'bg-gray-100':    !['done','running','failed','script_review','review'].includes(currentJob?.['step_'+key])
+                  }">
+                  <div x-show="currentJob?.['step_'+key]==='running'" class="h-full w-1/2 bg-white/30 rounded-full animate-pulse"></div>
+                </div>
+                <p class="text-[11px] font-medium"
+                  :class="{
+                    'text-emerald-600': currentJob?.['step_'+key]==='done',
+                    'text-green-600':   currentJob?.['step_'+key]==='running',
+                    'text-red-500':     currentJob?.['step_'+key]==='failed',
+                    'text-blue-500':    ['script_review','review'].includes(currentJob?.['step_'+key]),
+                    'text-gray-300':    !['done','running','failed','script_review','review'].includes(currentJob?.['step_'+key])
+                  }" x-text="label"></p>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Error -->
+        <div x-show="currentJob?.error"
+          class="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-600"
+          x-text="currentJob?.error"></div>
+
+        <!-- Script Review -->
+        <div x-show="currentJob?.step_screenshot === 'script_review'" class="space-y-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700 flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            腳本已生成，請確認或修改後點「確認腳本」繼續。
+          </div>
+          <template x-for="(item, i) in scriptItems" :key="i">
+            <div class="glass rounded-2xl p-5 space-y-3">
+              <div class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <span class="bg-gray-100 text-gray-500 rounded-lg px-2 py-0.5 text-xs font-medium" x-text="'#' + (i+1)"></span>
+                <span x-text="item.title || item.hook || '新聞 ' + (i+1)"></span>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
+                <input x-model="scriptItems[i].hook" type="text"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-400 block mb-1">
+                  腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
+                </label>
+                <textarea x-model="scriptItems[i].script" rows="3"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all"></textarea>
+              </div>
+            </div>
+          </template>
+          <button @click="confirmScript()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all glow-sm">
+            確認腳本 →
+          </button>
+        </div>
+
+        <!-- Screenshot Review (with replace) -->
+        <div x-show="currentJob?.step_audio === 'review'" class="space-y-4">
+          <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700 flex items-center gap-2">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            截圖完成。如果截圖被封鎖，可以替換成備用新聞，或重拍。
+          </div>
+
+          <div class="space-y-4">
+            <template x-for="shot in screenshots" :key="shot.index">
+              <div class="glass rounded-2xl overflow-hidden">
+                <div class="flex gap-4 p-4">
+                  <!-- Screenshot / B-roll preview -->
+                  <div class="w-40 h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                    <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover">
+                    <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover" autoplay muted loop playsinline></video>
+                    <div x-show="!shot.url" class="w-full h-full flex items-center justify-center text-gray-300 text-xs">無截圖</div>
+                  </div>
+                  <!-- Info + actions -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span class="text-xs font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md" x-text="'#' + shot.index"></span>
+                      <span x-show="!shot.url" class="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded-md">截圖失敗</span>
+                    </div>
+                    <p class="text-sm text-gray-700 line-clamp-2 leading-snug" x-text="shot.title || '—'"></p>
+                    <div class="flex gap-2 mt-3">
+                      <button @click="retakeScreenshot(shot.index)"
+                        class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-all hover:border-gray-300">
+                        重拍
+                      </button>
+                      <button @click="toggleReplacePanel(shot.index)"
+                        class="text-xs text-orange-600 hover:text-orange-700 border border-orange-200 bg-orange-50 hover:bg-orange-100 rounded-lg px-3 py-1.5 transition-all"
+                        x-text="replacePanelOpen === shot.index ? '收起' : '替換新聞'">
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Replace panel -->
+                <div x-show="replacePanelOpen === shot.index" class="border-t border-gray-100 bg-gray-50 p-4 space-y-2">
+                  <p class="text-xs font-medium text-gray-500 mb-3">選擇替換用的新聞（未選取的備用候選）：</p>
+
+                  <div x-show="unusedPool().length === 0" class="text-xs text-gray-400 py-2">
+                    沒有備用新聞了。
+                    <button @click="newStep='config'" class="text-green-600 hover:text-green-700 ml-1">重新搜尋 →</button>
+                  </div>
+
+                  <template x-for="item in unusedPool()" :key="item.cache_id">
+                    <div @click="replaceNewsItem(shot.index, item.cache_id)"
+                      class="bg-white border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-all">
+                      <p class="text-sm text-gray-800 font-medium leading-tight" x-text="item.title"></p>
+                      <div class="flex gap-2 mt-1.5">
+                        <span class="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full" x-text="item.source"></span>
+                        <span x-show="item.screenshot_blocked" class="text-[11px] text-orange-500">⚠ 曾封鎖</span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <button @click="continueJob()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all glow-sm">
+            確認截圖，繼續生成語音與影片 →
+          </button>
+        </div>
+
+        <!-- Running log -->
+        <div x-show="currentJob?.status==='running' && !['script_review'].includes(currentJob?.step_screenshot) && currentJob?.step_audio !== 'review'"
+          class="glass rounded-2xl overflow-hidden">
+          <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+            <span class="text-xs font-medium text-gray-500">Pipeline 執行中</span>
+          </div>
+          <div class="p-4 font-mono text-xs text-gray-500 h-40 overflow-y-auto bg-gray-50" id="log-box">
+            <template x-for="(evt, i) in sseLog" :key="i">
+              <div class="py-0.5" x-text="evt"></div>
+            </template>
+            <div x-show="sseLog.length === 0" class="text-gray-300 py-2">等待輸出…</div>
+          </div>
+        </div>
+
+        <!-- Done: Video + Upload -->
+        <div x-show="currentJob?.status==='done'" class="space-y-4">
+          <div class="glass rounded-2xl overflow-hidden">
+            <video controls class="w-full max-h-80 bg-black"
+              :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video'"></video>
+          </div>
+          <div class="glass rounded-2xl p-5 space-y-4">
+            <p class="text-sm font-semibold text-gray-700">上傳到平台</p>
+            <!-- Upload Post key not set warning -->
+            <div x-show="!uploadKeySet"
+              class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex items-center gap-2">
+              <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              尚未設定 Upload-Post API Key。
+              <button @click="page='settings'; loadSettings()" class="underline font-medium ml-1">前往設定 →</button>
+            </div>
+            <div class="flex gap-3 items-center">
+              <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
+                @click="uploadJob()"
+                :disabled="!uploadKeySet"
+                :class="!uploadKeySet ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
+                上傳到 YouTube/平台
+              </button>
+              <span x-show="currentJob?.step_upload==='uploading'"
+                class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium">
+                <div class="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>上傳中…
+              </span>
+              <span x-show="currentJob?.step_upload==='done'"
+                class="inline-flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>上傳完成
+              </span>
+              <button @click="retryStep('video')"
+                class="text-sm text-gray-400 hover:text-gray-600 border border-gray-200 rounded-xl px-4 py-2 transition-all">
+                重新生成影片
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Failed -->
+        <div x-show="currentJob?.status==='failed'"
+          class="glass rounded-2xl p-5 space-y-3">
+          <p class="text-sm font-medium text-gray-700">任務失敗，可以重試特定步驟：</p>
+          <div class="flex gap-3">
+            <button @click="retryStep('audio')" x-show="currentJob?.step_audio==='failed'"
+              class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">重試語音</button>
+            <button @click="retryStep('video')" x-show="currentJob?.step_video==='failed'"
+              class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">重試影片</button>
+            <button @click="retryStep('news')" x-show="currentJob?.step_news==='failed'"
+              class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">重試新聞</button>
+          </div>
+        </div>
+
+      </div><!-- /pipeline -->
+    </div><!-- /page=new -->
+
+    <!-- ── Job Detail ─────────────────────────────────────────────────── -->
+    <div x-show="page==='job'" class="p-8 max-w-4xl mx-auto space-y-6">
+
+      <!-- Header -->
+      <div class="flex items-center gap-3">
+        <button @click="page='dashboard'; loadDashboard()"
+          class="text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
+          ← 返回
+        </button>
+        <div class="h-4 w-px bg-gray-200"></div>
+        <h1 class="text-xl font-bold text-gray-900" x-text="'Job #' + (currentJob?.id ?? '...')"></h1>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+          :class="{
+            'bg-emerald-500/10 text-emerald-600 border-emerald-500/20': currentJob?.status==='done',
+            'bg-green-500/10 text-green-700 border-green-500/20':     currentJob?.status==='running',
+            'bg-red-500/10 text-red-600 border-red-500/20':           currentJob?.status==='failed',
+            'bg-zinc-500/10 text-zinc-500 border-zinc-500/20':        currentJob?.status==='cancelled',
+            'bg-amber-500/10 text-amber-600 border-amber-500/20':     !['done','running','failed','cancelled'].includes(currentJob?.status)
+          }" x-text="{done:'完成',running:'執行中',failed:'失敗',cancelled:'已取消',queued:'排隊中'}[currentJob?.status] ?? currentJob?.status ?? ''">
+        </span>
+        <span class="text-sm text-gray-400" x-text="currentJob?.topic || ''"></span>
+        <button x-show="currentJob?.status==='running'" @click="cancelJob()"
+          class="ml-auto text-xs text-red-500 hover:text-red-600 border border-red-200 hover:border-red-300 rounded-lg px-3 py-1.5 transition-all">
+          取消任務
+        </button>
+      </div>
+
+      <!-- Step progress -->
+      <div class="glass rounded-2xl p-5">
+        <div class="flex gap-3">
+          <template x-for="[key, label] in [['news','抓新聞'],['screenshot','截圖'],['audio','語音'],['video','影片'],['upload','上傳']]" :key="key">
+            <div class="flex-1">
+              <div class="h-1.5 w-full rounded-full mb-2 overflow-hidden"
+                :class="{
+                  'bg-emerald-500': currentJob?.['step_'+key]==='done',
+                  'bg-green-500':   currentJob?.['step_'+key]==='running',
+                  'bg-red-500':     currentJob?.['step_'+key]==='failed',
+                  'bg-blue-400':    ['script_review','review'].includes(currentJob?.['step_'+key]),
+                  'bg-gray-100':    !['done','running','failed','script_review','review'].includes(currentJob?.['step_'+key])
+                }">
+                <div x-show="currentJob?.['step_'+key]==='running'" class="h-full w-1/2 bg-white/30 rounded-full animate-pulse"></div>
+              </div>
+              <p class="text-[11px] font-medium"
+                :class="{
+                  'text-emerald-600': currentJob?.['step_'+key]==='done',
+                  'text-green-600':   currentJob?.['step_'+key]==='running',
+                  'text-red-500':     currentJob?.['step_'+key]==='failed',
+                  'text-blue-500':    ['script_review','review'].includes(currentJob?.['step_'+key]),
+                  'text-gray-300':    !['done','running','failed','script_review','review'].includes(currentJob?.['step_'+key])
+                }" x-text="label"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div x-show="currentJob?.error"
+        class="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-600"
+        x-text="currentJob?.error"></div>
+
+      <!-- Script Review -->
+      <div x-show="currentJob?.step_screenshot === 'script_review'" class="space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
+          腳本已生成，請確認或修改後點「確認腳本」繼續。
+        </div>
+        <template x-for="(item, i) in scriptItems" :key="i">
+          <div class="glass rounded-2xl p-5 space-y-3">
+            <div class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+              <span class="bg-gray-100 text-gray-500 rounded-lg px-2 py-0.5 text-xs font-medium" x-text="'#' + (i+1)"></span>
+              <span x-text="item.title || item.hook || '新聞 ' + (i+1)"></span>
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
+              <input x-model="scriptItems[i].hook" type="text"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-400 block mb-1">
+                腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
+              </label>
+              <textarea x-model="scriptItems[i].script" rows="3"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all"></textarea>
+            </div>
+          </div>
+        </template>
+        <button @click="confirmScript()"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all glow-sm">
+          確認腳本 →
+        </button>
+      </div>
+
+      <!-- Screenshot Review -->
+      <div x-show="currentJob?.step_audio === 'review'" class="space-y-4">
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
+          截圖完成，請確認後點「繼續生成語音與影片」。
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <template x-for="shot in screenshots" :key="shot.index">
+            <div class="glass rounded-2xl overflow-hidden">
+              <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100">
+              <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100" autoplay muted loop playsinline></video>
+              <div x-show="!shot.url" class="h-40 bg-gray-50 flex items-center justify-center text-gray-300 text-sm">無截圖</div>
+              <div class="p-3 flex items-center gap-2">
+                <span class="text-xs text-gray-400 flex-1 font-mono" x-text="'#' + shot.index"></span>
+                <button @click="retakeScreenshot(shot.index)"
+                  class="text-xs text-green-600 hover:text-green-700 font-medium transition-colors">重拍</button>
+              </div>
+            </div>
+          </template>
+        </div>
+        <button @click="continueJob()"
+          class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-all glow-sm">
+          繼續生成語音與影片 →
+        </button>
+      </div>
+
+      <!-- Running log -->
+      <div x-show="currentJob?.status==='running' && !['script_review'].includes(currentJob?.step_screenshot) && currentJob?.step_audio !== 'review'"
+        class="glass rounded-2xl overflow-hidden">
+        <div class="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+          <div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+          <span class="text-xs font-medium text-gray-500">Pipeline 執行中</span>
+        </div>
+        <div class="p-4 font-mono text-xs text-gray-500 h-48 overflow-y-auto bg-gray-50" id="log-box">
+          <template x-for="(evt, i) in sseLog" :key="i">
+            <div class="py-0.5" x-text="evt"></div>
+          </template>
+          <div x-show="sseLog.length === 0" class="text-gray-300 py-2">等待輸出…</div>
+        </div>
+      </div>
+
+      <!-- Done -->
+      <div x-show="currentJob?.status==='done'" class="space-y-4">
+        <div class="glass rounded-2xl overflow-hidden">
+          <video controls class="w-full max-h-96 bg-black"
+            :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video'"></video>
+        </div>
+        <div class="flex gap-3">
+          <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
+            @click="uploadJob()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
+            上傳到平台
+          </button>
+          <span x-show="currentJob?.step_upload==='uploading'"
+            class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium py-2.5">
+            <div class="w-3.5 h-3.5 rounded-full border-2 border-amber-500 border-t-transparent animate-spin"></div>
+            上傳中…
+          </span>
+          <span x-show="currentJob?.step_upload==='done'"
+            class="inline-flex items-center gap-1.5 text-sm text-emerald-600 font-medium py-2.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            上傳完成
+          </span>
+          <button @click="retryStep('video')"
+            class="text-sm text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 rounded-xl px-4 py-2 transition-all">
+            重新生成影片
+          </button>
+        </div>
+      </div>
+
+      <!-- Failed -->
+      <div x-show="currentJob?.status==='failed'" class="flex gap-3">
+        <button @click="retryStep('audio')" x-show="currentJob?.step_audio==='failed'"
+          class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">
+          重試語音
+        </button>
+        <button @click="retryStep('video')" x-show="currentJob?.step_video==='failed'"
+          class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">
+          重試影片
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Settings ───────────────────────────────────────────────────── -->
+    <div x-show="page==='settings'" class="p-8 max-w-xl mx-auto space-y-6">
+
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">設定</h1>
+        <p class="text-sm text-gray-500 mt-1">API 金鑰與排程設定</p>
+      </div>
+
+      <div class="glass rounded-2xl p-6 space-y-5">
+        <template x-for="[key, label, type, placeholder] in settingsFields" :key="key">
+          <div>
+            <label class="text-sm font-medium text-gray-700 block mb-1.5" x-text="label"></label>
+            <input :type="type" x-model="settings[key]" :placeholder="placeholder"
+              class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+          </div>
+        </template>
+
+        <div class="h-px bg-gray-100"></div>
+
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-3">排程時間（每日自動執行）</label>
+          <div class="flex gap-3">
+            <div class="flex-1">
+              <label class="text-xs text-gray-400 block mb-1">小時</label>
+              <input type="number" x-model="settings.schedule_hour" min="0" max="23"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+            </div>
+            <div class="flex-1">
+              <label class="text-xs text-gray-400 block mb-1">分鐘</label>
+              <input type="number" x-model="settings.schedule_minute" min="0" max="59"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+            </div>
+          </div>
+        </div>
+
+        <div class="h-px bg-gray-100"></div>
+
+        <div class="space-y-3">
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" :checked="settings.dry_run==='true'"
+                @change="settings.dry_run = $event.target.checked ? 'true' : 'false'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-green-600 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <span class="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">Dry Run（不產生實際輸出）</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" :checked="settings.skip_upload==='true'"
+                @change="settings.skip_upload = $event.target.checked ? 'true' : 'false'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-green-600 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <span class="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">跳過上傳</span>
+          </label>
+
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative">
+              <input type="checkbox" :checked="settings.background_mode==='broll'"
+                @change="settings.background_mode = $event.target.checked ? 'broll' : 'screenshot'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-blue-500 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <div>
+              <span class="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
+                背景模式：<span x-text="settings.background_mode==='broll' ? 'B-roll 影片（Pexels）' : '截圖模式'" :class="settings.background_mode==='broll' ? 'text-blue-600 font-medium' : ''"></span>
+              </span>
+              <p class="text-xs text-gray-400 mt-0.5" x-show="settings.background_mode==='broll'">需填入 Pexels API Key，影片背景更專業且無版權問題</p>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex items-center gap-3 pt-1">
+          <button @click="saveSettings()"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
+            儲存設定
+          </button>
+          <span x-show="settingsSaved" x-transition
+            class="text-sm text-emerald-600 font-medium flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            已儲存
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast -->
+  <div x-show="toast" x-transition
+    class="fixed bottom-5 right-5 bg-gray-900 text-white rounded-xl px-4 py-3 text-sm shadow-lg flex items-center gap-2 z-50"
+    x-text="toast"></div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000'
+
+function app() {
+  return {
+    page: 'dashboard',
+    stats: {},
+    jobs: [],
+
+    // generate flow
+    newStep: 'config',
+    newTopic: '',
+    newLangs: new Set(['zh-TW']),   // multi-lang selection for initial fetch
+    appendLangs: new Set(),          // multi-lang selection for append
+    appending: false,
+    useSocial: false,               // include last30days (Reddit·HN)
+    newsItems: [],      // currently displayed items (may be filtered)
+    newsPool: [],       // all fetched items (for replacement)
+    selectedIds: new Set(),
+
+    // pipeline (inline on generate page)
+    currentJob: null,
+    sseLog: [],
+    sseSource: null,
+    screenshots: [],
+    scriptItems: [],
+    replacePanelOpen: null,   // shot.index of open replace panel
+    uploadKeySet: false,
+
+    settings: {},
+    settingsSaved: false,
+    settingsFields: [
+      ['fish_audio_key',  'Fish Audio API Key',  'password', 'sk-...'],
+      ['voice_id',        'Fish Audio Voice ID', 'text',     'model-id'],
+      ['upload_post_key', 'Upload-Post API Key (上傳平台)', 'password', 'key...'],
+      ['upload_post_profile', 'Upload-Post Profile 名稱', 'text', 'yt'],
+      ['pexels_api_key',  'Pexels API Key（B-roll 背景影片）', 'password', '申請：pexels.com/api'],
+    ],
+
+    toast: '',
+    _toastTimer: null,
+
+    async init() {
+      await this.loadDashboard()
+      // Check if upload key is set
+      try {
+        const s = await this.api('GET', '/api/settings')
+        this.uploadKeySet = !!(s.upload_post_key)
+      } catch (_) {}
+    },
+
+    showToast(msg) {
+      this.toast = msg
+      clearTimeout(this._toastTimer)
+      this._toastTimer = setTimeout(() => this.toast = '', 3000)
+    },
+
+    async api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' } }
+      if (body) opts.body = JSON.stringify(body)
+      const r = await fetch(API + path, opts)
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ detail: r.statusText }))
+        throw new Error(err.detail || r.statusText)
+      }
+      return r.json()
+    },
+
+    async loadDashboard() {
+      try {
+        const [stats, jobs] = await Promise.all([
+          this.api('GET', '/api/stats'),
+          this.api('GET', '/api/jobs?limit=30'),
+        ])
+        this.stats = stats
+        this.jobs = jobs
+      } catch (e) {
+        this.showToast('無法連接後端：' + e.message)
+      }
+    },
+
+    startNewVideo() {
+      this.page = 'new'
+      this.newStep = 'config'
+      this.newsItems = []
+      this.newsPool = []
+      this.selectedIds = new Set()
+      this.appendLangs = new Set()
+      this.appending = false
+      this.currentJob = null
+      this.sseLog = []
+      this.screenshots = []
+      this.scriptItems = []
+      this.replacePanelOpen = null
+      if (this.sseSource) { this.sseSource.close(); this.sseSource = null }
+    },
+
+    toggleLang(val) {
+      const s = new Set(this.newLangs)
+      s.has(val) ? s.delete(val) : s.add(val)
+      this.newLangs = s
+    },
+
+    toggleAppendLang(val) {
+      const s = new Set(this.appendLangs)
+      s.has(val) ? s.delete(val) : s.add(val)
+      this.appendLangs = s
+    },
+
+    // Tag items with their language
+    _tagItems(items, lang) {
+      return items.map(item => ({ ...item, _lang: lang }))
+    },
+
+    _sourceConfig: {
+      google:     { label: 'Google News', cls: 'text-blue-600 bg-blue-50 border-blue-100' },
+      bing:       { label: 'Bing',        cls: 'text-sky-600 bg-sky-50 border-sky-100' },
+      bilibili:   { label: 'Bilibili',    cls: 'text-pink-600 bg-pink-50 border-pink-100' },
+      zhihu:      { label: '知乎',        cls: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+      hackernews: { label: 'HN',          cls: 'text-orange-600 bg-orange-50 border-orange-100' },
+      reddit:     { label: 'Reddit',      cls: 'text-red-600 bg-red-50 border-red-100' },
+      youtube:    { label: 'YouTube',     cls: 'text-red-700 bg-red-50 border-red-200' },
+      tiktok:     { label: 'TikTok',      cls: 'text-gray-800 bg-gray-100 border-gray-200' },
+      instagram:  { label: 'IG',          cls: 'text-purple-600 bg-purple-50 border-purple-100' },
+    },
+
+    groupedNews() {
+      const ORDER = ['google','bing','bilibili','zhihu','hackernews','reddit','youtube','tiktok','instagram']
+      const groups = {}
+      for (const item of this.newsItems) {
+        const k = item.source_type || 'other'
+        ;(groups[k] = groups[k] || []).push(item)
+      }
+      const keys = ORDER.filter(k => groups[k]).concat(Object.keys(groups).filter(k => !ORDER.includes(k)))
+      return keys.map(k => ({
+        source_type: k,
+        label: (this._sourceConfig[k] || {}).label || k,
+        cls: (this._sourceConfig[k] || {}).cls || 'text-gray-600 bg-gray-100 border-gray-200',
+        items: groups[k],
+      }))
+    },
+
+    // Deduplicate by URL
+    _dedup(items) {
+      const seen = new Set()
+      return items.filter(item => {
+        const key = item.url || item.source_url || item.cache_id
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+    },
+
+    async fetchNews() {
+      if (this.newLangs.size === 0) return
+      this.newStep = 'fetching'
+      try {
+        const kw = this.newTopic || 'AI 人工智慧 科技'
+        const langs = [...this.newLangs]
+        const srcParam = this.useSocial ? '&sources=google,bing,bilibili,zhihu,last30days' : ''
+        // Parallel fetch for all selected languages
+        const results = await Promise.all(
+          langs.map(lang =>
+            this.api('GET', `/api/news/fetch?topic=${encodeURIComponent(kw)}&lang=${lang}${srcParam}`)
+              .then(data => this._tagItems(data.items || [], lang))
+              .catch(() => [])
+          )
+        )
+        const merged = this._dedup(results.flat())
+        this.newsItems = merged
+        this.newsPool  = [...merged]
+        this.selectedIds = new Set()
+        this.appendLangs = new Set([...this.newLangs])  // preselect same langs for append
+        this.newStep = 'select'
+      } catch (e) {
+        this.showToast('抓取失敗：' + e.message)
+        this.newStep = 'config'
+      }
+    },
+
+    // Append more news without clearing existing pool
+    async appendNews() {
+      if (this.appendLangs.size === 0 || this.appending) return
+      this.appending = true
+      try {
+        const kw = this.newTopic || 'AI 人工智慧 科技'
+        const langs = [...this.appendLangs]
+        const srcParam = this.useSocial ? '&sources=google,bing,bilibili,zhihu,last30days' : ''
+        const results = await Promise.all(
+          langs.map(lang =>
+            this.api('GET', `/api/news/fetch?topic=${encodeURIComponent(kw)}&lang=${lang}${srcParam}`)
+              .then(data => this._tagItems(data.items || [], lang))
+              .catch(() => [])
+          )
+        )
+        const newItems = this._dedup([...this.newsPool, ...results.flat()])
+        const added = newItems.length - this.newsPool.length
+        this.newsPool  = newItems
+        this.newsItems = newItems
+        this.showToast(added > 0 ? `追加了 ${added} 則新聞` : '沒有新的新聞（可能重複）')
+      } catch (e) {
+        this.showToast('追加失敗：' + e.message)
+      } finally {
+        this.appending = false
+      }
+    },
+
+    toggleSelect(id) {
+      const s = new Set(this.selectedIds)
+      if (s.has(id)) {
+        s.delete(id)
+      } else if (s.size < 5) {
+        s.add(id)
+      } else {
+        this.showToast('最多選 5 篇')
+        return
+      }
+      this.selectedIds = s
+    },
+
+    // Returns pool items not currently selected (candidates for replacement)
+    unusedPool() {
+      return this.newsPool.filter(item => !this.selectedIds.has(item.cache_id))
+    },
+
+    async triggerJob() {
+      if (this.selectedIds.size === 0) return
+      this.newStep = 'triggering'
+      try {
+        const cacheIds = [...this.selectedIds]
+        const selectedNews = this.newsPool
+          .filter(n => this.selectedIds.has(n.cache_id))
+          .map(n => ({ title: n.title, summary: n.summary, url: n.url, source: n.source }))
+        const data = await this.api('POST', '/api/jobs/trigger', {
+          topic: this.newTopic || null,
+          lang: [...this.newLangs][0] || 'zh-TW',   // primary lang for script generation
+          selected_cache_ids: cacheIds,
+          selected_news: selectedNews,
+        })
+        // Stay on generate page, show pipeline inline
+        await this.loadInlineJob(data.job_id)
+      } catch (e) {
+        this.showToast('啟動失敗：' + e.message)
+        this.newStep = 'select'
+      }
+    },
+
+    async loadInlineJob(jobId) {
+      this.currentJob = null
+      this.sseLog = []
+      this.screenshots = []
+      this.scriptItems = []
+      this.replacePanelOpen = null
+      if (this.sseSource) { this.sseSource.close(); this.sseSource = null }
+      this.newStep = 'pipeline'
+      try {
+        const job = await this.api('GET', `/api/jobs/${jobId}`)
+        this.currentJob = job
+        await this.loadJobExtras(job)
+        if (['running', 'queued'].includes(job.status)) {
+          this.subscribeSSE(jobId)
+        }
+      } catch (e) {
+        this.showToast('載入 Job 失敗：' + e.message)
+      }
+    },
+
+    // Dashboard job click → navigate to job detail page (keeps job page)
+    async openJob(jobId) {
+      this.page = 'job'
+      this.currentJob = null
+      this.sseLog = []
+      this.screenshots = []
+      this.scriptItems = []
+      if (this.sseSource) { this.sseSource.close(); this.sseSource = null }
+      try {
+        const job = await this.api('GET', `/api/jobs/${jobId}`)
+        this.currentJob = job
+        await this.loadJobExtras(job)
+        if (['running', 'queued'].includes(job.status)) {
+          this.subscribeSSE(jobId)
+        }
+      } catch (e) {
+        this.showToast('載入 Job 失敗：' + e.message)
+      }
+    },
+
+    async loadJobExtras(job) {
+      if (job.step_screenshot === 'script_review') {
+        try {
+          const data = await this.api('GET', `/api/jobs/${job.id}/news`)
+          this.scriptItems = data.items || []
+        } catch (_) {}
+      }
+      if (job.step_audio === 'review') {
+        await this.loadScreenshots(job.id)
+      }
+    },
+
+    async loadScreenshots(jobId) {
+      try {
+        this.screenshots = await this.api('GET', `/api/jobs/${jobId}/screenshots`)
+      } catch (_) {}
+    },
+
+    subscribeSSE(jobId) {
+      const es = new EventSource(`${API}/api/events/${jobId}`)
+      this.sseSource = es
+      es.onmessage = async (e) => {
+        const data = JSON.parse(e.data)
+        this.sseLog.push(JSON.stringify(data))
+        if (this.currentJob) Object.assign(this.currentJob, data)
+        this.$nextTick(() => {
+          const box = document.getElementById('log-box')
+          if (box) box.scrollTop = box.scrollHeight
+        })
+        if (data.step_screenshot === 'script_review') {
+          try {
+            const newsData = await this.api('GET', `/api/jobs/${jobId}/news`)
+            this.scriptItems = newsData.items || []
+          } catch (_) {}
+        }
+        if (data.step_audio === 'review') {
+          await this.loadScreenshots(jobId)
+        }
+        if (['done', 'failed', 'cancelled'].includes(data.status)) {
+          es.close(); this.sseSource = null
+        }
+      }
+      es.onerror = () => {
+        this.sseLog.push('（連線中斷）')
+        es.close(); this.sseSource = null
+      }
+    },
+
+    async confirmScript() {
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/confirm_script`, { items: this.scriptItems })
+        this.currentJob.step_screenshot = 'running'
+        this.subscribeSSE(this.currentJob.id)
+        this.showToast('腳本已確認，繼續截圖…')
+      } catch (e) { this.showToast('確認失敗：' + e.message) }
+    },
+
+    async retakeScreenshot(n) {
+      try {
+        const data = await this.api('POST', `/api/jobs/${this.currentJob.id}/screenshots/${n}/retake`, {})
+        if (data.url) {
+          const idx = this.screenshots.findIndex(s => s.index === n)
+          if (idx !== -1) this.screenshots[idx] = { ...this.screenshots[idx], url: data.url }
+        }
+        this.showToast('截圖完成')
+      } catch (e) { this.showToast('截圖失敗：' + e.message) }
+    },
+
+    async continueJob() {
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/continue`)
+        this.currentJob.step_audio = 'running'
+        this.subscribeSSE(this.currentJob.id)
+        this.showToast('繼續生成語音與影片…')
+      } catch (e) { this.showToast('繼續失敗：' + e.message) }
+    },
+
+    async uploadJob() {
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/upload`)
+        this.currentJob.step_upload = 'uploading'
+        this.showToast('上傳中…')
+      } catch (e) { this.showToast('上傳失敗：' + e.message) }
+    },
+
+    async cancelJob() {
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/cancel`)
+        this.currentJob.status = 'cancelled'
+        if (this.sseSource) { this.sseSource.close(); this.sseSource = null }
+        this.showToast('已取消')
+      } catch (e) { this.showToast('取消失敗：' + e.message) }
+    },
+
+    // Cancel from inline generate page
+    async cancelInlineJob() {
+      await this.cancelJob()
+    },
+
+    toggleReplacePanel(shotIndex) {
+      this.replacePanelOpen = this.replacePanelOpen === shotIndex ? null : shotIndex
+    },
+
+    async replaceNewsItem(shotIndex, cacheId) {
+      this.replacePanelOpen = null
+      try {
+        this.showToast('替換中，重新生成腳本與截圖…')
+        const data = await this.api('POST', `/api/jobs/${this.currentJob.id}/items/${shotIndex}/replace`, {
+          cache_id: cacheId,
+          mark_old_blocked: true,
+        })
+        // Update screenshot in list
+        const idx = this.screenshots.findIndex(s => s.index === shotIndex)
+        if (idx !== -1) {
+          this.screenshots[idx] = {
+            ...this.screenshots[idx],
+            url: data.url || null,
+            title: data.title || this.screenshots[idx].title,
+          }
+        }
+        // Mark the used cache_id as selected so it won't appear in pool again
+        const s = new Set(this.selectedIds)
+        s.add(cacheId)
+        this.selectedIds = s
+        this.showToast(data.screenshot_ok ? '替換完成' : '替換完成（截圖仍失敗，可再試）')
+      } catch (e) {
+        this.showToast('替換失敗：' + e.message)
+      }
+    },
+
+    async retryStep(step) {
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/retry/${step}`)
+        this.currentJob.status = 'running'
+        this.currentJob[`step_${step}`] = 'running'
+        this.subscribeSSE(this.currentJob.id)
+        this.showToast(`重試 ${step}…`)
+      } catch (e) { this.showToast('重試失敗：' + e.message) }
+    },
+
+    async loadSettings() {
+      try {
+        this.settings = await this.api('GET', '/api/settings')
+      } catch (e) { this.showToast('載入設定失敗：' + e.message) }
+    },
+
+    async saveSettings() {
+      try {
+        this.settings = await this.api('PUT', '/api/settings', this.settings)
+        this.uploadKeySet = !!(this.settings.upload_post_key)
+        this.settingsSaved = true
+        setTimeout(() => this.settingsSaved = false, 2000)
+      } catch (e) { this.showToast('儲存失敗：' + e.message) }
+    },
+  }
+}
+</script>
+</body>
+</html>

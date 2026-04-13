@@ -148,8 +148,8 @@ def make_ass(chunks: list[str], durations: list[tuple[float,float]], out_path: s
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         # BorderStyle=3: opaque box背景; Bold=1; 字大粗體半透明黑底塊風格
-        "Style: Main,Microsoft JhengHei,62,&H00FFFFFF,&H000000FF,"
-        "&H00000000,&HAA000000,1,0,0,0,100,100,1,0,3,0,0,2,60,60,160,1\n\n"
+        "Style: Main,Microsoft JhengHei,72,&H00FFFFFF,&H000000FF,"
+        "&H00000000,&H99000000,1,0,0,0,100,100,2,0,3,0,0,2,60,60,175,1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -172,9 +172,11 @@ def make_segment(
     out_path: Path,
     timing: list[dict] | None = None,   # [{text, start, end}, ...]
     hue: int = 0,                        # 背景色調偏移角度
+    broll: Path | None = None,           # B-roll 影片（優先於截圖）
 ):
     audio_dur = get_duration(audio)
     duration  = audio_dur + 0.3
+    use_video = broll is not None and broll.exists()
 
     # ── 字幕分段 ────────────────────────────────────────────────────
     if timing:
@@ -213,51 +215,81 @@ def make_segment(
         make_ass(chunks, sub_times, ass_path)
 
         # ── Video filters ──────────────────────────────────────────
-        # 背景: 放大 → 慢速橫移 (Ken Burns pan) → 模糊壓暗 → 色調偏移
-        bg = (
-            f"[0:v]scale=1400:2500:force_original_aspect_ratio=increase,"
-            f"crop={W}:{H}:x='(iw-{W})/2*(1+sin(t*0.12))/2':y='(ih-{H})/2',"
-            f"boxblur=18:4,"
-            f"hue=h={hue},"
-            f"eq=brightness=-0.28:saturation=0.75[bg]"
-        )
-        # 前景: 慢速輕微 zoom-in
-        fg = (
-            f"[0:v]scale=w='{W}+t*4':h=-2:eval=frame[fgz];"
-            f"[fgz]crop={W}:ih:x='(iw-{W})/2'[fg]"
-        )
+        if use_video:
+            # B-roll 模式：影片當背景 + 前景，背景不做 Ken Burns（影片本身有動態）
+            bg = (
+                f"[0:v]scale=1400:2500:force_original_aspect_ratio=increase,"
+                f"crop={W}:{H},"
+                f"boxblur=16:3,"
+                f"hue=h={hue},"
+                f"eq=brightness=-0.25:saturation=0.80[bg]"
+            )
+            # 前景：等比縮放至 1080px 寬（直向影片填滿；橫向置中）
+            fg = f"[0:v]scale={W}:-2[fg]"
+        else:
+            # 截圖模式：Ken Burns 橫移 + zoom-in（原有行為）
+            bg = (
+                f"[0:v]scale=1400:2500:force_original_aspect_ratio=increase,"
+                f"crop={W}:{H}:x='(iw-{W})/2*(1+sin(t*0.12))/2':y='(ih-{H})/2',"
+                f"boxblur=16:3,"
+                f"hue=h={hue},"
+                f"eq=brightness=-0.25:saturation=0.80[bg]"
+            )
+            fg = (
+                f"[0:v]scale=w='{W}+t*4':h=-2:eval=frame[fgz];"
+                f"[fgz]crop={W}:ih:x='(iw-{W})/2'[fg]"
+            )
         ovl  = f"[bg][fg]overlay=(W-w)/2:(H-h)/2[ov]"
-        # 頂部黑框
-        tbar = f"[ov]drawbox=x=0:y=0:w={W}:h=155:color=black@0.72:t=fill[tb]"
+        # 頂部黑框（加高配合更大 hook 字體）
+        tbar = f"[ov]drawbox=x=0:y=0:w={W}:h=170:color=black@0.75:t=fill[tb]"
         # hook 金黃字（drawtext，單行，不需換行）
         hk   = (
             f"[tb]drawtext=fontfile='{tf(FONT_ZH)}':"
             f"textfile='{tf(hook_f.name)}':"
-            f"fontsize=50:fontcolor=#{HOOK_COLOR}:"
-            f"x=(w-text_w)/2:y=52:"
+            f"fontsize=56:fontcolor=#{HOOK_COLOR}:"
+            f"x=(w-text_w)/2:y=58:"
             f"shadowcolor=black@0.95:shadowx=3:shadowy=3[hk]"
         )
         # ASS 字幕燒入（BorderStyle=3 自帶半透明黑底塊，不需要再 drawbox）
         sub  = (
             f"[hk]subtitles='{tf(ass_path)}':"
-            f"fontsdir='{tf('C:/Windows/Fonts')}'[out]"
+            f"fontsdir='{tf('C:/Windows/Fonts')}'[ov2]"
         )
 
-        filter_complex = ";".join([bg, fg, ovl, tbar, hk, sub])
+        # fade in/out（影片＋音訊）
+        fade_dur = min(0.4, duration / 3)
+        fade_v = (
+            f"[ov2]fade=t=in:st=0:d={fade_dur:.2f},"
+            f"fade=t=out:st={max(0, duration - fade_dur):.2f}:d={fade_dur:.2f}[out]"
+        )
+        fade_a = (
+            f"[1:a]afade=t=in:st=0:d={fade_dur:.2f},"
+            f"afade=t=out:st={max(0, duration - fade_dur):.2f}:d={fade_dur:.2f}[aout]"
+        )
+
+        filter_complex = ";".join([bg, fg, ovl, tbar, hk, sub, fade_v, fade_a])
+
+        if use_video:
+            # B-roll：stream_loop 讓影片循環到音訊結束
+            src_args = ["-stream_loop", "-1", "-i", str(broll)]
+            mode_label = f"B-roll {out_path.name}"
+        else:
+            src_args = ["-loop", "1", "-i", str(screenshot)]
+            mode_label = f"截圖 {out_path.name}"
 
         run([
             FFMPEG, "-y",
-            "-loop", "1", "-i", str(screenshot),
+            *src_args,
             "-i", str(audio),
             "-filter_complex", filter_complex,
-            "-map", "[out]", "-map", "1:a",
+            "-map", "[out]", "-map", "[aout]",
             "-t", str(duration),
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
             "-pix_fmt", "yuv420p",
             "-r", "30",
             str(out_path),
-        ], desc=f"合成片段 {out_path.name}")
+        ], desc=f"合成片段 ({mode_label})")
 
     finally:
         for f in tmp_files:
@@ -342,6 +374,7 @@ def main():
     items = data["items"]
 
     SEG_DIR.mkdir(parents=True, exist_ok=True)
+    BROLL_DIR = PIPE_DIR / "broll"
     seg_files = []
 
     print(f"🎬 合成 {len(items)} 個片段...")
@@ -349,11 +382,15 @@ def main():
         shot  = Path(item.get("screenshot") or SHOTS_DIR / f"news_{i:02d}.png")
         audio = AUDIO_DIR / f"audio_{i:02d}.mp3"
         seg   = SEG_DIR   / f"seg_{i:02d}.mp4"
+        broll = BROLL_DIR / f"broll_{i:02d}.mp4"
 
-        if not shot.exists():
+        # B-roll 優先；若無則 fallback 截圖 → 佔位圖
+        use_broll = broll.exists()
+        if not use_broll and not shot.exists():
             print(f"  [{i}] 截圖不存在，自動生成佔位背景...")
             shot.parent.mkdir(parents=True, exist_ok=True)
             make_placeholder(shot, hue=ITEM_HUE[(i - 1) % len(ITEM_HUE)])
+
         if not audio.exists():
             print(f"❌ 找不到語音：{audio}", file=sys.stderr)
             sys.exit(1)
@@ -366,8 +403,13 @@ def main():
             timing_f = AUDIO_DIR / f"audio_{i:02d}_timing.json"
             timing   = json.loads(timing_f.read_text(encoding="utf-8")) if timing_f.exists() else None
             hue      = ITEM_HUE[(i - 1) % len(ITEM_HUE)]
-            print(f"  [{i}] {item['title']}... (hue={hue}°, timing={'精確' if timing else '等比'})")
-            make_segment(shot, audio, hook, script, seg, timing=timing, hue=hue)
+            mode_str = "B-roll" if use_broll else "截圖"
+            print(f"  [{i}] {item['title']}... ({mode_str}, hue={hue}°, timing={'精確' if timing else '等比'})")
+            make_segment(
+                shot, audio, hook, script, seg,
+                timing=timing, hue=hue,
+                broll=broll if use_broll else None,
+            )
 
         seg_files.append(seg)
 

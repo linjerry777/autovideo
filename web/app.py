@@ -3,8 +3,10 @@ web/app.py — FastAPI application factory
 """
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from web.db import init_db, get_setting
 from web import job_runner, scheduler_service
@@ -44,3 +46,9 @@ app.include_router(accounts.router)
 @app.get("/")
 def root():
     return {"status": "ok", "service": "AutoVideo API"}
+
+
+# ── Serve local UI at /ui ──────────────────────────────────────────────────────
+_static_dir = Path(__file__).parent / "static"
+_static_dir.mkdir(exist_ok=True)
+app.mount("/ui", StaticFiles(directory=str(_static_dir), html=True), name="ui")

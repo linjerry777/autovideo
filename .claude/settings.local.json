@@ -1,4 +1,7 @@
 {
+  "enabledPlugins": {
+    "last30days@last30days-skill": true
+  },
   "permissions": {
     "allow": [
       "Bash(go mod tidy)",

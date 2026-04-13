@@ -89,6 +89,17 @@ def job_screenshot(job_id: int, filename: str):
     return FileResponse(str(f), media_type="image/png")
 
 
+@router.get("/jobs/{job_id}/broll/{filename}")
+async def job_broll(job_id: int, filename: str, request: Request):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    f = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "broll" / filename
+    if not f.exists():
+        raise HTTPException(404, "B-roll not found")
+    return await _stream_video(f, request)
+
+
 @router.get("/{date}/log/{job_id}")
 def log(date: str, job_id: int):
     f = _pipe(date) / f"job_{job_id}" / "run.log"

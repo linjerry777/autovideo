@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-07/job_45",
+  "items": [
+    {
+      "hook": "祖克柏竟然重操舊業？",
+      "title": "祖克柏睽違20年親自寫程式",
+      "summary": "祖克柏用Claude Code提交程式碼，Meta目標75%程式碼交給AI，工程師角色正在改變。",
+      "script": "你知道嗎？祖克柏已經20年沒寫程式了，結果最近他用Claude Code直接提交了三筆程式碼到Meta的程式庫。他們的目標是75%的程式碼都讓AI來寫，這代表什麼你想過嗎？",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2fwww.bnext.com.tw%2farticle%2f90534%2fmeta-zuckerberg-claude-code-ai-coding-founders&c=11472864194585172078&mkt=zh-tw",
+      "source_name": "數位時代"
+    },
+    {
+      "hook": "客戶根本不管你用什麼AI",
+      "title": "台灣軟體小將聯手高通拚邊緣AI",
+      "summary": "行動貝果營收破20億年增六成，果斷放棄純軟體模式，聯手高通搶攻邊緣AI應用市場。",
+      "script": "大家都在追AI技術，但客戶只在乎一件事：成效。台灣有間公司叫行動貝果，佈局AI十年，去年營收直接衝破20億，秘訣就是放棄純軟體，跟高通合作做邊緣運算，務實才是王道。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2ftw.news.yahoo.com%2f%25E7%25AE%25A1%25E4%25BB%2596%25E4%25BB%2580%25E9%25BA%25BCai-%25E5%25AE%25A2%25E6%2588%25B6%25E5%258F%25AA%25E5%259C%25A8%25E4%25B9%258E%25E6%2588%2590%25E6%2595%2588-%25E8%25B6%2585%25E5%2589%258D%25E9%2583%25A8%25E7%25BD%25B2ai%25E5%258D%2581%25E5%25B9%25B4%25E7%259A%2584%25E5%258F%25B0%25E7%2581%25A3%25E7%25B4%2594%25E8%25BB%259F%25E9%25AB%2594%25E5%25B0%258F%25E5%25B0%2587-%25E7%2582%25BA%25E4%25BD%2595%25E8%2581%25AF%25E6%2589%258B%25E9%25AB%2598%25E9%2580%259A%25E9%2597%2596%25E9%2580%25B2%25E9%2582%258A%25E7%25B7%25A3%25E6%2587%2589%25E7%2594%25A8-003905129.html&c=1152862921022696171&mkt=zh-tw",
+      "source_name": "Yahoo新聞"
+    },
+    {
+      "hook": "57%的工作將被重組？",
+      "title": "AI正在重組你的工作內容",
+      "summary": "麥肯錫指出57%美國工時可自動化，工作不會消失但任務、流程與技能正從底層被重新定義。",
+      "script": "AI不會搶走你的工作，但會徹底改變你怎麼工作。麥肯錫最新報告說，57%的工作時數技術上都能自動化了。重點不是失業，而是你的任務、流程、技能全部都在被重組，你準備好了嗎？",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2fwww.bnext.com.tw%2farticle%2f90517%2fmckinsey-taiwan-ai-literacy&c=5749635651490133801&mkt=zh-tw",
+      "source_name": "數位時代"
+    }
+  ]
+}

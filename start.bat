@@ -11,13 +11,15 @@ start "Backend :8000" cmd /k "cd /d C:\Users\User\Documents\GitHub\AutoVideo && 
 
 timeout /t 1 /nobreak >nul
 
-REM 3. Frontend
-start "Frontend :3000" cmd /k "cd /d C:\Users\User\Documents\GitHub\AutoVideo\frontend && npm run dev"
+timeout /t 3 /nobreak >nul
+
+REM 3. Open UI in browser
+start "" "http://localhost:8000/ui"
 
 echo.
 echo Services starting...
 echo   Proxy    http://localhost:3456
 echo   Backend  http://localhost:8000
-echo   Frontend http://localhost:3000
+echo   UI       http://localhost:8000/ui
 echo.
 pause

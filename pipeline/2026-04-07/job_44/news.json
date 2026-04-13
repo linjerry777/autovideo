@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-07/job_44",
+  "items": [
+    {
+      "hook": "輝達又出手了！",
+      "title": "輝達收購SchedMD引爭議",
+      "summary": "輝達買下開源排程軟體公司SchedMD，專家擔心未來恐獨厚自家技術，破壞公平競爭。",
+      "script": "輝達買了一家掌握超級電腦排程的公司SchedMD，這軟體超多AI資料中心都在用。專家擔心輝達會不會只支援自家晶片，讓對手沒得玩？這場壟斷疑慮值得關注。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2fudn.com%2fnews%2fstory%2f6811%2f9427353&c=18271412114000368204&mkt=zh-tw",
+      "source_name": "聯合新聞網"
+    },
+    {
+      "hook": "報告一天就出？",
+      "title": "大數據公司用AI重塑流程",
+      "summary": "大數據公司導入AI後，分析師一天出報告，新產品開發週期快了三倍，效率大躍進。",
+      "script": "這家大數據公司把AI列為年度目標，跨部門組了AI團隊，結果分析師本來要好幾天的報告，現在一天搞定，產品開發速度還快三倍！AI真的在改變工作方式。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2fwww.businessweekly.com.tw%2fbusiness%2fblog%2f3021061&c=16860749806702058362&mkt=zh-tw",
+      "source_name": "商業周刊"
+    },
+    {
+      "hook": "十萬公務員上課！",
+      "title": "紐約州推動AI公僕培訓",
+      "summary": "紐約州將培訓超過十萬名公務員學習負責任的AI應用，目標成為全美首個大規模推動的州。",
+      "script": "紐約州要讓十萬公務員都學會用AI！而且不是亂用，是負責任地用在公共服務上。這可能是全美第一個這麼大規模訓練公僕用AI的州，政府也要跟上時代了。",
+      "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69d4f6e3ac084c97a6f7983d1d1d1369&url=https%3a%2f%2ftw.news.yahoo.com%2f%25E7%25B4%2590%25E7%25B4%2584%25E5%25B7%259E%25E5%2585%25A8%25E5%25A2%2583%25E6%258E%25A8%25E5%258B%2595ai%25E5%259F%25B9%25E8%25A8%2593-%25E9%2580%25BE%25E5%258D%2581%25E8%2590%25AC%25E5%2585%25AC%25E5%2583%2595%25E5%25B0%2587%25E7%25BF%2592%25E8%25B2%25A0%25E8%25B2%25AC%25E4%25BB%25BB%25E6%2587%2589%25E7%2594%25A8-112537060.html&c=12291248137523757998&mkt=zh-tw",
+      "source_name": "Yahoo新聞"
+    }
+  ]
+}

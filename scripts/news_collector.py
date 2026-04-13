@@ -9,8 +9,8 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='repla
 from datetime import date
 from pathlib import Path
 import feedparser
+import requests
 from dotenv import load_dotenv
-from groq import Groq
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -30,9 +30,9 @@ NEWS_FILE = PIPE_DIR / "news.json"
 
 DEFAULT_KEYWORD = "AI artificial intelligence technology"
 
-# ── Groq 客戶端 ──────────────────────────────────────────────────────
-_groq_client = Groq(api_key=os.getenv("GROQ_API_KEY", ""))
-GROQ_MODEL   = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# ── Claude Proxy 設定 ────────────────────────────────────────────────
+_PROXY_URL = os.getenv("CLAUDE_PROXY_URL", "http://localhost:3456")
+_LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
 
 
 def _google_news_url(keyword: str, days: int = 3) -> str:
@@ -42,15 +42,19 @@ def _google_news_url(keyword: str, days: int = 3) -> str:
 
 # ── 工具 ────────────────────────────────────────────────────────────
 
-def call_groq(prompt: str) -> str:
-    """呼叫 Groq API，回傳純文字"""
-    resp = _groq_client.chat.completions.create(
-        model=GROQ_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.7,
-        max_tokens=2048,
+def call_llm(prompt: str) -> str:
+    """呼叫 Claude proxy（OpenAI-compatible），回傳純文字"""
+    r = requests.post(
+        f"{_PROXY_URL}/v1/chat/completions",
+        json={
+            "model": _LLM_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 2048,
+        },
+        timeout=60,
     )
-    return resp.choices[0].message.content.strip()
+    r.raise_for_status()
+    return r.json()["choices"][0]["message"]["content"].strip()
 
 
 def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dict]:
@@ -105,8 +109,8 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
 
 請直接回傳只有 3 則的 JSON 陣列，不要加任何其他文字或 markdown。"""
 
-    print(f"  呼叫 Groq ({GROQ_MODEL}) 整理新聞...")
-    raw = call_groq(prompt)
+    print(f"  呼叫 Claude proxy ({_LLM_MODEL}) 整理新聞...")
+    raw = call_llm(prompt)
 
     # 清除可能的 markdown 包裹
     raw = re.sub(r"^```[a-z]*\n?", "", raw.strip())

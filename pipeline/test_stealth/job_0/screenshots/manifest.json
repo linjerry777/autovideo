@@ -1,0 +1,20 @@
+[
+  {
+    "index": 1,
+    "url": "https://variety.com",
+    "title": "Euphoria Season 3 premieres",
+    "screenshot": "screenshots/news_01.png",
+    "images": [],
+    "videos": [],
+    "youtube_urls": []
+  },
+  {
+    "index": 2,
+    "url": "https://www.billboard.com",
+    "title": "Coachella 2026",
+    "screenshot": null,
+    "images": [],
+    "videos": [],
+    "youtube_urls": []
+  }
+]

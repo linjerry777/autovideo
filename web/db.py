@@ -71,11 +71,12 @@ def init_db():
             );
 
             INSERT OR IGNORE INTO settings (key, value) VALUES
-                ('schedule_hour',   '8'),
-                ('schedule_minute', '0'),
-                ('platforms',       'youtube,instagram'),
-                ('skip_upload',     'false'),
-                ('dry_run',         'false');
+                ('schedule_hour',    '8'),
+                ('schedule_minute',  '0'),
+                ('platforms',        'youtube,instagram'),
+                ('skip_upload',      'false'),
+                ('dry_run',          'false'),
+                ('background_mode',  'screenshot');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
