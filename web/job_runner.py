@@ -207,7 +207,7 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
                 extra += ["--dry-run"]
             ok, out = _call_script("news_collector.py", job_key, extra, log_path)
             if not ok:
-                step_update("news", "failed")
+                su("news", "failed")
                 raise RuntimeError(f"news_collector 失敗:\n{out[-500:]}")
 
         su("news", "done")
@@ -221,12 +221,28 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         del _pause_events[f"{job_id}_script"]
         _check_cancel(job_id)
 
-        # ── Step 2: 截圖新聞頁面 ────────────────────────────────────
+        # ── Step 2: 背景素材（截圖 or B-roll）──────────────────────
+        bg_mode = get_setting("background_mode", "screenshot")
         su("screenshot", "running")
-        ok, out = _call_script("screenshot_collector.py", job_key, [], log_path)
+        if bg_mode == "broll":
+            ok, out = _call_script("broll_fetcher.py", job_key, [], log_path)
+            if not ok:
+                # B-roll 抓取失敗不是致命錯誤：fallback 到截圖
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write("\n[WARN] B-roll 失敗，改用截圖模式\n")
+                ok, out = _call_script("screenshot_collector.py", job_key, [], log_path)
+        elif bg_mode == "playwright_stealth":
+            ok, out = _call_script("playwright_scraper.py", job_key, [], log_path)
+            if not ok:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write("\n[WARN] Playwright stealth 失敗，改用截圖模式\n")
+                ok, out = _call_script("screenshot_collector.py", job_key, [], log_path)
+        else:
+            ok, out = _call_script("screenshot_collector.py", job_key, [], log_path)
+
         if not ok:
             su("screenshot", "failed")
-            raise RuntimeError(f"screenshot_collector 失敗:\n{out[-500:]}")
+            raise RuntimeError(f"背景素材抓取失敗:\n{out[-500:]}")
         su("screenshot", "done")
         _check_cancel(job_id)
 

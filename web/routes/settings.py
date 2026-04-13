@@ -22,8 +22,11 @@ class SettingsUpdate(BaseModel):
     fish_audio_key:  str | None = None
     upload_post_key: str | None = None
     unsplash_key:    str | None = None
+    pexels_api_key:  str | None = None
     voice_id:        str | None = None
     x_keywords:      str | None = None
+    # 背景模式
+    background_mode: str | None = None   # "screenshot" | "broll" | "playwright_stealth"
 
 
 @router.get("/settings")
