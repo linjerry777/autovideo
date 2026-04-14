@@ -66,7 +66,7 @@
         <span class="font-medium" :class="page==='dashboard' ? 'text-green-700' : ''">控制台</span>
       </button>
 
-      <button @click="startNewVideo()"
+      <button @click="page='new'"
         class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
         :class="page==='new' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
         <span x-show="page==='new'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
@@ -327,13 +327,19 @@
           </div>
         </div>
         <div>
-          <label class="text-sm font-medium text-gray-700 block mb-2">額外來源</label>
-          <button type="button" @click="useSocial = !useSocial"
-            :class="useSocial ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
-            class="border rounded-lg px-4 py-2 text-sm font-medium transition-all">
-            <span x-show="useSocial" class="mr-1">✓</span>🌐 Social (Reddit · HN)
-          </button>
-          <span x-show="useSocial" class="ml-2 text-xs text-gray-400">搜尋時間約 +20 秒</span>
+          <label class="text-sm font-medium text-gray-700 block mb-2">新聞來源</label>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="[id, icon, label] in [['google','🔍','Google'],['bing','🔎','Bing'],['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['hackernews','🦊','HN'],['last30days','🌐','Social']]" :key="id">
+              <button type="button"
+                @click="toggleSource(id)"
+                :class="selectedSources.has(id) ? 'bg-green-50 border-green-300 text-green-700 ring-1 ring-green-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
+                <span x-show="selectedSources.has(id)" class="text-green-600 text-xs">✓</span>
+                <span x-text="icon + ' ' + label"></span>
+              </button>
+            </template>
+          </div>
+          <p class="text-xs text-gray-400 mt-1.5" x-show="selectedSources.has('last30days') || selectedSources.has('bilibili') || selectedSources.has('zhihu')">含社群來源，搜尋約 +20 秒</p>
         </div>
         <button @click="fetchNews()"
           :disabled="newLangs.size === 0"
@@ -536,7 +542,10 @@
                   <div class="w-40 h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                     <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover">
                     <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover" autoplay muted loop playsinline></video>
-                    <div x-show="!shot.url" class="w-full h-full flex items-center justify-center text-gray-300 text-xs">無截圖</div>
+                    <div x-show="!shot.url" class="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-gray-50 to-gray-100 p-2">
+                      <span class="text-xl">📰</span>
+                      <p class="text-[10px] text-gray-500 text-center leading-tight line-clamp-3" x-text="shot.title || '截圖失敗'"></p>
+                    </div>
                   </div>
                   <!-- Info + actions -->
                   <div class="flex-1 min-w-0">
@@ -567,16 +576,18 @@
                     <button @click="newStep='config'" class="text-green-600 hover:text-green-700 ml-1">重新搜尋 →</button>
                   </div>
 
-                  <template x-for="item in unusedPool()" :key="item.cache_id">
-                    <div @click="replaceNewsItem(shot.index, item.cache_id)"
-                      class="bg-white border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-all">
-                      <p class="text-sm text-gray-800 font-medium leading-tight" x-text="item.title"></p>
-                      <div class="flex gap-2 mt-1.5">
-                        <span class="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full" x-text="item.source"></span>
-                        <span x-show="item.screenshot_blocked" class="text-[11px] text-orange-500">⚠ 曾封鎖</span>
+                  <div class="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+                    <template x-for="item in unusedPool()" :key="item.cache_id">
+                      <div @click="replaceNewsItem(shot.index, item.cache_id)"
+                        class="bg-white border border-gray-200 rounded-xl p-3 cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-all">
+                        <p class="text-sm text-gray-800 font-medium leading-tight" x-text="item.title"></p>
+                        <div class="flex gap-2 mt-1.5">
+                          <span class="text-[11px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full" x-text="item.source"></span>
+                          <span x-show="item.screenshot_blocked" class="text-[11px] text-orange-500">⚠ 曾封鎖</span>
+                        </div>
                       </div>
-                    </div>
-                  </template>
+                    </template>
+                  </div>
                 </div>
               </div>
             </template>
@@ -760,7 +771,10 @@
             <div class="glass rounded-2xl overflow-hidden">
               <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100">
               <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100" autoplay muted loop playsinline></video>
-              <div x-show="!shot.url" class="h-40 bg-gray-50 flex items-center justify-center text-gray-300 text-sm">無截圖</div>
+              <div x-show="!shot.url" class="h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center gap-1 p-3">
+                <span class="text-2xl">📰</span>
+                <p class="text-[10px] text-gray-500 text-center leading-tight line-clamp-3" x-text="shot.title || '截圖失敗'"></p>
+              </div>
               <div class="p-3 flex items-center gap-2">
                 <span class="text-xs text-gray-400 flex-1 font-mono" x-text="'#' + shot.index"></span>
                 <button @click="retakeScreenshot(shot.index)"
@@ -946,7 +960,7 @@ function app() {
     newLangs: new Set(['zh-TW']),   // multi-lang selection for initial fetch
     appendLangs: new Set(),          // multi-lang selection for append
     appending: false,
-    useSocial: false,               // include last30days (Reddit·HN)
+    selectedSources: new Set(['google','bing','bilibili','zhihu']),  // per-source toggle
     newsItems: [],      // currently displayed items (may be filtered)
     newsPool: [],       // all fetched items (for replacement)
     selectedIds: new Set(),
@@ -1020,6 +1034,7 @@ function app() {
       this.selectedIds = new Set()
       this.appendLangs = new Set()
       this.appending = false
+      this.selectedSources = new Set(['google','bing','bilibili','zhihu'])
       this.currentJob = null
       this.sseLog = []
       this.screenshots = []
@@ -1084,13 +1099,19 @@ function app() {
       })
     },
 
+    toggleSource(id) {
+      const s = new Set(this.selectedSources)
+      s.has(id) ? s.delete(id) : s.add(id)
+      this.selectedSources = s
+    },
+
     async fetchNews() {
       if (this.newLangs.size === 0) return
       this.newStep = 'fetching'
       try {
         const kw = this.newTopic || 'AI 人工智慧 科技'
         const langs = [...this.newLangs]
-        const srcParam = this.useSocial ? '&sources=google,bing,bilibili,zhihu,last30days' : ''
+        const srcParam = this.selectedSources.size > 0 ? `&sources=${[...this.selectedSources].join(',')}` : ''
         // Parallel fetch for all selected languages
         const results = await Promise.all(
           langs.map(lang =>
@@ -1118,7 +1139,7 @@ function app() {
       try {
         const kw = this.newTopic || 'AI 人工智慧 科技'
         const langs = [...this.appendLangs]
-        const srcParam = this.useSocial ? '&sources=google,bing,bilibili,zhihu,last30days' : ''
+        const srcParam = this.selectedSources.size > 0 ? `&sources=${[...this.selectedSources].join(',')}` : ''
         const results = await Promise.all(
           langs.map(lang =>
             this.api('GET', `/api/news/fetch?topic=${encodeURIComponent(kw)}&lang=${lang}${srcParam}`)
