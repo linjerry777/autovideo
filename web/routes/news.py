@@ -215,7 +215,7 @@ def _fetch_last30days(keyword: str, limit: int = 20) -> list[dict]:
         import json as _json
         result = subprocess.run(
             [sys.executable, str(_LAST30DAYS_SCRIPT), keyword,
-             "--emit", "json", "--quick", "--search", "reddit,hackernews"],
+             "--emit", "json", "--search", "reddit,hackernews,x,youtube"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", timeout=25,
         )
