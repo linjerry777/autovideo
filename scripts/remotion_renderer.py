@@ -1,0 +1,210 @@
+#!/usr/bin/env python3
+"""
+Remotion Renderer — Python bridge for the Remotion-based animated compositor.
+
+Usage:
+    python scripts/remotion_renderer.py 2026-04-14
+
+This script:
+1. Reads pipeline/DATE/news.json
+2. Resolves audio paths + timing files + screenshot paths
+3. Gets audio durations via ffprobe
+4. Calls: npx remotion render src/index.tsx NewsVideo <output> --props='<json>'
+5. Output → pipeline/DATE/output_remotion.mp4
+
+Environment variables:
+    RENDER_MODE        Must be "remotion" (this script is only called when set)
+    REMOTION_DIR       Optional override for the remotion/ project directory
+    PIPELINE_DIR       Optional override for pipeline root dir
+"""
+
+import base64
+import io
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+# Fix Windows encoding
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
+from datetime import date
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
+TODAY = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
+
+BASE_DIR    = Path(__file__).parent.parent
+PIPELINE_ROOT = Path(os.environ.get("PIPELINE_DIR", BASE_DIR / "pipeline"))
+PIPE_DIR    = PIPELINE_ROOT / TODAY
+NEWS_FILE   = PIPE_DIR / "news.json"
+AUDIO_DIR   = PIPE_DIR / "audio"
+SHOTS_DIR   = PIPE_DIR / "screenshots"
+OUTPUT      = PIPE_DIR / "output.mp4"
+
+REMOTION_DIR = Path(os.environ.get("REMOTION_DIR", BASE_DIR / "remotion"))
+
+
+# ── ffprobe helper ─────────────────────────────────────────────────────────────
+def _find_ffprobe() -> str:
+    """Locate ffprobe (mirrors logic from video_composer.py)."""
+    import shutil
+    if shutil.which("ffprobe"):
+        return "ffprobe"
+    winget_base = Path(os.environ.get("LOCALAPPDATA", "")) / \
+        "Microsoft/WinGet/Packages"
+    for root, _dirs, files in os.walk(winget_base):
+        for f in files:
+            if f.lower() == "ffprobe.exe":
+                return str(Path(root) / f)
+    raise RuntimeError("ffprobe not found — install ffmpeg: winget install Gyan.FFmpeg")
+
+
+def get_duration(path: Path) -> float:
+    ffprobe = _find_ffprobe()
+    r = subprocess.run(
+        [ffprobe, "-v", "error",
+         "-show_entries", "format=duration",
+         "-of", "default=noprint_wrappers=1:nokey=1",
+         str(path)],
+        capture_output=True, text=True,
+    )
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        raise RuntimeError(f"Could not read duration from {path}: {r.stderr.strip()}")
+
+
+# ── File-to-data-URL helper ────────────────────────────────────────────────────
+def file_to_data_url(path: Path, mime: str) -> str:
+    """Encode a local file as a base64 data URL so Remotion's Chromium can load it."""
+    data = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{data}"
+
+
+# ── Props builder ──────────────────────────────────────────────────────────────
+def build_props(pipe_dir: Path, news_file: Path) -> dict:
+    """
+    Read news.json and resolve all file paths → return props dict
+    matching the NewsVideoProps TypeScript interface.
+    """
+    raw = json.loads(news_file.read_text(encoding="utf-8"))
+    items_raw = raw.get("items", [])
+
+    items_out = []
+    for i, item in enumerate(items_raw, 1):
+        audio_path  = pipe_dir / "audio" / f"audio_{i:02d}.mp3"
+        shot_path   = Path(item.get("screenshot") or pipe_dir / "screenshots" / f"news_{i:02d}.png")
+        timing_path = pipe_dir / "audio" / f"audio_{i:02d}_timing.json"
+
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        duration = get_duration(audio_path)
+
+        timing = None
+        if timing_path.exists():
+            try:
+                timing = json.loads(timing_path.read_text(encoding="utf-8"))
+            except Exception as e:
+                print(f"  Warning: could not read timing {timing_path}: {e}", file=sys.stderr)
+
+        # Encode as base64 data URLs — Remotion's Chromium blocks file:// local resources
+        screenshot_url = file_to_data_url(shot_path, "image/png") if shot_path.exists() else ""
+        audio_url = file_to_data_url(audio_path, "audio/mpeg")
+
+        items_out.append({
+            "hook":       item.get("hook", "AI 快訊"),
+            "title":      item.get("title", ""),
+            "script":     item.get("script") or item.get("summary", ""),
+            "source":     item.get("source") or item.get("source_name", ""),
+            "screenshot": screenshot_url,
+            "audio":      audio_url,
+            "timing":     timing,
+            "duration":   duration,
+        })
+
+    return {
+        "date":  TODAY,
+        "items": items_out,
+    }
+
+
+# ── Remotion render ────────────────────────────────────────────────────────────
+def render(props: dict, output: Path):
+    """
+    Run: npx remotion render src/index.tsx NewsVideo <output> --props=<file>
+    inside the remotion/ directory.
+
+    Props are written to a temp JSON file to avoid Windows command-line length
+    limits (WinError 206) when screenshots/audio are base64-encoded data URLs.
+    """
+    import tempfile
+
+    print(f"Running Remotion render → {output.name}", file=sys.stderr)
+    print(f"  Items: {len(props['items'])}", file=sys.stderr)
+    for item in props["items"]:
+        print(f"    - {item['title'][:60]}... (duration={item['duration']:.1f}s)", file=sys.stderr)
+
+    # Write props to a temp file so we don't hit Windows MAX_CMD_LINE limits
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    ) as tf:
+        json.dump(props, tf, ensure_ascii=False)
+        props_file = tf.name
+
+    try:
+        cmd = [
+            "npx", "remotion", "render",
+            "src/index.tsx",
+            "NewsVideo",
+            str(output).replace("\\", "/"),
+            f"--props={props_file.replace(chr(92), '/')}",
+            "--overwrite",
+            "--codec", "h264",
+            "--crf", "18",
+            "--concurrency", "4",
+        ]
+
+        result = subprocess.run(
+            cmd,
+            cwd=str(REMOTION_DIR),
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            shell=(sys.platform == "win32"),
+        )
+    finally:
+        try:
+            os.unlink(props_file)
+        except OSError:
+            pass
+
+    if result.returncode != 0:
+        raise RuntimeError(f"Remotion render failed (exit {result.returncode})")
+
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+def main():
+    if not NEWS_FILE.exists():
+        print(f"ERROR: news.json not found: {NEWS_FILE}", file=sys.stderr)
+        sys.exit(1)
+
+    # Ensure node_modules exist
+    nm = REMOTION_DIR / "node_modules"
+    if not nm.exists():
+        print("Installing Remotion dependencies (npm install)...", file=sys.stderr)
+        subprocess.run(["npm", "install"], cwd=str(REMOTION_DIR), check=True)
+
+    print(f"Building props from {NEWS_FILE}", file=sys.stderr)
+    props = build_props(PIPE_DIR, NEWS_FILE)
+
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    render(props, OUTPUT)
+
+    print(f"\nDone: {OUTPUT}", file=sys.stdout)
+
+
+if __name__ == "__main__":
+    main()

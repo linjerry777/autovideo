@@ -213,7 +213,8 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
  */
 function pathToUrl(p: string): string {
   if (!p) return "";
-  if (/^https?:\/\//i.test(p) || /^file:\/\//i.test(p)) return p;
+  // Already a URL (http/https/file/data) — pass through unchanged
+  if (/^https?:\/\//i.test(p) || /^file:\/\//i.test(p) || /^data:/i.test(p)) return p;
   // Windows: C:\path\to\file → file:///C:/path/to/file
   const normalized = p.replace(/\\/g, "/");
   if (/^[A-Za-z]:\//.test(normalized)) {
