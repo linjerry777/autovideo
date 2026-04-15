@@ -49,12 +49,17 @@ def unsubscribe(job_id: int, q: asyncio.Queue):
 
 
 def _broadcast(job_id: int, data: dict):
-    """Thread-safe: push event to all SSE queues for this job"""
+    """Thread-safe: push event to all SSE queues and step hooks for this job"""
     with _event_queues_lock:
         queues = list(_event_queues.get(job_id, []))
     for q in queues:
         if _main_loop and _main_loop.is_running():
             _main_loop.call_soon_threadsafe(q.put_nowait, data)
+    for hook in list(_step_hooks):
+        try:
+            hook(job_id, data)
+        except Exception:
+            pass
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
@@ -62,6 +67,27 @@ _main_loop: asyncio.AbstractEventLoop | None = None
 def set_event_loop(loop: asyncio.AbstractEventLoop):
     global _main_loop
     _main_loop = loop
+
+
+# ── Step hooks (for Telegram bot, etc.) ──────────────────────────────────────
+_step_hooks: list = []
+
+def add_step_hook(fn):
+    """Register a callable(job_id, data) to be called on every broadcast."""
+    if fn not in _step_hooks:
+        _step_hooks.append(fn)
+
+def remove_step_hook(fn):
+    if fn in _step_hooks:
+        _step_hooks.remove(fn)
+
+
+def resume_job(job_id: int, key=None):
+    """Resume a job paused at a review step."""
+    k = key if key is not None else job_id
+    ev = _pause_events.get(k)
+    if ev:
+        ev.set()
 
 
 def is_running() -> bool:
@@ -113,8 +139,18 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
             _step_update(job_id, date, "audio", "done")
             _check_cancel(job_id)
 
+            # ── Step 3.5: AI 圖生影片 B-roll (optional) ─────────────
+            ai_video_mode = get_setting("ai_video_mode", "").lower()
+            if ai_video_mode in ("kling", "replicate"):
+                _step_update(job_id, date, "ai_video", "running")
+                ok_av, out_av = _call_script("ai_video_fetcher.py", job_key, [], log_path)
+                _step_update(job_id, date, "ai_video", "done" if ok_av else "skipped")
+                _check_cancel(job_id)
+
+            renderer = get_setting("video_renderer", "ffmpeg").lower()
+            script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
             _step_update(job_id, date, "video", "running")
-            ok, out = _call_script("video_composer.py", job_key, [], log_path)
+            ok, out = _call_script(script_name, job_key, [], log_path)
             if not ok:
                 _step_update(job_id, date, "video", "failed")
                 update_job(job_id, status="failed", error=out[-300:])
@@ -150,7 +186,7 @@ def _call_script(script: str, date: str, extra: list = [],
     cmd = [PYTHON, str(SCRIPTS / script), date, *extra]
     result = subprocess.run(
         cmd, capture_output=True, text=True,
-        encoding="utf-8", errors="replace", timeout=600
+        encoding="utf-8", errors="replace", timeout=1500
     )
     output = result.stdout + result.stderr
     if log_path:
@@ -264,12 +300,22 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         su("audio", "done")
         _check_cancel(job_id)
 
+        # ── Step 3.5: AI 圖生影片 B-roll (optional) ─────────────────
+        ai_video_mode = get_setting("ai_video_mode", "").lower()
+        if ai_video_mode in ("kling", "replicate"):
+            su("ai_video", "running")
+            ok_av, out_av = _call_script("ai_video_fetcher.py", job_key, [], log_path)
+            su("ai_video", "done" if ok_av else "skipped")
+            _check_cancel(job_id)
+
         # ── Step 4: 合成影片 ────────────────────────────────────────
+        renderer = get_setting("video_renderer", "ffmpeg").lower()
+        script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
         su("video", "running")
-        ok, out = _call_script("video_composer.py", job_key, [], log_path)
+        ok, out = _call_script(script_name, job_key, [], log_path)
         if not ok:
             su("video", "failed")
-            raise RuntimeError(f"video_composer 失敗:\n{out[-500:]}")
+            raise RuntimeError(f"{script_name} 失敗:\n{out[-500:]}")
         su("video", "done")
 
         # ── Step 5: 上傳 (需用戶手動觸發) ─────────────────────────
