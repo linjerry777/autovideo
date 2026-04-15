@@ -21,9 +21,19 @@ async def lifespan(app: FastAPI):
     hour   = int(get_setting("schedule_hour",   "8"))
     minute = int(get_setting("schedule_minute", "0"))
     scheduler_service.start(hour, minute)
+
+    # Telegram Bot（若已設定 token 則自動啟動）
+    tg_token    = get_setting("telegram_bot_token", "")
+    tg_chat_ids = {c.strip() for c in get_setting("telegram_chat_ids", "").split(",") if c.strip()}
+    if tg_token:
+        from web.telegram_bot import start_bot
+        start_bot(tg_token, tg_chat_ids)
+
     yield
     # 關閉
     scheduler_service.shutdown()
+    from web.telegram_bot import stop_bot
+    stop_bot()
 
 
 app = FastAPI(title="AutoVideo API", lifespan=lifespan)

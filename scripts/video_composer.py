@@ -363,9 +363,36 @@ def make_placeholder(out_path: Path, hue: int = 0):
         ], desc=f"生成純色背景 {out_path.name}")
 
 
+# ── Remotion 模式 ────────────────────────────────────────────────────
+
+def main_remotion():
+    """
+    Delegate rendering to the Remotion compositor.
+    Called when RENDER_MODE=remotion is set.
+    Runs scripts/remotion_renderer.py and exits with its return code.
+    """
+    remotion_script = BASE_DIR / "scripts" / "remotion_renderer.py"
+    if not remotion_script.exists():
+        print(f"❌ 找不到 remotion_renderer.py：{remotion_script}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"🎬 RENDER_MODE=remotion — delegating to Remotion compositor...")
+    result = subprocess.run(
+        [sys.executable, str(remotion_script), TODAY],
+        text=True, encoding="utf-8", errors="replace",
+    )
+    sys.exit(result.returncode)
+
+
 # ── 主程式 ───────────────────────────────────────────────────────────
 
 def main():
+    # ── RENDER_MODE check ──────────────────────────────────────────
+    render_mode = os.environ.get("RENDER_MODE", "ffmpeg").lower()
+    if render_mode == "remotion":
+        main_remotion()
+        return  # unreachable (main_remotion calls sys.exit)
+
     if not NEWS_FILE.exists():
         print(f"❌ 找不到新聞檔：{NEWS_FILE}", file=sys.stderr)
         sys.exit(1)

@@ -107,8 +107,12 @@ def stats():
 
 
 
+class UploadRequest(BaseModel):
+    platforms: list[str] | None = None   # ["youtube","tiktok","instagram"]; None = use job's stored
+
+
 @router.post("/jobs/{job_id}/upload")
-def upload_job(job_id: int):
+def upload_job(job_id: int, req: UploadRequest | None = None):
     """手動觸發上傳 — 在用戶確認影片後呼叫"""
     job = get_job(job_id)
     if not job:
@@ -119,7 +123,10 @@ def upload_job(job_id: int):
         raise HTTPException(409, "Already uploading")
 
     job_key   = f"{job['date']}/job_{job_id}"
-    platforms = (job.get("platforms") or "youtube,instagram").split(",")
+    req_plats = (req.platforms if req else None) or []
+    platforms = req_plats or (job.get("platforms") or "youtube,instagram").split(",")
+    if req_plats:
+        update_job(job_id, platforms=",".join(req_plats))
     dry_run   = get_setting("dry_run", "false") == "true"
 
     plat_args = ["--platforms"] + platforms

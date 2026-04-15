@@ -83,6 +83,42 @@ def file_to_data_url(path: Path, mime: str) -> str:
     return f"data:{mime};base64,{data}"
 
 
+# ── Scene resolver (fills scene_recipe for free-text scene_type) ──────────────
+PRESET_SCENE_KEYS = {"fire", "race", "money", "robot", "warning", "trophy", "default", ""}
+
+def resolve_scenes_inplace(news_file: Path) -> int:
+    """Call Claude to resolve free-text scene_type → scene_recipe.
+    Writes back to news.json. Returns count of items resolved."""
+    try:
+        # Import lazy so this script can run without the web package in some setups
+        sys.path.insert(0, str(BASE_DIR))
+        from web.claude_client import resolve_scene_recipe
+    except Exception as e:
+        print(f"  [scene] resolver unavailable: {e}", file=sys.stderr)
+        return 0
+
+    data = json.loads(news_file.read_text(encoding="utf-8"))
+    items = data.get("items", [])
+    resolved = 0
+    for item in items:
+        st = (item.get("scene_type") or "").strip()
+        if not st or st in PRESET_SCENE_KEYS:
+            continue
+        if item.get("scene_recipe"):  # already cached
+            continue
+        print(f"  [scene] resolving {st!r}...", file=sys.stderr)
+        recipe = resolve_scene_recipe(st, context_title=item.get("title", ""))
+        if recipe:
+            item["scene_recipe"] = recipe
+            resolved += 1
+            print(f"  [scene] got {len(recipe.get('layers', []))} layers", file=sys.stderr)
+        else:
+            print(f"  [scene] resolve failed; will fall back to default", file=sys.stderr)
+    if resolved:
+        news_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    return resolved
+
+
 # ── Props builder ──────────────────────────────────────────────────────────────
 def build_props(pipe_dir: Path, news_file: Path) -> dict:
     """
@@ -115,14 +151,16 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
         audio_url = file_to_data_url(audio_path, "audio/mpeg")
 
         items_out.append({
-            "hook":       item.get("hook", "AI 快訊"),
-            "title":      item.get("title", ""),
-            "script":     item.get("script") or item.get("summary", ""),
-            "source":     item.get("source") or item.get("source_name", ""),
-            "screenshot": screenshot_url,
-            "audio":      audio_url,
-            "timing":     timing,
-            "duration":   duration,
+            "hook":         item.get("hook", "AI 快訊"),
+            "title":        item.get("title", ""),
+            "script":       item.get("script") or item.get("summary", ""),
+            "source":       item.get("source") or item.get("source_name", ""),
+            "scene_type":   item.get("scene_type", ""),
+            "scene_recipe": item.get("scene_recipe"),
+            "screenshot":   screenshot_url,
+            "audio":        audio_url,
+            "timing":       timing,
+            "duration":     duration,
         })
 
     return {
@@ -196,6 +234,11 @@ def main():
     if not nm.exists():
         print("Installing Remotion dependencies (npm install)...", file=sys.stderr)
         subprocess.run(["npm", "install"], cwd=str(REMOTION_DIR), check=True)
+
+    print(f"Resolving scene recipes...", file=sys.stderr)
+    resolved = resolve_scenes_inplace(NEWS_FILE)
+    if resolved:
+        print(f"  Resolved {resolved} scene recipe(s)", file=sys.stderr)
 
     print(f"Building props from {NEWS_FILE}", file=sys.stderr)
     props = build_props(PIPE_DIR, NEWS_FILE)

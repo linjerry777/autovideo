@@ -40,7 +40,7 @@ export const NewsVideo: React.FC<NewsVideoProps> = ({ items }) => {
         >
           <NewsItemComponent
             item={item}
-            segmentStartFrame={startFrame}
+            index={idx}
             totalFrames={durationFrames}
           />
         </Sequence>

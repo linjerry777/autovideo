@@ -35,6 +35,15 @@
 </head>
 <body class="bg-[#f9fafb] text-gray-900 h-full">
 
+<datalist id="scene-presets">
+  <option value="default">預設（文字卡片）</option>
+  <option value="fire">🔥 攻擊/爆炸/燃燒</option>
+  <option value="race">🏃 競賽/追趕/對決</option>
+  <option value="money">💰 融資/估值/錢</option>
+  <option value="robot">🤖 AI/機器人/科技</option>
+  <option value="warning">⚠️ 爭議/警告/風險</option>
+  <option value="trophy">🏆 突破/獲獎/創紀錄</option>
+</datalist>
 <div x-data="app()" x-init="init()" x-cloak class="flex h-screen overflow-hidden">
 
   <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
@@ -73,6 +82,14 @@
         <!-- Clapperboard / play -->
         <svg class="w-[15px] h-[15px] flex-shrink-0 transition-colors" :class="page==='new'||page==='job' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         <span class="font-medium" :class="page==='new'||page==='job' ? 'text-green-700' : ''">生成影片</span>
+      </button>
+
+      <button @click="page='accounts'; loadAccounts()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='accounts' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='accounts'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <svg class="w-[15px] h-[15px] flex-shrink-0" :class="page==='accounts' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6 2.87a4 4 0 100-8 4 4 0 000 8zm6-8a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        <span class="font-medium" :class="page==='accounts' ? 'text-green-700' : ''">帳號</span>
       </button>
 
       <button @click="page='settings'; loadSettings()"
@@ -513,6 +530,12 @@
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
               </div>
               <div>
+                <label class="text-xs font-medium text-gray-400 block mb-1">動畫場景</label>
+                <input x-model="scriptItems[i].scene_type" type="text" list="scene-presets"
+                  placeholder="預設樣式，或輸入：fire / race / 專家推眼鏡 / 高雄…"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+              </div>
+              <div>
                 <label class="text-xs font-medium text-gray-400 block mb-1">
                   腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
                 </label>
@@ -617,8 +640,10 @@
         <!-- Done: Video + Upload -->
         <div x-show="currentJob?.status==='done'" class="space-y-4">
           <div class="glass rounded-2xl overflow-hidden">
-            <video controls class="w-full max-h-80 bg-black"
-              :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video'"></video>
+            <template x-if="currentJob?.status==='done'">
+              <video controls class="w-full max-h-80 bg-black"
+                :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"></video>
+            </template>
           </div>
           <div class="glass rounded-2xl p-5 space-y-4">
             <p class="text-sm font-semibold text-gray-700">上傳到平台</p>
@@ -629,13 +654,27 @@
               尚未設定 Upload-Post API Key。
               <button @click="page='settings'; loadSettings()" class="underline font-medium ml-1">前往設定 →</button>
             </div>
+            <!-- Auto-detected platforms (from Upload-Post bound socials) -->
+            <div x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
+                 class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+              <span x-show="uploadPlatforms.size > 0">將上傳到：</span>
+              <span x-show="uploadPlatforms.size === 0" class="text-amber-600">
+                ⚠️ 帳號尚未綁定任何社群 — <button @click="page='accounts'; loadAccounts()" class="underline">前往綁定</button>
+              </span>
+              <template x-for="p in [...uploadPlatforms]" :key="p">
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs font-medium">
+                  <span x-text="platformIcon(p) + ' ' + (PLATFORMS.find(x=>x.id===p)?.label || p)"></span>
+                </span>
+              </template>
+            </div>
+
             <div class="flex gap-3 items-center">
               <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
                 @click="uploadJob()"
-                :disabled="!uploadKeySet"
-                :class="!uploadKeySet ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+                :disabled="!uploadKeySet || uploadPlatforms.size === 0"
+                :class="(!uploadKeySet || uploadPlatforms.size === 0) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
                 class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
-                上傳到 YouTube/平台
+                上傳到 <span x-text="uploadPlatforms.size"></span> 個平台
               </button>
               <span x-show="currentJob?.step_upload==='uploading'"
                 class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium">
@@ -747,6 +786,19 @@
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
             </div>
             <div>
+              <label class="text-xs font-medium text-gray-400 block mb-1">動畫場景</label>
+              <select x-model="scriptItems[i].scene_type"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
+                <option value="default">預設（純文字卡片）</option>
+                <option value="fire">🔥 攻擊/爆炸/燃燒</option>
+                <option value="race">🏃 競賽/追趕/對決</option>
+                <option value="money">💰 融資/估值/錢</option>
+                <option value="robot">🤖 AI/機器人/科技</option>
+                <option value="warning">⚠️ 爭議/警告/風險</option>
+                <option value="trophy">🏆 突破/獲獎/創紀錄</option>
+              </select>
+            </div>
+            <div>
               <label class="text-xs font-medium text-gray-400 block mb-1">
                 腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
               </label>
@@ -807,14 +859,32 @@
       <!-- Done -->
       <div x-show="currentJob?.status==='done'" class="space-y-4">
         <div class="glass rounded-2xl overflow-hidden">
-          <video controls class="w-full max-h-96 bg-black"
-            :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video'"></video>
+          <template x-if="currentJob?.status==='done'">
+            <video controls class="w-full max-h-96 bg-black"
+              :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"></video>
+          </template>
         </div>
+        <!-- Platform picker -->
+        <div x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
+             class="flex flex-wrap gap-2">
+          <template x-for="p in ['youtube','tiktok','instagram']" :key="p">
+            <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 text-xs">
+              <input type="checkbox" :value="p"
+                :checked="uploadPlatforms.has(p)"
+                @change="togglePlatform(p)"
+                class="accent-green-600">
+              <span class="font-medium" x-text="p==='youtube' ? '▶️ YouTube' : p==='tiktok' ? '🎵 TikTok' : '📷 Instagram'"></span>
+            </label>
+          </template>
+        </div>
+
         <div class="flex gap-3">
           <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
             @click="uploadJob()"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
-            上傳到平台
+            :disabled="uploadPlatforms.size === 0"
+            :class="uploadPlatforms.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
+            上傳到 <span x-text="uploadPlatforms.size"></span> 個平台
           </button>
           <span x-show="currentJob?.step_upload==='uploading'"
             class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium py-2.5">
@@ -842,6 +912,164 @@
         <button @click="retryStep('video')" x-show="currentJob?.step_video==='failed'"
           class="text-sm bg-white hover:bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-gray-600 transition-all">
           重試影片
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Accounts ───────────────────────────────────────────────────── -->
+    <div x-show="page==='accounts'" class="p-8 max-w-4xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-gray-900">帳號管理</h1>
+          <p class="text-sm text-gray-500 mt-1">Upload-Post 發布帳號與社群平台綁定</p>
+        </div>
+        <button @click="loadAccounts()"
+          class="px-3 py-2 rounded-xl text-xs text-gray-500 border border-gray-200 hover:border-gray-300 hover:text-gray-800 transition-colors">
+          🔄 重新整理
+        </button>
+      </div>
+
+      <!-- API status banner -->
+      <div class="glass rounded-2xl px-5 py-4 flex items-center gap-3"
+        :class="accountsApi?.ok ? '' : 'border border-red-200'">
+        <span class="w-2.5 h-2.5 rounded-full"
+          :class="accountsApi?.ok ? 'bg-emerald-500' : 'bg-red-500'"></span>
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-gray-700">Upload-Post API</p>
+          <p class="text-xs text-gray-500 mt-0.5"
+             x-text="accountsApi?.ok ? (accountsApi.email + ' · ' + (accountsApi.plan||'') + ' plan') : '未連線 — 請至設定填寫 API Key'"></p>
+        </div>
+      </div>
+
+      <!-- Account list -->
+      <div class="glass rounded-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+          <span class="text-xs font-semibold text-gray-500 tracking-wider uppercase">發布帳號 (<span x-text="accountsList.length"></span>)</span>
+          <button @click="accountsCreateOpen=true"
+            :disabled="!accountsApi?.ok"
+            class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 hover:bg-green-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            + 新增帳號
+          </button>
+        </div>
+        <div x-show="accountsList.length === 0" class="py-12 text-center text-sm text-gray-400">
+          尚無帳號，點右上角新增
+        </div>
+        <template x-for="acc in accountsList" :key="acc.username">
+          <div class="px-5 py-4 border-b border-gray-50 flex items-start gap-4 hover:bg-gray-50/50 transition-colors">
+            <div class="w-9 h-9 rounded-xl bg-gray-100 text-gray-600 font-bold flex items-center justify-center"
+                 x-text="acc.username.slice(0,1).toUpperCase()"></div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-semibold text-gray-800" x-text="acc.username"></div>
+              <div class="flex flex-wrap gap-1 mt-1.5">
+                <template x-for="[plat, info] in Object.entries(acc.social_accounts || {}).filter(([,v]) => v && typeof v === 'object')" :key="plat">
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-gray-50 border border-gray-200 text-gray-600">
+                    <span x-text="platformIcon(plat)"></span>
+                    <span x-text="info.display_name || info.handle || plat"></span>
+                  </span>
+                </template>
+                <span x-show="Object.entries(acc.social_accounts || {}).filter(([,v]) => v && typeof v === 'object').length === 0"
+                  class="text-[11px] text-gray-400 italic">尚未綁定任何社群</span>
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button @click="linkAccount(acc.username)"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium bg-green-50 border border-green-200 text-green-700 hover:bg-green-100 transition-colors">
+                🔗 綁定
+              </button>
+              <button @click="deleteAccount(acc.username)"
+                class="px-3 py-1.5 rounded-lg text-xs text-red-500 border border-transparent hover:border-red-200 hover:bg-red-50 transition-colors">
+                🗑
+              </button>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- Upload status checker -->
+      <div class="glass rounded-2xl p-5 space-y-3">
+        <h3 class="text-xs font-semibold text-gray-500 tracking-wider uppercase">查詢上傳狀態</h3>
+        <p class="text-xs text-gray-400">輸入 request_id 查各平台發布進度</p>
+        <div class="flex gap-2">
+          <input x-model="accountsStatusId" type="text" placeholder="request_id..."
+            @keydown.enter="checkUploadStatus()"
+            class="flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-400">
+          <button @click="checkUploadStatus()"
+            class="px-4 py-2 rounded-xl text-xs font-semibold bg-green-600 hover:bg-green-700 text-white">
+            查詢
+          </button>
+        </div>
+        <div x-show="accountsStatusResult" class="rounded-xl bg-gray-50 border border-gray-200 p-3 text-xs space-y-2">
+          <div><span class="font-semibold">狀態：</span><span x-text="accountsStatusResult?.status"></span></div>
+          <template x-for="[plat, info] in Object.entries(accountsStatusResult?.platforms || {})" :key="plat">
+            <div class="flex items-center justify-between">
+              <span x-text="platformIcon(plat) + ' ' + plat"></span>
+              <span class="flex items-center gap-2">
+                <span x-text="info.status" :class="info.status==='completed' ? 'text-emerald-600' : info.status==='failed' ? 'text-red-600' : 'text-amber-600'"></span>
+                <a x-show="info.url" :href="info.url" target="_blank" class="text-green-600 underline">查看 ↗</a>
+              </span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- Create Account Modal -->
+    <div x-show="accountsCreateOpen" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      @click.self="accountsCreateOpen=false">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+        <div class="flex justify-between">
+          <h3 class="font-semibold text-gray-900">新增發布帳號</h3>
+          <button @click="accountsCreateOpen=false" class="text-gray-400 hover:text-gray-700">✕</button>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">帳號名稱 *</label>
+          <input x-model="accountsNewName" type="text" placeholder="例如：client_a"
+            class="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 block mb-1">Email（選填）</label>
+          <input x-model="accountsNewEmail" type="email" placeholder="client@example.com"
+            class="w-full rounded-xl border border-gray-200 px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+        </div>
+        <div class="flex gap-2 pt-1">
+          <button @click="accountsCreateOpen=false"
+            class="flex-1 py-2.5 rounded-xl text-sm border border-gray-200 text-gray-500 hover:bg-gray-50">取消</button>
+          <button @click="createAccount()"
+            class="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white">建立</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Link Account Modal -->
+    <div x-show="accountsLinkInfo" x-cloak
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+      @click.self="accountsLinkInfo=null; loadAccounts()">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+        <div class="flex justify-between">
+          <h3 class="font-semibold text-gray-900">綁定社群帳號</h3>
+          <button @click="accountsLinkInfo=null; loadAccounts()" class="text-gray-400 hover:text-gray-700">✕</button>
+        </div>
+        <p class="text-xs text-gray-500">帳號：<span class="font-mono text-gray-700" x-text="accountsLinkInfo?.name"></span></p>
+        <button @click="window.open(accountsLinkInfo?.url, '_blank', 'width=520,height=700')"
+          class="w-full py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold">
+          🔗 開啟綁定頁面
+        </button>
+        <div class="flex items-center gap-3">
+          <div class="flex-1 h-px bg-gray-200"></div>
+          <span class="text-xs text-gray-400">或複製連結</span>
+          <div class="flex-1 h-px bg-gray-200"></div>
+        </div>
+        <div class="flex gap-2">
+          <input readonly :value="accountsLinkInfo?.url"
+            class="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-[11px] font-mono text-gray-500">
+          <button @click="copyToClipboard(accountsLinkInfo?.url)"
+            class="px-3 py-2 rounded-xl text-xs bg-gray-50 border border-gray-200 hover:bg-gray-100">複製</button>
+        </div>
+        <p x-show="accountsLinkInfo?.expires_at" class="text-[11px] text-gray-400 text-center">有效期：<span x-text="accountsLinkInfo?.expires_at"></span></p>
+        <button @click="accountsLinkInfo=null; loadAccounts()"
+          class="w-full py-2.5 rounded-xl border border-gray-200 text-sm text-gray-500 hover:bg-gray-50">
+          完成，刷新帳號狀態
         </button>
       </div>
     </div>
@@ -1038,6 +1266,26 @@ function app() {
     scriptItems: [],
     replacePanelOpen: null,   // shot.index of open replace panel
     uploadKeySet: false,
+    uploadPlatforms: new Set(['youtube','tiktok','instagram']),
+
+    // Accounts page state
+    accountsApi: null,
+    accountsList: [],
+    accountsCreateOpen: false,
+    accountsNewName: '',
+    accountsNewEmail: '',
+    accountsLinkInfo: null,
+    accountsStatusId: '',
+    accountsStatusResult: null,
+
+    PLATFORMS: [
+      { id: 'youtube',   icon: '▶️', label: 'YouTube',   activeCls: 'bg-red-50 border-red-300 text-red-700' },
+      { id: 'tiktok',    icon: '🎵', label: 'TikTok',    activeCls: 'bg-gray-100 border-gray-400 text-gray-800' },
+      { id: 'instagram', icon: '📷', label: 'Instagram', activeCls: 'bg-pink-50 border-pink-300 text-pink-700' },
+      { id: 'facebook',  icon: '📘', label: 'Facebook',  activeCls: 'bg-blue-50 border-blue-300 text-blue-700' },
+      { id: 'threads',   icon: '🧵', label: 'Threads',   activeCls: 'bg-gray-100 border-gray-400 text-gray-800' },
+      { id: 'x',         icon: '✖️', label: 'X',         activeCls: 'bg-gray-100 border-gray-400 text-gray-800' },
+    ],
 
     settings: {},
     settingsSaved: false,
@@ -1314,6 +1562,27 @@ function app() {
       if (job.step_audio === 'review') {
         await this.loadScreenshots(job.id)
       }
+      // Auto-derive platforms from Upload-Post bound socials
+      await this.refreshBoundPlatforms()
+    },
+
+    async refreshBoundPlatforms() {
+      try {
+        const [settings, list] = await Promise.all([
+          this.api('GET', '/api/settings').catch(() => ({})),
+          this.api('GET', '/api/accounts').catch(() => ({ users: [] })),
+        ])
+        const profile = settings.upload_post_profile || 'yt'
+        const admin = (list.users || []).find(a => a.username === profile) || (list.users || [])[0]
+        const bound = admin
+          ? Object.entries(admin.social_accounts || {})
+              .filter(([, v]) => v && typeof v === 'object')
+              .map(([k]) => k)
+          : []
+        this.uploadPlatforms = new Set(bound)
+      } catch (_) {
+        this.uploadPlatforms = new Set()
+      }
     },
 
     async loadScreenshots(jobId) {
@@ -1381,11 +1650,85 @@ function app() {
       } catch (e) { this.showToast('繼續失敗：' + e.message) }
     },
 
-    async uploadJob() {
+    platformIcon(p) {
+      return ({youtube:'▶️',tiktok:'🎵',instagram:'📷',facebook:'📘',threads:'🧵',x:'✖️',linkedin:'💼',bluesky:'🦋',pinterest:'📌'})[p] || '🔗'
+    },
+
+    async loadAccounts() {
       try {
-        await this.api('POST', `/api/jobs/${this.currentJob.id}/upload`)
+        const [me, list] = await Promise.all([
+          this.api('GET', '/api/accounts/me').catch(() => ({ ok: false })),
+          this.api('GET', '/api/accounts').catch(() => ({ users: [] })),
+        ])
+        this.accountsApi  = me?.success ? { ok: true, email: me.email, plan: me.plan } : { ok: false }
+        this.accountsList = list?.users || []
+      } catch (e) { this.showToast('載入失敗：' + e.message) }
+    },
+
+    async createAccount() {
+      if (!this.accountsNewName.trim()) { this.showToast('請填寫帳號名稱'); return }
+      try {
+        await this.api('POST', '/api/accounts', {
+          username: this.accountsNewName.trim(),
+          email: this.accountsNewEmail.trim() || null,
+        })
+        this.accountsCreateOpen = false
+        this.accountsNewName = ''
+        this.accountsNewEmail = ''
+        await this.loadAccounts()
+        this.showToast('帳號已建立')
+      } catch (e) { this.showToast('建立失敗：' + e.message) }
+    },
+
+    async linkAccount(username) {
+      try {
+        const res = await this.api('POST', `/api/accounts/${username}/link`)
+        this.accountsLinkInfo = { url: res.url, expires_at: res.duration, name: username }
+      } catch (e) { this.showToast('產生綁定連結失敗：' + e.message) }
+    },
+
+    async deleteAccount(username) {
+      if (!confirm(`確定刪除帳號「${username}」？`)) return
+      try {
+        await this.api('DELETE', `/api/accounts/${username}`)
+        await this.loadAccounts()
+        this.showToast('已刪除')
+      } catch (e) { this.showToast('刪除失敗：' + e.message) }
+    },
+
+    async checkUploadStatus() {
+      if (!this.accountsStatusId.trim()) return
+      this.accountsStatusResult = null
+      try {
+        this.accountsStatusResult = await this.api('GET', `/api/accounts/upload-status/${this.accountsStatusId.trim()}`)
+      } catch (e) { this.showToast('查詢失敗：' + e.message) }
+    },
+
+    async copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text)
+        this.showToast('已複製連結')
+      } catch { this.showToast('複製失敗') }
+    },
+
+    togglePlatform(p) {
+      if (this.uploadPlatforms.has(p)) this.uploadPlatforms.delete(p)
+      else this.uploadPlatforms.add(p)
+      // trigger Alpine reactivity on Set
+      this.uploadPlatforms = new Set(this.uploadPlatforms)
+    },
+
+    async uploadJob() {
+      if (this.uploadPlatforms.size === 0) {
+        this.showToast('請先勾選至少一個平台')
+        return
+      }
+      try {
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/upload`, {
+          platforms: [...this.uploadPlatforms],
+        })
         this.currentJob.step_upload = 'uploading'
-        this.showToast('上傳中…')
+        this.showToast(`上傳中… (${[...this.uploadPlatforms].join(', ')})`)
       } catch (e) { this.showToast('上傳失敗：' + e.message) }
     },
 

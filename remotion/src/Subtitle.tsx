@@ -9,23 +9,18 @@ import { TimingEntry } from "./types";
 interface SubtitleProps {
   timing: TimingEntry[] | null;
   script: string;
-  segmentStartFrame: number;  // absolute frame where this segment starts
 }
 
 /**
  * Renders animated subtitles synced to timing JSON.
  * Falls back to splitting script into 4 equal chunks if timing is absent.
+ *
+ * Runs inside <Sequence from=N>, so useCurrentFrame() is already 0-based
+ * relative to the sequence start.
  */
-export const Subtitle: React.FC<SubtitleProps> = ({
-  timing,
-  script,
-  segmentStartFrame,
-}) => {
-  const frame = useCurrentFrame();
+export const Subtitle: React.FC<SubtitleProps> = ({ timing, script }) => {
+  const localFrame = useCurrentFrame();
   const { fps } = useVideoConfig();
-
-  // Convert frame to local seconds within this segment
-  const localFrame = frame - segmentStartFrame;
   const localSeconds = localFrame / fps;
 
   // Build subtitle chunks from timing or equal split
@@ -79,7 +74,7 @@ export const Subtitle: React.FC<SubtitleProps> = ({
     <div
       style={{
         position: "absolute",
-        bottom: 160,
+        bottom: 60,
         left: 0,
         right: 0,
         display: "flex",
@@ -92,10 +87,11 @@ export const Subtitle: React.FC<SubtitleProps> = ({
     >
       <div
         style={{
-          backgroundColor: "rgba(0,0,0,0.6)",
+          backgroundColor: "rgba(0,0,0,0.7)",
           borderRadius: 12,
-          padding: "14px 28px",
+          padding: "10px 22px",
           textAlign: "center",
+          maxWidth: "92%",
         }}
       >
         {wrapped.map((line, idx) => (
@@ -104,10 +100,10 @@ export const Subtitle: React.FC<SubtitleProps> = ({
             style={{
               fontFamily:
                 '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif',
-              fontSize: 62,
+              fontSize: 52,
               fontWeight: "bold",
               color: "#FFFFFF",
-              lineHeight: 1.35,
+              lineHeight: 1.3,
               textShadow: "2px 2px 6px rgba(0,0,0,0.9)",
               letterSpacing: 2,
               display: "block",
