@@ -922,6 +922,71 @@
           </label>
         </div>
 
+        <!-- AI 圖生影片設定 -->
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-700">🎬 AI 圖生影片 B-roll</h3>
+          <p class="text-xs text-gray-400">將截圖動態化為影片片段，替代靜態 Ken Burns 效果</p>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block">模式</label>
+            <select x-model="settings.ai_video_mode"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="">停用（Ken Burns 效果）</option>
+              <option value="kling">Kling AI（高品質，需申請帳號）</option>
+              <option value="replicate">Replicate SVD（備用方案）</option>
+            </select>
+          </div>
+          <template x-if="settings.ai_video_mode === 'kling'">
+            <div class="space-y-2">
+              <input x-model="settings.kling_access_key" type="password" placeholder="Kling Access Key"
+                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <input x-model="settings.kling_secret_key" type="password" placeholder="Kling Secret Key"
+                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <p class="text-xs text-gray-400">申請：<a href="https://klingai.com" target="_blank" class="text-blue-500 underline">klingai.com</a> → API → 開發者中心</p>
+            </div>
+          </template>
+          <template x-if="settings.ai_video_mode === 'replicate'">
+            <div>
+              <input x-model="settings.replicate_api_token" type="password" placeholder="Replicate API Token (r8_...)"
+                class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <p class="text-xs text-gray-400 mt-1">申請：<a href="https://replicate.com/account/api-tokens" target="_blank" class="text-blue-500 underline">replicate.com</a></p>
+            </div>
+          </template>
+        </div>
+
+        <!-- 影片渲染器 -->
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-700">🎞️ 影片渲染器</h3>
+          <p class="text-xs text-gray-400">Remotion 提供 React 動畫（彈跳、漸入、Ken Burns）；FFmpeg 較快但僅靜態合成</p>
+          <select x-model="settings.video_renderer"
+            class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="ffmpeg">FFmpeg（快速、穩定，預設）</option>
+            <option value="remotion">Remotion（React 動畫，較慢）</option>
+          </select>
+          <p x-show="settings.video_renderer === 'remotion'" class="text-xs text-amber-600">
+            ⚠️ 首次使用需在 <span class="font-mono bg-gray-100 px-1 rounded">remotion/</span> 執行 <span class="font-mono bg-gray-100 px-1 rounded">npm install</span>，渲染時間約 5–10 分鐘
+          </p>
+        </div>
+
+        <!-- Telegram Bot 設定 -->
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <h3 class="text-sm font-semibold text-gray-700">📱 Telegram 手機遙控</h3>
+          <p class="text-xs text-gray-400">設定後可用手機 Telegram 觸發 Pipeline、查看進度、接收完成影片</p>
+          <div class="space-y-2">
+            <input x-model="settings.telegram_bot_token" type="password" placeholder="Bot Token（@BotFather 取得）"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <input x-model="settings.telegram_chat_ids" type="text" placeholder="Chat ID（@userinfobot 取得），多個用逗號分隔"
+              class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          </div>
+          <div class="text-xs text-gray-400 space-y-0.5">
+            <p>1. Telegram 搜尋 <span class="font-mono bg-gray-100 px-1 rounded">@BotFather</span> → /newbot → 複製 Token</p>
+            <p>2. 搜尋 <span class="font-mono bg-gray-100 px-1 rounded">@userinfobot</span> → 複製你的 Chat ID</p>
+            <p>3. 儲存設定後重啟 server，Bot 自動啟動</p>
+          </div>
+          <div x-show="settings.telegram_bot_token" class="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+            可用指令：<span class="font-mono">/run</span> 觸發 &nbsp;·&nbsp; <span class="font-mono">/status</span> 查看 &nbsp;·&nbsp; <span class="font-mono">/cancel</span> 取消 &nbsp;·&nbsp; <span class="font-mono">/jobs</span> 歷史
+          </div>
+        </div>
+
         <div class="flex items-center gap-3 pt-1">
           <button @click="saveSettings()"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
