@@ -76,12 +76,17 @@ def init_db():
                 ('platforms',        'youtube,instagram'),
                 ('skip_upload',      'false'),
                 ('dry_run',          'false'),
-                ('background_mode',  'screenshot');
+                ('background_mode',  'screenshot'),
+                ('ai_video_mode',         ''),
+                ('telegram_bot_token',    ''),
+                ('telegram_chat_ids',     ''),
+                ('video_renderer',        'ffmpeg');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}
         new_cols = [
             ("step_screenshot",    "TEXT DEFAULT 'pending'"),
+            ("step_ai_video",      "TEXT DEFAULT 'pending'"),
             ("tokens_used",        "INTEGER DEFAULT 0"),
             ("lang",               "TEXT DEFAULT 'zh-TW'"),
             ("selected_cache_ids", "TEXT DEFAULT ''"),

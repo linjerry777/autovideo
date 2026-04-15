@@ -26,7 +26,17 @@ class SettingsUpdate(BaseModel):
     voice_id:        str | None = None
     x_keywords:      str | None = None
     # 背景模式
-    background_mode: str | None = None   # "screenshot" | "broll" | "playwright_stealth"
+    background_mode:      str | None = None   # "screenshot" | "broll" | "playwright_stealth"
+    # AI 圖生影片
+    ai_video_mode:        str | None = None   # "" | "kling" | "replicate"
+    kling_access_key:     str | None = None
+    kling_secret_key:     str | None = None
+    replicate_api_token:  str | None = None
+    # Telegram Bot
+    telegram_bot_token:   str | None = None
+    telegram_chat_ids:    str | None = None   # comma-separated chat IDs
+    # 影片渲染器
+    video_renderer:       str | None = None   # "ffmpeg" | "remotion"
 
 
 @router.get("/settings")
