@@ -553,6 +553,7 @@ def fetch_news(
     topic: str = Query(None),
     lang: str = Query("zh-TW"),
     sources: str = Query(None),  # 逗號分隔，e.g. "google,bilibili,zhihu"
+    force: bool = Query(False),  # True = skip cache
 ):
     if lang not in LANG_CONFIG:
         lang = "zh-TW"
@@ -572,8 +573,8 @@ def fetch_news(
     today = datetime.now(timezone.utc).date().isoformat()
     cache_key = f"{keyword}|{'|'.join(sorted(selected_sources))}"
 
-    # 檢查今日快取（同 keyword + 相同來源組合）
-    cached = get_cached_news(cache_key, lang, today)
+    # 檢查今日快取（同 keyword + 相同來源組合）；force=true 跳過
+    cached = None if force else get_cached_news(cache_key, lang, today)
     if cached:
         return {
             "keyword":    keyword,

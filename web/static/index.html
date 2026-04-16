@@ -314,7 +314,11 @@
           <span class="text-xs text-gray-400 bg-gray-100 px-2.5 py-1.5 rounded-lg font-mono truncate max-w-[140px]" x-text="newTopic || 'AI 人工智慧 科技'"></span>
           <button @click="newStep='config'"
             class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-2.5 py-1.5 transition-all hover:border-gray-300">
-            重新搜尋
+            修改條件
+          </button>
+          <button @click="fetchNews(true)"
+            class="text-xs text-orange-600 hover:text-orange-700 border border-orange-200 rounded-lg px-2.5 py-1.5 transition-all hover:border-orange-300">
+            🔄 強制重抓
           </button>
         </div>
       </div>
@@ -1480,17 +1484,20 @@ function app() {
       this.selectedSources = new Set(presets[preset] || presets.news)
     },
 
-    async fetchNews() {
+    async fetchNews(force = false) {
       if (this.newLangs.size === 0) return
       this.newStep = 'fetching'
       try {
-        const kw = this.newTopic || 'AI 人工智慧 科技'
+        const TRENDING = new Set(['reddit','youtube_tw','youtube_us','ptt','dcard','bilibili','zhihu'])
+        const allTrending = [...this.selectedSources].every(s => TRENDING.has(s))
+        const kw = (!allTrending && (this.newTopic || 'AI 人工智慧 科技')) || (this.newTopic || '')
         const langs = [...this.newLangs]
         const srcParam = this.selectedSources.size > 0 ? `&sources=${[...this.selectedSources].join(',')}` : ''
+        const forceParam = force ? '&force=true' : ''
         // Parallel fetch for all selected languages
         const results = await Promise.all(
           langs.map(lang =>
-            this.api('GET', `/api/news/fetch?topic=${encodeURIComponent(kw)}&lang=${lang}${srcParam}`)
+            this.api('GET', `/api/news/fetch?topic=${encodeURIComponent(kw)}&lang=${lang}${srcParam}${forceParam}`)
               .then(data => this._tagItems(data.items || [], lang))
               .catch(() => [])
           )
