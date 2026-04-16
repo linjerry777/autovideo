@@ -41,17 +41,22 @@ _SOCIAL_LABELS = {
 
 # 所有支援的來源定義
 ALL_SOURCES = {
-    "google":     {"label": "Google News",       "icon": "🔍", "default": True},
-    "bing":       {"label": "Bing News",         "icon": "🔎", "default": True},
-    "bilibili":   {"label": "Bilibili 熱榜",     "icon": "📺", "default": True},
-    "zhihu":      {"label": "知乎熱搜",           "icon": "💬", "default": True},
-    "hackernews": {"label": "Hacker News",       "icon": "🦊", "default": False},
-    "last30days": {"label": "Social (Reddit·HN)", "icon": "🌐", "default": False},
-    "v2ex":       {"label": "V2EX",              "icon": "💻", "default": False},
-    "36kr":       {"label": "36氪",              "icon": "📰", "default": False},
-    "sspai":      {"label": "少數派",            "icon": "✏️", "default": False},
-    "ithome":     {"label": "IT之家",            "icon": "🏠", "default": False},
-    "huxiu":      {"label": "虎嗅",              "icon": "🐯", "default": False},
+    "google":       {"label": "Google News",        "icon": "🔍", "default": True,  "group": "news"},
+    "bing":         {"label": "Bing News",          "icon": "🔎", "default": True,  "group": "news"},
+    "bilibili":     {"label": "Bilibili 熱榜",      "icon": "📺", "default": True,  "group": "zh"},
+    "zhihu":        {"label": "知乎熱搜",            "icon": "💬", "default": True,  "group": "zh"},
+    "ptt":          {"label": "PTT 八卦/熱門",       "icon": "🏛️", "default": False, "group": "zh"},
+    "dcard":        {"label": "Dcard 熱門",          "icon": "🃏", "default": False, "group": "zh"},
+    "reddit":       {"label": "Reddit 熱門",         "icon": "🤖", "default": False, "group": "en"},
+    "youtube_tw":   {"label": "YouTube 熱門 TW",     "icon": "▶️", "default": False, "group": "en"},
+    "youtube_us":   {"label": "YouTube Trending US", "icon": "▶️", "default": False, "group": "en"},
+    "hackernews":   {"label": "Hacker News",         "icon": "🦊", "default": False, "group": "en"},
+    "last30days":   {"label": "Social (Reddit·HN)",  "icon": "🌐", "default": False, "group": "en"},
+    "v2ex":         {"label": "V2EX",               "icon": "💻", "default": False, "group": "zh"},
+    "36kr":         {"label": "36氪",               "icon": "📰", "default": False, "group": "zh"},
+    "sspai":        {"label": "少數派",             "icon": "✏️", "default": False, "group": "zh"},
+    "ithome":       {"label": "IT之家",             "icon": "🏠", "default": False, "group": "zh"},
+    "huxiu":        {"label": "虎嗅",               "icon": "🐯", "default": False, "group": "zh"},
 }
 
 DEFAULT_SOURCES = [k for k, v in ALL_SOURCES.items() if v["default"]]
@@ -207,6 +212,205 @@ def _fetch_hackernews(keyword: str = None, limit: int = 20) -> list[dict]:
         return []
 
 
+def _fetch_reddit_trending(keyword: str = None, limit: int = 25) -> list[dict]:
+    """Fetch Reddit r/popular/hot — no API key needed."""
+    import requests
+    try:
+        headers = {"User-Agent": "AutoVideo/1.0 news-aggregator"}
+        r = requests.get(
+            "https://www.reddit.com/r/popular/hot.json?limit=50",
+            headers=headers, timeout=12,
+        )
+        r.raise_for_status()
+        posts = r.json().get("data", {}).get("children", [])
+        items = []
+        for p in posts:
+            d = p.get("data", {})
+            title = d.get("title", "")
+            if not title:
+                continue
+            if keyword:
+                kws = keyword.lower().split()
+                if not any(kw in title.lower() for kw in kws):
+                    continue
+            score    = d.get("score", 0)
+            comments = d.get("num_comments", 0)
+            sub      = d.get("subreddit", "")
+            link     = d.get("url") or f"https://www.reddit.com{d.get('permalink','')}"
+            items.append({
+                "title":       title,
+                "summary":     f"🔥 {score:,} upvotes · {comments:,} comments · r/{sub}",
+                "url":         link,
+                "source":      f"Reddit · r/{sub}",
+                "source_type": "reddit",
+            })
+            if len(items) >= limit:
+                break
+        # 若 keyword 過濾後太少，直接回傳全部熱門
+        if len(items) < 5 and keyword:
+            return _fetch_reddit_trending(None, limit)
+        return items
+    except Exception as e:
+        log.warning(f"Reddit trending 失敗: {e}")
+        return []
+
+
+def _fetch_youtube_trending(keyword: str = None, region: str = "TW", limit: int = 25) -> list[dict]:
+    """Fetch YouTube trending via Data API v3. Requires YOUTUBE_API_KEY env var."""
+    import os, requests
+    api_key = os.getenv("YOUTUBE_API_KEY", "")
+    if not api_key:
+        log.info(f"YouTube trending ({region}): YOUTUBE_API_KEY not set, skipping")
+        return []
+    try:
+        params = {
+            "part":       "snippet,statistics",
+            "chart":      "mostPopular",
+            "regionCode": region,
+            "maxResults": limit,
+            "key":        api_key,
+        }
+        r = requests.get(
+            "https://www.googleapis.com/youtube/v3/videos",
+            params=params, timeout=12,
+        )
+        r.raise_for_status()
+        items = []
+        for v in r.json().get("items", []):
+            snippet = v.get("snippet", {})
+            stats   = v.get("statistics", {})
+            title   = snippet.get("title", "")
+            if not title:
+                continue
+            if keyword:
+                kws = keyword.lower().split()
+                if not any(kw in title.lower() for kw in kws):
+                    continue
+            vid      = v.get("id", "")
+            views    = int(stats.get("viewCount",   0))
+            comments = int(stats.get("commentCount", 0))
+            channel  = snippet.get("channelTitle", "")
+            items.append({
+                "title":       title,
+                "summary":     f"▶ {views:,} views · {comments:,} comments · {channel}",
+                "url":         f"https://www.youtube.com/watch?v={vid}",
+                "source":      f"YouTube Trending · {region}",
+                "source_type": f"youtube_{region.lower()}",
+            })
+        if len(items) < 5 and keyword:
+            return _fetch_youtube_trending(None, region, limit)
+        return items
+    except Exception as e:
+        log.warning(f"YouTube trending ({region}) 失敗: {e}")
+        return []
+
+
+def _fetch_ptt(keyword: str = None, limit: int = 25) -> list[dict]:
+    """Fetch PTT 八卦板 hot posts via web scraping."""
+    import requests
+    from html.parser import HTMLParser
+
+    class _PttParser(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.items = []
+            self._in_title = False
+            self._cur = {}
+
+        def handle_starttag(self, tag, attrs):
+            d = dict(attrs)
+            cls = d.get("class", "")
+            if tag == "div" and "r-ent" in cls:
+                self._cur = {}
+            if tag == "div" and cls == "title":
+                self._in_title = True
+            if tag == "a" and self._in_title and d.get("href", "").startswith("/bbs/"):
+                self._cur["href"] = d["href"]
+            if tag == "div" and cls == "nrec":
+                self._in_nrec = True
+
+        def handle_data(self, data):
+            if self._in_title and data.strip():
+                self._cur.setdefault("title", data.strip())
+
+        def handle_endtag(self, tag):
+            if tag == "div" and self._in_title:
+                self._in_title = False
+                if self._cur.get("href") and self._cur.get("title"):
+                    self.items.append(dict(self._cur))
+
+    try:
+        session = requests.Session()
+        session.cookies.set("over18", "1", domain="www.ptt.cc")
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+            "Referer": "https://www.ptt.cc/bbs/Gossiping/index.html",
+        }
+        r = session.get("https://www.ptt.cc/bbs/Gossiping/index.html",
+                        headers=headers, timeout=12)
+        r.raise_for_status()
+        parser = _PttParser()
+        parser.feed(r.text)
+        raw = parser.items
+        items = []
+        for p in raw:
+            title = p.get("title", "")
+            if not title or title.startswith("[公告]"):
+                continue
+            if keyword:
+                kws = keyword.lower().split()
+                if not any(kw in title for kw in kws):
+                    continue
+            items.append({
+                "title":       title,
+                "summary":     "PTT 八卦板熱門文章",
+                "url":         f"https://www.ptt.cc{p.get('href','')}",
+                "source":      "PTT 八卦板",
+                "source_type": "ptt",
+            })
+            if len(items) >= limit:
+                break
+        if len(items) < 3 and keyword:
+            return _fetch_ptt(None, limit)
+        return items
+    except Exception as e:
+        log.warning(f"PTT 失敗: {e}")
+        return []
+
+
+def _fetch_dcard(keyword: str = None, limit: int = 25) -> list[dict]:
+    """Fetch Dcard popular posts via RSS."""
+    import feedparser
+    try:
+        # Dcard RSS: all forums popular feed
+        feed = feedparser.parse("https://www.dcard.tw/f.rss")
+        items = []
+        for e in feed.entries:
+            title = e.get("title", "")
+            if not title:
+                continue
+            if keyword:
+                kws = keyword.lower().split()
+                if not any(kw in title.lower() for kw in kws):
+                    continue
+            link  = e.get("link", "")
+            items.append({
+                "title":       title,
+                "summary":     e.get("summary", "")[:200],
+                "url":         link,
+                "source":      "Dcard",
+                "source_type": "dcard",
+            })
+            if len(items) >= limit:
+                break
+        if len(items) < 3 and keyword:
+            return _fetch_dcard(None, limit)
+        return items
+    except Exception as e:
+        log.warning(f"Dcard 失敗: {e}")
+        return []
+
+
 def _fetch_last30days(keyword: str, limit: int = 20) -> list[dict]:
     if not _LAST30DAYS_SCRIPT.exists():
         log.warning("last30days: script not found, skipping")
@@ -296,12 +500,17 @@ def _fetch_all(keyword: str, lang: str, sources: list[str], limit_per: int = 20)
         if name in sources:
             tasks[name] = fn
 
-    add("google",     lambda: _fetch_google(keyword, lang, limit_per))
-    add("bing",       lambda: _fetch_bing(keyword, lang, limit_per))
-    add("bilibili",   lambda: _fetch_bilibili(keyword, limit_per))
-    add("zhihu",      lambda: _fetch_zhihu(keyword, limit_per))
-    add("hackernews", lambda: _fetch_hackernews(keyword, limit_per))
-    add("last30days", lambda: _fetch_last30days(keyword, limit_per))
+    add("google",      lambda: _fetch_google(keyword, lang, limit_per))
+    add("bing",        lambda: _fetch_bing(keyword, lang, limit_per))
+    add("bilibili",    lambda: _fetch_bilibili(keyword, limit_per))
+    add("zhihu",       lambda: _fetch_zhihu(keyword, limit_per))
+    add("hackernews",  lambda: _fetch_hackernews(keyword, limit_per))
+    add("last30days",  lambda: _fetch_last30days(keyword, limit_per))
+    add("reddit",      lambda: _fetch_reddit_trending(keyword, limit_per))
+    add("youtube_tw",  lambda: _fetch_youtube_trending(keyword, "TW", limit_per))
+    add("youtube_us",  lambda: _fetch_youtube_trending(keyword, "US", limit_per))
+    add("ptt",         lambda: _fetch_ptt(keyword, limit_per))
+    add("dcard",       lambda: _fetch_dcard(keyword, limit_per))
     for sid, rss_url in CURATED_RSS.items():
         add(sid, lambda u=rss_url, s=sid: _fetch_rss_source(s, u, keyword, limit_per))
 

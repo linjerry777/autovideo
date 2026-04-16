@@ -344,19 +344,65 @@
           </div>
         </div>
         <div>
-          <label class="text-sm font-medium text-gray-700 block mb-2">新聞來源</label>
-          <div class="flex flex-wrap gap-2">
-            <template x-for="[id, icon, label] in [['google','🔍','Google'],['bing','🔎','Bing'],['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['hackernews','🦊','HN'],['last30days','🌐','Social']]" :key="id">
-              <button type="button"
-                @click="toggleSource(id)"
-                :class="selectedSources.has(id) ? 'bg-green-50 border-green-300 text-green-700 ring-1 ring-green-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-sm font-medium text-gray-700">新聞來源</label>
+            <div class="flex gap-1.5">
+              <button type="button" @click="setSourcePreset('news')"
+                class="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all">
+                📰 新聞
+              </button>
+              <button type="button" @click="setSourcePreset('zh')"
+                class="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 hover:border-purple-300 hover:text-purple-600 transition-all">
+                🇹🇼 中文熱門
+              </button>
+              <button type="button" @click="setSourcePreset('en')"
+                class="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 hover:border-orange-300 hover:text-orange-600 transition-all">
+                🌍 英文趨勢
+              </button>
+              <button type="button" @click="setSourcePreset('all')"
+                class="text-xs px-2 py-1 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 hover:border-green-300 hover:text-green-600 transition-all">
+                全選
+              </button>
+            </div>
+          </div>
+          <!-- 新聞 group -->
+          <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">新聞搜尋</p>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <template x-for="[id, icon, label] in [['google','🔍','Google'],['bing','🔎','Bing'],['hackernews','🦊','HN'],['last30days','🌐','Social']]" :key="id">
+              <button type="button" @click="toggleSource(id)"
+                :class="selectedSources.has(id) ? 'bg-blue-50 border-blue-300 text-blue-700 ring-1 ring-blue-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
                 class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
-                <span x-show="selectedSources.has(id)" class="text-green-600 text-xs">✓</span>
+                <span x-show="selectedSources.has(id)" class="text-blue-600 text-xs">✓</span>
                 <span x-text="icon + ' ' + label"></span>
               </button>
             </template>
           </div>
-          <p class="text-xs text-gray-400 mt-1.5" x-show="selectedSources.has('last30days') || selectedSources.has('bilibili') || selectedSources.has('zhihu')">含社群來源，搜尋約 +20 秒</p>
+          <!-- 中文熱門 group -->
+          <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">中文熱門</p>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <template x-for="[id, icon, label] in [['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['ptt','🏛️','PTT'],['dcard','🃏','Dcard'],['v2ex','💻','V2EX'],['36kr','📰','36氪'],['sspai','✏️','少數派'],['ithome','🏠','ITHome'],['huxiu','🐯','虎嗅']]" :key="id">
+              <button type="button" @click="toggleSource(id)"
+                :class="selectedSources.has(id) ? 'bg-purple-50 border-purple-300 text-purple-700 ring-1 ring-purple-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
+                <span x-show="selectedSources.has(id)" class="text-purple-600 text-xs">✓</span>
+                <span x-text="icon + ' ' + label"></span>
+              </button>
+            </template>
+          </div>
+          <!-- 英文趨勢 group -->
+          <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">英文趨勢（不需關鍵字）</p>
+          <div class="flex flex-wrap gap-2 mb-2">
+            <template x-for="[id, icon, label] in [['reddit','🤖','Reddit 熱門'],['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US']]" :key="id">
+              <button type="button" @click="toggleSource(id)"
+                :class="selectedSources.has(id) ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
+                <span x-show="selectedSources.has(id)" class="text-orange-600 text-xs">✓</span>
+                <span x-text="icon + ' ' + label"></span>
+              </button>
+            </template>
+          </div>
+          <p class="text-xs text-gray-400 mt-1" x-show="selectedSources.has('youtube_tw') || selectedSources.has('youtube_us')">⚠️ YouTube 需設定 YOUTUBE_API_KEY</p>
+          <p class="text-xs text-gray-400" x-show="selectedSources.has('last30days') || selectedSources.has('bilibili') || selectedSources.has('zhihu') || selectedSources.has('reddit')">含社群/趨勢來源，搜尋約 +15-30 秒</p>
         </div>
         <button @click="fetchNews()"
           :disabled="newLangs.size === 0"
@@ -1374,19 +1420,23 @@ function app() {
     },
 
     _sourceConfig: {
-      google:     { label: 'Google News', cls: 'text-blue-600 bg-blue-50 border-blue-100' },
-      bing:       { label: 'Bing',        cls: 'text-sky-600 bg-sky-50 border-sky-100' },
-      bilibili:   { label: 'Bilibili',    cls: 'text-pink-600 bg-pink-50 border-pink-100' },
-      zhihu:      { label: '知乎',        cls: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
-      hackernews: { label: 'HN',          cls: 'text-orange-600 bg-orange-50 border-orange-100' },
-      reddit:     { label: 'Reddit',      cls: 'text-red-600 bg-red-50 border-red-100' },
-      youtube:    { label: 'YouTube',     cls: 'text-red-700 bg-red-50 border-red-200' },
-      tiktok:     { label: 'TikTok',      cls: 'text-gray-800 bg-gray-100 border-gray-200' },
-      instagram:  { label: 'IG',          cls: 'text-purple-600 bg-purple-50 border-purple-100' },
+      google:       { label: 'Google News',   cls: 'text-blue-600 bg-blue-50 border-blue-100' },
+      bing:         { label: 'Bing',          cls: 'text-sky-600 bg-sky-50 border-sky-100' },
+      bilibili:     { label: 'Bilibili',      cls: 'text-pink-600 bg-pink-50 border-pink-100' },
+      zhihu:        { label: '知乎',          cls: 'text-indigo-600 bg-indigo-50 border-indigo-100' },
+      ptt:          { label: 'PTT',           cls: 'text-green-700 bg-green-50 border-green-200' },
+      dcard:        { label: 'Dcard',         cls: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+      hackernews:   { label: 'HN',            cls: 'text-orange-600 bg-orange-50 border-orange-100' },
+      reddit:       { label: 'Reddit',        cls: 'text-red-600 bg-red-50 border-red-100' },
+      youtube_tw:   { label: 'YT TW',         cls: 'text-red-700 bg-red-50 border-red-200' },
+      youtube_us:   { label: 'YT US',         cls: 'text-rose-700 bg-rose-50 border-rose-200' },
+      youtube:      { label: 'YouTube',       cls: 'text-red-700 bg-red-50 border-red-200' },
+      tiktok:       { label: 'TikTok',        cls: 'text-gray-800 bg-gray-100 border-gray-200' },
+      instagram:    { label: 'IG',            cls: 'text-purple-600 bg-purple-50 border-purple-100' },
     },
 
     groupedNews() {
-      const ORDER = ['google','bing','bilibili','zhihu','hackernews','reddit','youtube','tiktok','instagram']
+      const ORDER = ['google','bing','bilibili','zhihu','ptt','dcard','hackernews','reddit','youtube_tw','youtube_us','youtube','tiktok','instagram']
       const groups = {}
       for (const item of this.newsItems) {
         const k = item.source_type || 'other'
@@ -1416,6 +1466,16 @@ function app() {
       const s = new Set(this.selectedSources)
       s.has(id) ? s.delete(id) : s.add(id)
       this.selectedSources = s
+    },
+
+    setSourcePreset(preset) {
+      const presets = {
+        news:  ['google', 'bing', 'hackernews'],
+        zh:    ['bilibili', 'zhihu', 'ptt', 'dcard'],
+        en:    ['reddit', 'youtube_tw', 'youtube_us'],
+        all:   ['google', 'bing', 'bilibili', 'zhihu', 'ptt', 'dcard', 'reddit', 'youtube_tw', 'youtube_us', 'hackernews'],
+      }
+      this.selectedSources = new Set(presets[preset] || presets.news)
     },
 
     async fetchNews() {
