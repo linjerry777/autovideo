@@ -23,6 +23,7 @@ class SettingsUpdate(BaseModel):
     upload_post_key: str | None = None
     unsplash_key:    str | None = None
     pexels_api_key:  str | None = None
+    youtube_api_key: str | None = None
     voice_id:        str | None = None
     x_keywords:      str | None = None
     # 背景模式
@@ -43,7 +44,8 @@ class SettingsUpdate(BaseModel):
 def get_settings():
     s = get_all_settings()
     # Expose whether optional API keys are configured (without revealing the key)
-    s["youtube_key_set"] = bool(os.getenv("YOUTUBE_API_KEY", ""))
+    # DB key takes priority over .env
+    s["youtube_key_set"] = bool(s.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY", ""))
     return s
 
 

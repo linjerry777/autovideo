@@ -256,9 +256,14 @@ def _fetch_reddit_trending(keyword: str = None, limit: int = 25) -> list[dict]:
 
 
 def _fetch_youtube_trending(keyword: str = None, region: str = "TW", limit: int = 25) -> list[dict]:
-    """Fetch YouTube trending via Data API v3. Requires YOUTUBE_API_KEY env var."""
+    """Fetch YouTube trending via Data API v3. Requires YOUTUBE_API_KEY env var or DB setting."""
     import os, requests
-    api_key = os.getenv("YOUTUBE_API_KEY", "")
+    # DB setting takes priority over .env
+    try:
+        from web.db import get_setting as _gs
+        api_key = _gs("youtube_api_key", "") or os.getenv("YOUTUBE_API_KEY", "")
+    except Exception:
+        api_key = os.getenv("YOUTUBE_API_KEY", "")
     if not api_key:
         log.info(f"YouTube trending ({region}): YOUTUBE_API_KEY not set, skipping")
         return []
