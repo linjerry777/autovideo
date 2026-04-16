@@ -554,7 +554,6 @@ def fetch_news(
     lang: str = Query("zh-TW"),
     sources: str = Query(None),  # 逗號分隔，e.g. "google,bilibili,zhihu"
 ):
-    keyword = topic or DEFAULT_KEYWORD
     if lang not in LANG_CONFIG:
         lang = "zh-TW"
 
@@ -562,6 +561,13 @@ def fetch_news(
     selected_sources = [s.strip() for s in selected_sources if s.strip() in ALL_SOURCES]
     if not selected_sources:
         selected_sources = DEFAULT_SOURCES
+
+    # Trending-only sources (reddit/youtube/ptt) don't need a keyword —
+    # use empty string so fetchers return full hot feed without filtering.
+    TRENDING_SOURCES = {"reddit", "youtube_tw", "youtube_us", "ptt", "dcard",
+                        "bilibili", "zhihu"}
+    all_trending = all(s in TRENDING_SOURCES for s in selected_sources)
+    keyword = topic or ("" if all_trending else DEFAULT_KEYWORD)
 
     today = datetime.now(timezone.utc).date().isoformat()
     cache_key = f"{keyword}|{'|'.join(sorted(selected_sources))}"
