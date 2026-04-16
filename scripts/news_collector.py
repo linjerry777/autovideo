@@ -100,6 +100,7 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
   "script": "旁白腳本（60字以內，像在跟朋友說話的語氣，第一人稱）",
+  "scene_type": "動畫場景類型（從以下擇一）：fire（攻擊/爆炸/燃燒）, race（競賽/追趕/對決）, money（融資/估值/賺錢）, robot（AI/機器人/科技突破）, warning（爭議/警告/風險）, trophy（創紀錄/得獎/突破）, default（其他）",
   "source_url": "完整的新聞原始 URL",
   "source_name": "媒體名稱"
 }}
