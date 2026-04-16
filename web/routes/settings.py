@@ -38,6 +38,10 @@ class SettingsUpdate(BaseModel):
     telegram_chat_ids:    str | None = None   # comma-separated chat IDs
     # 影片渲染器
     video_renderer:       str | None = None   # "ffmpeg" | "remotion"
+    # Trending account profiles
+    trending_profile_tech:          str | None = None
+    trending_profile_entertainment: str | None = None
+    trending_profile_finance:       str | None = None
 
 
 @router.get("/settings")
