@@ -41,7 +41,10 @@ class SettingsUpdate(BaseModel):
 
 @router.get("/settings")
 def get_settings():
-    return get_all_settings()
+    s = get_all_settings()
+    # Expose whether optional API keys are configured (without revealing the key)
+    s["youtube_key_set"] = bool(os.getenv("YOUTUBE_API_KEY", ""))
+    return s
 
 
 @router.put("/settings")

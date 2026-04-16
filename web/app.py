@@ -4,6 +4,14 @@ web/app.py — FastAPI application factory
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
+
+# Load .env before anything else so os.getenv() works everywhere
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env", override=False)
+except ImportError:
+    pass  # python-dotenv optional; env vars can be set at OS level
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles

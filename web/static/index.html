@@ -401,7 +401,7 @@
               </button>
             </template>
           </div>
-          <p class="text-xs text-gray-400 mt-1" x-show="selectedSources.has('youtube_tw') || selectedSources.has('youtube_us')">⚠️ YouTube 需設定 YOUTUBE_API_KEY</p>
+          <p class="text-xs text-amber-500 mt-1" x-show="(selectedSources.has('youtube_tw') || selectedSources.has('youtube_us')) && !youtubeKeySet">⚠️ YouTube 需設定 YOUTUBE_API_KEY</p>
           <p class="text-xs text-gray-400" x-show="selectedSources.has('last30days') || selectedSources.has('bilibili') || selectedSources.has('zhihu') || selectedSources.has('reddit')">含社群/趨勢來源，搜尋約 +15-30 秒</p>
         </div>
         <button @click="fetchNews()"
@@ -1312,6 +1312,7 @@ function app() {
     scriptItems: [],
     replacePanelOpen: null,   // shot.index of open replace panel
     uploadKeySet: false,
+    youtubeKeySet: false,
     uploadPlatforms: new Set(['youtube','tiktok','instagram']),
 
     // Accounts page state
@@ -1352,6 +1353,7 @@ function app() {
       try {
         const s = await this.api('GET', '/api/settings')
         this.uploadKeySet = !!(s.upload_post_key)
+        this.youtubeKeySet = !!(s.youtube_key_set)
       } catch (_) {}
     },
 
