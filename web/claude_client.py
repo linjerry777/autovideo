@@ -113,6 +113,70 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None) -> list[d
         raise ValueError(f"Claude 回傳無效 JSON：{e}\n原始內容：{raw[:300]}")
 
 
+def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
+    """
+    raw_items: [{title, summary, url, source, source_type}, ...]
+    回傳: [{format, category, hook, title, script, scene_type,
+            source_url, source_name, account_suggestion}, ...]
+
+    format: top5 | explainer | reaction | story
+    category: tech | entertainment | finance
+    """
+    lines = "\n".join([
+        f"{i+1}. [{it.get('source','')}] {it['title']}\n   URL: {it.get('url','')}\n   {it.get('summary','')[:120]}"
+        for i, it in enumerate(raw_items)
+    ])
+
+    prompt = f"""請使用繁體中文回答。
+以下是從社群平台抓取的熱門話題，請為每則選擇最適合的短影音格式，並生成對應腳本。
+
+{lines}
+
+格式說明：
+- top5：排名揭曉節奏「第5是...第1竟然是...」（適合列舉、比較類話題）
+- explainer：教育科普節奏「你知道嗎？X其實是...背後原因是...」（適合知識、解釋類）
+- reaction：反應評論節奏「全網都在討論X，但沒人告訴你...」（適合爭議、驚訝類）
+- story：敘事案例節奏「他靠這個方法...結果...」（適合人物、事件類）
+
+分類說明：
+- tech：AI、科技、軟體、遊戲、電腦相關
+- entertainment：影視、音樂、運動、迷因、名人、奇聞
+- finance：投資、市場、創業、經濟、公司
+
+每則請用以下 JSON 格式（照順序）：
+{{
+  "format": "top5 | explainer | reaction | story 擇一",
+  "category": "tech | entertainment | finance 擇一",
+  "hook": "開場鉤子（5-8字，製造懸念或衝擊）",
+  "title": "標題（15字以內，中文）",
+  "script": "旁白腳本（80字以內，依格式結構生成，像在跟朋友說話）",
+  "scene_type": "動畫場景：fire/race/money/robot/warning/trophy/default 擇一",
+  "account_suggestion": "科技帳號 | 娛樂帳號 | 財經帳號 擇一",
+  "source_url": "原始 URL",
+  "source_name": "來源名稱"
+}}
+
+請直接回傳 JSON 陣列，不要加任何其他文字或 markdown。"""
+
+    raw, usage = call_claude(prompt)
+    if not raw:
+        raise ValueError("Claude 回傳空白內容")
+    match = re.search(r"\[[\s\S]*\]", raw)
+    if match:
+        raw = match.group(0)
+    else:
+        raw = re.sub(r"^```[a-z]*\n?", "", raw.strip())
+        raw = re.sub(r"\n?```$", "", raw.strip())
+    try:
+        items = json.loads(raw)
+        if isinstance(items, dict):
+            items = [items]
+        _last_usage.update(usage)
+        return items
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Claude 回傳無效 JSON：{e}\n原始內容：{raw[:300]}")
+
+
 # 供 job_runner 讀取最後一次 Claude 的 token 用量
 _last_usage: dict = {}
 
