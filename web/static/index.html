@@ -595,12 +595,12 @@
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
-                <input x-model="scriptItems[i].hook" type="text"
+                <input x-model="item.hook" type="text"
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
               </div>
               <div>
                 <label class="text-xs font-medium text-gray-400 block mb-1">動畫場景</label>
-                <input x-model="scriptItems[i].scene_type" type="text" list="scene-presets"
+                <input x-model="item.scene_type" type="text" list="scene-presets"
                   placeholder="預設樣式，或輸入：fire / race / 專家推眼鏡 / 高雄…"
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
               </div>
@@ -608,7 +608,7 @@
                 <label class="text-xs font-medium text-gray-400 block mb-1">
                   腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
                 </label>
-                <textarea x-model="scriptItems[i].script" rows="3"
+                <textarea x-model="item.script" rows="3"
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all"></textarea>
               </div>
             </div>
@@ -851,12 +851,12 @@
             </div>
             <div>
               <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
-              <input x-model="scriptItems[i].hook" type="text"
+              <input x-model="item.hook" type="text"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
             </div>
             <div>
               <label class="text-xs font-medium text-gray-400 block mb-1">動畫場景</label>
-              <select x-model="scriptItems[i].scene_type"
+              <select x-model="item.scene_type"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
                 <option value="default">預設（純文字卡片）</option>
                 <option value="fire">🔥 攻擊/爆炸/燃燒</option>
@@ -871,7 +871,7 @@
               <label class="text-xs font-medium text-gray-400 block mb-1">
                 腳本 <span class="text-gray-300" x-text="'(' + (item.script||'').length + ' 字)'"></span>
               </label>
-              <textarea x-model="scriptItems[i].script" rows="3"
+              <textarea x-model="item.script" rows="3"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all"></textarea>
             </div>
           </div>
