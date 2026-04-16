@@ -48,6 +48,7 @@ class TriggerRequest(BaseModel):
     dry_run:            bool              = False
     selected_news:      list[dict] | None = None   # 前端預選的新聞，有則跳過爬蟲
     selected_cache_ids: list[int] | None  = None   # 對應快取 ID
+    account_profile:    str | None        = None   # 覆蓋預設 Upload-Post profile
 
 
 @router.post("/jobs/trigger")
@@ -68,12 +69,13 @@ def trigger(req: TriggerRequest):
     )
 
     started = job_runner.trigger_job(
-        job_id     = job_id,
-        date       = run_date,
-        topic      = req.topic,
-        platforms  = req.platforms,
-        dry_run    = dry_run,
-        pre_news   = req.selected_news,
+        job_id          = job_id,
+        date            = run_date,
+        topic           = req.topic,
+        platforms       = req.platforms,
+        dry_run         = dry_run,
+        pre_news        = req.selected_news,
+        account_profile = req.account_profile,
     )
     if not started:
         update_job(job_id, status="failed", error="Lock acquire failed")
@@ -129,9 +131,21 @@ def upload_job(job_id: int, req: UploadRequest | None = None):
         update_job(job_id, platforms=",".join(req_plats))
     dry_run   = get_setting("dry_run", "false") == "true"
 
+    # 讀取 news.json 的 account_profile（若有）
+    news_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "news.json"
+    profile_override = ""
+    if news_file.exists():
+        try:
+            nd = _json.loads(news_file.read_text(encoding="utf-8"))
+            profile_override = nd.get("account_profile", "")
+        except Exception:
+            pass
+
     plat_args = ["--platforms"] + platforms
     if dry_run:
         plat_args += ["--dry-run"]
+    if profile_override:
+        plat_args += ["--profile", profile_override]
 
     update_job(job_id, step_upload="uploading")
     log_path = Path(job["log_path"]) if job.get("log_path") else None

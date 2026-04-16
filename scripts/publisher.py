@@ -123,5 +123,10 @@ if __name__ == "__main__":
                         help="目標平台（預設：youtube instagram）")
     parser.add_argument("--dry-run", action="store_true",
                         help="只顯示預覽，不實際上傳")
+    parser.add_argument("--profile", default=None,
+                        help="Upload-Post profile 名稱（覆蓋 UPLOAD_POST_PROFILE env var）")
     args = parser.parse_args()
+    if args.profile:
+        import sys as _sys
+        _sys.modules[__name__].PROFILE = args.profile
     publish(args.job_key, args.platforms, args.dry_run)

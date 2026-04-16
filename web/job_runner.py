@@ -197,7 +197,8 @@ def _call_script(script: str, date: str, extra: list = [],
 
 def _run_pipeline(job_id: int, date: str, topic: str | None,
                   platforms: list[str], skip_upload: bool, dry_run: bool,
-                  pre_news: list[dict] | None = None):
+                  pre_news: list[dict] | None = None,
+                  account_profile: str | None = None):
     global _running_job_id
 
     # 每個 job 有自己的子目錄，避免同天不同主題互相覆蓋
@@ -223,8 +224,10 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             from web.claude_client import enrich_news_items, _last_usage
             enriched = enrich_news_items(pre_news, topic)
             news_file.write_text(
-                _json.dumps({"date": job_key, "items": enriched},
-                            ensure_ascii=False, indent=2),
+                _json.dumps(
+                    {"date": job_key, "account_profile": account_profile or "", "items": enriched},
+                    ensure_ascii=False, indent=2
+                ),
                 encoding="utf-8",
             )
             # 記錄 token 用量
@@ -348,7 +351,8 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
 def trigger_job(job_id: int, date: str, topic: str | None = None,
                 platforms: list[str] = None, skip_upload: bool = False,
                 dry_run: bool = False,
-                pre_news: list[dict] | None = None) -> bool:
+                pre_news: list[dict] | None = None,
+                account_profile: str | None = None) -> bool:
     """Returns True if job was started, False if already running."""
     global _running_job_id
     if platforms is None:
@@ -358,7 +362,7 @@ def trigger_job(job_id: int, date: str, topic: str | None = None,
     _running_job_id = job_id
     t = threading.Thread(
         target=_run_pipeline,
-        args=(job_id, date, topic, platforms, skip_upload, dry_run, pre_news),
+        args=(job_id, date, topic, platforms, skip_upload, dry_run, pre_news, account_profile),
         daemon=True,
     )
     t.start()
