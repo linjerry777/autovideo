@@ -1518,6 +1518,7 @@ function app() {
         const s = await this.api('GET', '/api/settings')
         this.uploadKeySet = !!(s.upload_post_key)
         this.youtubeKeySet = !!(s.youtube_key_set)
+        this.settings = s
       } catch (_) {}
     },
 
@@ -1632,6 +1633,134 @@ function app() {
       const s = new Set(this.selectedSources)
       s.has(id) ? s.delete(id) : s.add(id)
       this.selectedSources = s
+    },
+
+    trendingToggleSource(id) {
+      const s = new Set(this.trendingSelectedSources)
+      s.has(id) ? s.delete(id) : s.add(id)
+      this.trendingSelectedSources = s
+    },
+
+    trendingToggleItem(item) {
+      const key = item.url || item.title
+      const s = new Set(this.trendingSelectedIds)
+      if (s.has(key)) {
+        s.delete(key)
+      } else if (s.size < 5) {
+        s.add(key)
+      }
+      this.trendingSelectedIds = s
+    },
+
+    groupedTrending() {
+      const ORDER = ['reddit','youtube_tw','youtube_us','ptt','dcard','bilibili','zhihu']
+      const groups = {}
+      for (const item of this.trendingItems) {
+        const k = item.source_type || 'other'
+        ;(groups[k] = groups[k] || []).push(item)
+      }
+      const keys = ORDER.filter(k => groups[k]).concat(Object.keys(groups).filter(k => !ORDER.includes(k)))
+      return keys.map(k => ({
+        source_type: k,
+        label: (this._sourceConfig[k] || {}).label || k,
+        cls: (this._sourceConfig[k] || {}).cls || 'text-gray-600 bg-gray-100 border-gray-200',
+        items: groups[k],
+      }))
+    },
+
+    async fetchTrending(force = false) {
+      this.trendingStep = 'fetching'
+      try {
+        const srcParam = [...this.trendingSelectedSources].join(',')
+        const forceParam = force ? '&force=true' : ''
+        const data = await this.api('GET', `/api/news/fetch?topic=&lang=zh-TW&sources=${srcParam}${forceParam}`)
+        this.trendingItems = (data.items || [])
+        this.trendingSelectedIds = new Set()
+        this.trendingStep = 'select'
+      } catch (e) {
+        this.showToast('抓取失敗：' + e.message)
+        this.trendingStep = 'config'
+      }
+    },
+
+    async analyzeTrending() {
+      const selected = this.trendingItems.filter(it =>
+        this.trendingSelectedIds.has(it.url || it.title)
+      )
+      this.trendingStep = 'analyzing'
+      try {
+        const res = await this.api('POST', '/api/trending/enrich', { items: selected })
+        this.trendingEnriched = res.items || []
+        this.trendingStep = 'confirm'
+      } catch (e) {
+        this.showToast('AI 分析失敗：' + e.message)
+        this.trendingStep = 'select'
+      }
+    },
+
+    cycleTrendingFormat(idx) {
+      const formats = ['top5', 'explainer', 'reaction', 'story']
+      const cur = this.trendingEnriched[idx].format
+      const next = formats[(formats.indexOf(cur) + 1) % formats.length]
+      this.trendingEnriched[idx] = { ...this.trendingEnriched[idx], format: next }
+    },
+
+    cycleTrendingAccount(idx) {
+      const accounts = ['科技帳號', '娛樂帳號', '財經帳號']
+      const cur = this.trendingEnriched[idx].account_suggestion
+      const next = accounts[(accounts.indexOf(cur) + 1) % accounts.length]
+      this.trendingEnriched[idx] = { ...this.trendingEnriched[idx], account_suggestion: next }
+    },
+
+    _accountToProfile(suggestion) {
+      const map = {
+        '科技帳號':  this.settings.trending_profile_tech          || '',
+        '娛樂帳號':  this.settings.trending_profile_entertainment  || '',
+        '財經帳號':  this.settings.trending_profile_finance        || '',
+      }
+      return map[suggestion] || ''
+    },
+
+    async triggerTrendingJobs() {
+      if (this.trendingEnriched.length === 0) return
+      const today = new Date().toISOString().split('T')[0]
+      let successCount = 0
+      for (const item of this.trendingEnriched) {
+        const profile = this._accountToProfile(item.account_suggestion)
+        const newsItem = {
+          hook:        item.hook,
+          title:       item.title,
+          script:      item.script,
+          summary:     item.script,
+          scene_type:  item.scene_type || 'default',
+          source_url:  item.source_url || '',
+          source_name: item.source_name || '',
+          source:      item.source_name || '',
+          url:         item.source_url || '',
+        }
+        try {
+          await this.api('POST', '/api/jobs/trigger', {
+            date:            today,
+            topic:           item.title,
+            lang:            'zh-TW',
+            platforms:       ['youtube', 'tiktok', 'instagram'],
+            dry_run:         false,
+            selected_news:   [newsItem],
+            account_profile: profile || null,
+          })
+          successCount++
+        } catch (e) {
+          this.showToast(`送出失敗：${item.title.slice(0,20)} — ${e.message}`)
+        }
+      }
+      if (successCount > 0) {
+        this.showToast(`已送出 ${successCount} 個 job，請至控制台查看`)
+        this.videoMode = 'news'
+        this.trendingStep = 'config'
+        this.trendingEnriched = []
+        this.trendingSelectedIds = new Set()
+        await this.loadDashboard()
+      }
     },
 
     setSourcePreset(preset) {
