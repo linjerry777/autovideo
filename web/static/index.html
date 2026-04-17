@@ -1039,6 +1039,10 @@
               </div>
               <div class="p-3 flex items-center gap-2">
                 <span class="text-xs text-gray-400 flex-1 font-mono" x-text="'#' + shot.index"></span>
+                <button @click="openEditor(shot.index)" x-show="shot.url && shot.type !== 'broll'"
+                  class="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-all">
+                  🖌️ 編輯
+                </button>
                 <button @click="retakeScreenshot(shot.index)"
                   class="text-xs text-green-600 hover:text-green-700 font-medium transition-colors">重拍</button>
               </div>
