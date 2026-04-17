@@ -1,6 +1,7 @@
 """
 web/routes/news.py — 多來源新聞/內容聚合 + 快取
 """
+import json
 import logging
 import subprocess
 import sys
@@ -13,6 +14,47 @@ from fastapi import APIRouter, HTTPException, Query
 
 from web.db import (save_news_cache, get_cached_news, get_job_candidates,
                     get_cache_item, mark_news_blocked)
+
+
+def _load_used_urls() -> dict[str, list[int]]:
+    """Scan pipeline/*/job_*/news.json to build {source_url: [job_ids]} map.
+
+    Used to tag fetched news items with `made_before` + `past_jobs` so users
+    can see which stories have already been turned into videos.
+    Fast in practice (file I/O ~5ms per job, typically <100 jobs).
+    """
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    pipeline_root = repo_root / "pipeline"
+    used: dict[str, list[int]] = {}
+    if not pipeline_root.exists():
+        return used
+    for job_dir in pipeline_root.glob("*/job_*"):
+        news_file = job_dir / "news.json"
+        if not news_file.exists():
+            continue
+        try:
+            data = json.loads(news_file.read_text(encoding="utf-8"))
+            job_id = int(job_dir.name.replace("job_", ""))
+            for item in data.get("items", []):
+                url = item.get("source_url") or item.get("url") or ""
+                if url:
+                    used.setdefault(url, []).append(job_id)
+        except Exception:
+            continue
+    return used
+
+
+def _load_blocked_urls() -> set[str]:
+    """Return set of URLs flagged screenshot_blocked=1 in news_cache."""
+    try:
+        from web.db import get_conn
+        with get_conn() as conn:
+            rows = conn.execute(
+                "SELECT url FROM news_cache WHERE screenshot_blocked=1 AND url IS NOT NULL"
+            ).fetchall()
+            return {r[0] for r in rows if r[0]}
+    except Exception:
+        return set()
 
 router = APIRouter(prefix="/api/news")
 log = logging.getLogger("news")
@@ -551,6 +593,7 @@ def fetch_news(
     lang: str = Query("zh-TW"),
     sources: str = Query(None),  # 逗號分隔，e.g. "google,bilibili,zhihu"
     force: bool = Query(False),  # True = skip cache
+    exclude_urls: str = Query(""),
 ):
     if lang not in LANG_CONFIG:
         lang = "zh-TW"
@@ -573,38 +616,26 @@ def fetch_news(
     # 檢查今日快取（同 keyword + 相同來源組合）；force=true 跳過
     cached = None if force else get_cached_news(cache_key, lang, today)
     if cached:
-        return {
-            "keyword":    keyword,
-            "lang":       lang,
-            "sources":    selected_sources,
-            "from_cache": True,
-            "items": [
-                {
-                    "cache_id":           r["id"],
-                    "title":              r["title"],
-                    "summary":            r["summary"],
-                    "url":                r["url"],
-                    "source":             r["source"],
-                    "source_type":        r["source_type"] if "source_type" in r.keys() else "google",
-                    "screenshot_blocked": bool(r["screenshot_blocked"]),
-                }
-                for r in cached
-            ],
-        }
+        items = [
+            {
+                "cache_id":           r["id"],
+                "title":              r["title"],
+                "summary":            r["summary"],
+                "url":                r["url"],
+                "source":             r["source"],
+                "source_type":        r["source_type"] if "source_type" in r.keys() else "google",
+                "screenshot_blocked": bool(r["screenshot_blocked"]),
+            }
+            for r in cached
+        ]
+    else:
+        # 並行抓取
+        raw = _fetch_all(keyword, lang, selected_sources)
+        if not raw:
+            raise HTTPException(500, "所有來源均未找到相關內容，請嘗試其他關鍵字")
 
-    # 並行抓取
-    raw = _fetch_all(keyword, lang, selected_sources)
-    if not raw:
-        raise HTTPException(500, "所有來源均未找到相關內容，請嘗試其他關鍵字")
-
-    ids = save_news_cache(cache_key, lang, raw)
-
-    return {
-        "keyword":    keyword,
-        "lang":       lang,
-        "sources":    selected_sources,
-        "from_cache": False,
-        "items": [
+        ids = save_news_cache(cache_key, lang, raw)
+        items = [
             {
                 "cache_id":           cid,
                 "title":              item["title"],
@@ -615,7 +646,35 @@ def fetch_news(
                 "screenshot_blocked": False,
             }
             for cid, item in zip(ids, raw)
-        ],
+        ]
+
+    # Dedup / blocked tagging + optional exclude_urls filter
+    used_map    = _load_used_urls()
+    blocked_set = _load_blocked_urls()
+    exclude_set: set[str] = set()
+    if exclude_urls:
+        exclude_set = {u.strip() for u in exclude_urls.split(",") if u.strip()}
+
+    enriched = []
+    for it in items:
+        u = it.get("url", "")
+        if u in exclude_set:
+            continue
+        past = used_map.get(u, [])
+        it["made_before"]        = bool(past)
+        it["past_jobs"]          = past[-3:]    # last 3 job ids
+        # Preserve existing screenshot_blocked (may be True from DB); OR with live check
+        it["screenshot_blocked"] = bool(it.get("screenshot_blocked")) or (u in blocked_set)
+        enriched.append(it)
+
+    items = enriched
+
+    return {
+        "keyword":    keyword,
+        "lang":       lang,
+        "sources":    selected_sources,
+        "from_cache": cached is not None,
+        "items":      items,
     }
 
 
