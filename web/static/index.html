@@ -1162,9 +1162,9 @@
     </div><!-- /page=job -->
 
     <!-- ── Upload Preview ─────────────────────────────────────────── -->
-    <div x-show="page==='upload'" class="p-8 max-w-6xl mx-auto space-y-6">
+    <div x-show="page==='upload'" class="p-8 pb-24 max-w-6xl mx-auto space-y-6">
       <div class="flex items-center gap-3">
-        <button @click="page='job'" class="text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
+        <button @click="page = uploadPreviewOrigin" class="text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
           ← 返回
         </button>
         <div class="h-4 w-px bg-gray-200"></div>
@@ -1597,6 +1597,7 @@ function app() {
     platformMeta: null,          // {youtube:{...}, tiktok:{...}, ...}
     platformMetaLoading: false,
     editingPlatform: null,       // 'youtube' | 'tiktok' | ... | null (modal open for this platform)
+    uploadPreviewOrigin: 'job',  // where to return on back navigation
 
     // Accounts page state
     accountsApi: null,
@@ -2234,11 +2235,13 @@ function app() {
         this.showToast('已儲存')
       } catch (e) {
         this.showToast('儲存失敗：' + e.message)
+        throw e   // propagate so callers can short-circuit
       }
     },
 
     openUploadPreview() {
       if (!this.currentJob) return
+      this.uploadPreviewOrigin = this.page   // remember where we came from
       this.page = 'upload'
       this.loadPlatformMeta(this.currentJob.id)
     },
