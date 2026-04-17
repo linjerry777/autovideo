@@ -24,11 +24,20 @@ except ImportError:
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-TODAY     = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
+import argparse as _ap
+_parser = _ap.ArgumentParser()
+_parser.add_argument("job_key", nargs="?", default=date.today().isoformat())
+_parser.add_argument("--version", choices=["short", "long"], default=None,
+                     help="Pick script_short / script_long for dual-version output (default: legacy script)")
+_args, _ = _parser.parse_known_args()
+
+TODAY   = _args.job_key
+VERSION = _args.version
+
 BASE_DIR  = Path(__file__).parent.parent
 PIPE_DIR  = BASE_DIR / "pipeline" / TODAY
 NEWS_FILE = PIPE_DIR / "news.json"
-AUDIO_DIR = PIPE_DIR / "audio"
+AUDIO_DIR = PIPE_DIR / VERSION / "audio" if VERSION else PIPE_DIR / "audio"
 
 API_KEY  = os.getenv("FISH_AUDIO_API_KEY", "")
 DEFAULT_VOICE_ID = os.getenv("FISH_AUDIO_VOICE_ID", "")
@@ -267,7 +276,13 @@ def main():
             print(f"  [{i}] 已存在，跳過")
             continue
 
-        script    = item.get("script") or item.get("summary", "")
+        # Pick script per version; legacy jobs use 'script'; dual-version uses script_short/long
+        if VERSION == "short":
+            script = item.get("script_short") or item.get("script") or item.get("summary", "")
+        elif VERSION == "long":
+            script = item.get("script_long")  or item.get("script") or item.get("summary", "")
+        else:
+            script = item.get("script") or item.get("summary", "")
         sentences = split_sentences(script)
         print(f"  [{i}] {item['title']} — {len(sentences)} 句...")
 

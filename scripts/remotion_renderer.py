@@ -33,15 +33,26 @@ sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="repla
 from datetime import date
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-TODAY = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
+import argparse as _ap
+_parser = _ap.ArgumentParser()
+_parser.add_argument("job_key", nargs="?", default=date.today().isoformat())
+_parser.add_argument("--version", choices=["short", "long"], default=None)
+_args, _ = _parser.parse_known_args()
+
+TODAY   = _args.job_key
+VERSION = _args.version
 
 BASE_DIR    = Path(__file__).resolve().parent.parent
 PIPELINE_ROOT = Path(os.environ.get("PIPELINE_DIR", BASE_DIR / "pipeline")).resolve()
 PIPE_DIR    = PIPELINE_ROOT / TODAY
 NEWS_FILE   = PIPE_DIR / "news.json"
-AUDIO_DIR   = PIPE_DIR / "audio"
 SHOTS_DIR   = PIPE_DIR / "screenshots"
-OUTPUT      = PIPE_DIR / "output.mp4"
+if VERSION:
+    AUDIO_DIR = PIPE_DIR / VERSION / "audio"
+    OUTPUT    = PIPE_DIR / VERSION / "output.mp4"
+else:
+    AUDIO_DIR = PIPE_DIR / "audio"
+    OUTPUT    = PIPE_DIR / "output.mp4"
 
 REMOTION_DIR = Path(os.environ.get("REMOTION_DIR", BASE_DIR / "remotion")).resolve()
 
@@ -156,7 +167,11 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
         items_out.append({
             "hook":         item.get("hook", "AI 快訊"),
             "title":        item.get("title", ""),
-            "script":       item.get("script") or item.get("summary", ""),
+            "script":       (
+                item.get("script_short") if VERSION == "short"
+                else item.get("script_long") if VERSION == "long"
+                else item.get("script")
+            ) or item.get("summary", ""),
             "source":       item.get("source") or item.get("source_name", ""),
             "scene_type":   item.get("scene_type", ""),
             "scene_recipe": item.get("scene_recipe"),
