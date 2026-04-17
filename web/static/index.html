@@ -645,13 +645,27 @@
           <!-- Layout mode toggle (visual vs text) -->
           <div class="flex items-center gap-4 py-3 px-5 glass rounded-2xl flex-wrap">
             <p class="text-xs font-semibold text-gray-500">版面風格</p>
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="radio" x-model="layoutMode" value="visual" @change="saveLayoutMode()" class="accent-green-500">
-              <span>🎬 視覺優先 <span class="text-[10px] text-gray-400">（圖片全螢幕 + Ken Burns）</span></span>
+            <label class="cursor-pointer group"
+              :class="layoutMode === 'visual' ? 'ring-2 ring-green-500 rounded-xl' : ''">
+              <input type="radio" x-model="layoutMode" value="visual" @change="saveLayoutMode()" class="sr-only">
+              <div class="flex items-center gap-3 border border-gray-200 rounded-xl p-2 group-hover:border-gray-300">
+                <img src="/static/preview/visual.jpg" class="w-14 h-24 object-cover rounded-md" alt="visual preview">
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-gray-700">🎬 視覺優先</p>
+                  <p class="text-[10px] text-gray-400 leading-tight">新聞圖片填滿畫面<br>像新聞台風格</p>
+                </div>
+              </div>
             </label>
-            <label class="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="radio" x-model="layoutMode" value="text" @change="saveLayoutMode()" class="accent-green-500">
-              <span>✨ 文字優先 <span class="text-[10px] text-gray-400">（漸層 + 浮光）</span></span>
+            <label class="cursor-pointer group"
+              :class="layoutMode === 'text' ? 'ring-2 ring-green-500 rounded-xl' : ''">
+              <input type="radio" x-model="layoutMode" value="text" @change="saveLayoutMode()" class="sr-only">
+              <div class="flex items-center gap-3 border border-gray-200 rounded-xl p-2 group-hover:border-gray-300">
+                <img src="/static/preview/text.jpg" class="w-14 h-24 object-cover rounded-md" alt="text preview">
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-gray-700">✨ 文字優先</p>
+                  <p class="text-[10px] text-gray-400 leading-tight">彩色漸層背景<br>文字卡片風格</p>
+                </div>
+              </div>
             </label>
           </div>
           <template x-for="(item, i) in scriptItems" :key="i">
@@ -1142,13 +1156,27 @@
         <!-- Layout mode toggle (visual vs text) -->
         <div class="flex items-center gap-4 py-3 px-5 glass rounded-2xl flex-wrap">
           <p class="text-xs font-semibold text-gray-500">版面風格</p>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="radio" x-model="layoutMode" value="visual" @change="saveLayoutMode()" class="accent-green-500">
-            <span>🎬 視覺優先 <span class="text-[10px] text-gray-400">（圖片全螢幕 + Ken Burns）</span></span>
+          <label class="cursor-pointer group"
+            :class="layoutMode === 'visual' ? 'ring-2 ring-green-500 rounded-xl' : ''">
+            <input type="radio" x-model="layoutMode" value="visual" @change="saveLayoutMode()" class="sr-only">
+            <div class="flex items-center gap-3 border border-gray-200 rounded-xl p-2 group-hover:border-gray-300">
+              <img src="/static/preview/visual.jpg" class="w-14 h-24 object-cover rounded-md" alt="visual preview">
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-700">🎬 視覺優先</p>
+                <p class="text-[10px] text-gray-400 leading-tight">新聞圖片填滿畫面<br>像新聞台風格</p>
+              </div>
+            </div>
           </label>
-          <label class="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="radio" x-model="layoutMode" value="text" @change="saveLayoutMode()" class="accent-green-500">
-            <span>✨ 文字優先 <span class="text-[10px] text-gray-400">（漸層 + 浮光）</span></span>
+          <label class="cursor-pointer group"
+            :class="layoutMode === 'text' ? 'ring-2 ring-green-500 rounded-xl' : ''">
+            <input type="radio" x-model="layoutMode" value="text" @change="saveLayoutMode()" class="sr-only">
+            <div class="flex items-center gap-3 border border-gray-200 rounded-xl p-2 group-hover:border-gray-300">
+              <img src="/static/preview/text.jpg" class="w-14 h-24 object-cover rounded-md" alt="text preview">
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-700">✨ 文字優先</p>
+                <p class="text-[10px] text-gray-400 leading-tight">彩色漸層背景<br>文字卡片風格</p>
+              </div>
+            </div>
           </label>
         </div>
         <template x-for="(item, i) in scriptItems" :key="i">
