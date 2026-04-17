@@ -65,17 +65,24 @@ async def video(date: str, request: Request):
 
 
 @router.get("/jobs/{job_id}/video")
-async def video_by_job(job_id: int, request: Request):
-    """Stream video for a specific job."""
+async def video_by_job(job_id: int, request: Request, v: str | None = None):
+    """Stream video for a specific job.
+
+    Optional `?v=short` or `?v=long` selects the dual-version output.
+    Falls back to legacy `output.mp4` at the job root if the requested
+    version file doesn't exist.
+    """
     job = get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    # output_path stored in DB; fallback to derived path
-    if job.get("output_path"):
-        f = Path(job["output_path"])
-    else:
-        f = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "output.mp4"
-    return await _stream_video(f, request)
+    job_dir = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+    legacy = Path(job["output_path"]) if job.get("output_path") else (job_dir / "output.mp4")
+
+    if v in ("short", "long"):
+        versioned = job_dir / v / "output.mp4"
+        if versioned.exists():
+            return await _stream_video(versioned, request)
+    return await _stream_video(legacy, request)
 
 
 @router.get("/jobs/{job_id}/thumbnail")

@@ -856,8 +856,29 @@
           </div>
           <div class="glass rounded-2xl overflow-hidden">
             <template x-if="currentJob?.status==='done'">
-              <video controls class="w-full max-h-80 bg-black"
-                :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"></video>
+              <div>
+                <div class="flex items-center justify-center gap-2 px-4 py-2 bg-gray-900/10 text-xs border-b border-gray-200">
+                  <span class="text-gray-500 mr-1">預覽版本：</span>
+                  <button type="button"
+                    @click="currentJobVersion = 'short'"
+                    :class="currentJobVersion === 'short'
+                      ? 'bg-gray-900 text-white font-semibold'
+                      : 'text-gray-700 hover:text-gray-900'"
+                    class="px-3 py-1 rounded-full transition-all">
+                    📱 短版
+                  </button>
+                  <button type="button"
+                    @click="currentJobVersion = 'long'"
+                    :class="currentJobVersion === 'long'
+                      ? 'bg-gray-900 text-white font-semibold'
+                      : 'text-gray-700 hover:text-gray-900'"
+                    class="px-3 py-1 rounded-full transition-all">
+                    💻 長版
+                  </button>
+                </div>
+                <video controls class="w-full max-h-80 bg-black"
+                  :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
+              </div>
             </template>
           </div>
           <div class="glass rounded-2xl p-5 space-y-4">
@@ -1330,8 +1351,29 @@
         </div>
         <div class="glass rounded-2xl overflow-hidden">
           <template x-if="currentJob?.status==='done'">
-            <video controls class="w-full max-h-96 bg-black"
-              :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"></video>
+            <div>
+              <div class="flex items-center justify-center gap-2 px-4 py-2 bg-gray-900/10 text-xs border-b border-gray-200">
+                <span class="text-gray-500 mr-1">預覽版本：</span>
+                <button type="button"
+                  @click="currentJobVersion = 'short'"
+                  :class="currentJobVersion === 'short'
+                    ? 'bg-gray-900 text-white font-semibold'
+                    : 'text-gray-700 hover:text-gray-900'"
+                  class="px-3 py-1 rounded-full transition-all">
+                  📱 短版
+                </button>
+                <button type="button"
+                  @click="currentJobVersion = 'long'"
+                  :class="currentJobVersion === 'long'
+                    ? 'bg-gray-900 text-white font-semibold'
+                    : 'text-gray-700 hover:text-gray-900'"
+                  class="px-3 py-1 rounded-full transition-all">
+                  💻 長版
+                </button>
+              </div>
+              <video controls class="w-full max-h-96 bg-black"
+                :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
+            </div>
           </template>
         </div>
         <div class="flex gap-3">
@@ -2298,6 +2340,7 @@ function app() {
 
     // pipeline (inline on generate page)
     currentJob: null,
+    currentJobVersion: 'long',
     sseLog: [],
     sseSource: null,
     screenshots: [],
