@@ -646,8 +646,25 @@
               <p x-show="item.virality_reason"
                 class="text-[11px] text-gray-500 italic leading-snug"
                 x-text="'💡 ' + item.virality_reason"></p>
+              <div x-show="item.hook_variants && item.hook_variants.length > 0">
+                <label class="text-xs font-medium text-gray-400 block mb-1">選擇 Hook 風格（AI 生成 3 個版本）</label>
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="(variant, vi) in item.hook_variants" :key="vi">
+                    <button type="button"
+                      @click="item.hook = variant"
+                      :class="item.hook === variant
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-700 ring-1 ring-emerald-200'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'"
+                      class="text-sm px-3 py-1.5 rounded-lg border transition-all text-left flex items-start gap-2">
+                      <span class="text-[10px] text-gray-400 mt-0.5"
+                        x-text="['A懸念','B打臉','C提問'][vi] || '#' + (vi+1)"></span>
+                      <span x-text="variant"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
               <div>
-                <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
+                <label class="text-xs font-medium text-gray-400 block mb-1">Hook（手動覆寫上方選擇）</label>
                 <input x-model="item.hook" type="text"
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
               </div>
@@ -1074,8 +1091,25 @@
             <p x-show="item.virality_reason"
               class="text-[11px] text-gray-500 italic leading-snug"
               x-text="'💡 ' + item.virality_reason"></p>
+            <div x-show="item.hook_variants && item.hook_variants.length > 0">
+              <label class="text-xs font-medium text-gray-400 block mb-1">選擇 Hook 風格（AI 生成 3 個版本）</label>
+              <div class="flex flex-wrap gap-2">
+                <template x-for="(variant, vi) in item.hook_variants" :key="vi">
+                  <button type="button"
+                    @click="item.hook = variant"
+                    :class="item.hook === variant
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-700 ring-1 ring-emerald-200'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'"
+                    class="text-sm px-3 py-1.5 rounded-lg border transition-all text-left flex items-start gap-2">
+                    <span class="text-[10px] text-gray-400 mt-0.5"
+                      x-text="['A懸念','B打臉','C提問'][vi] || '#' + (vi+1)"></span>
+                    <span x-text="variant"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
             <div>
-              <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
+              <label class="text-xs font-medium text-gray-400 block mb-1">Hook（手動覆寫上方選擇）</label>
               <input x-model="item.hook" type="text"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 transition-all">
             </div>
