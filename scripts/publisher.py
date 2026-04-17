@@ -12,10 +12,42 @@ import io, json, os, re, sys, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from upload_post import UploadPostClient
+
+# Golden-hour first-slot per platform (local time). Mirrors UI _GOLDEN_HOURS.
+GOLDEN_HOUR_FIRST = {
+    "youtube":   "14:00",
+    "tiktok":    "07:00",
+    "instagram": "13:00",
+    "facebook":  "13:00",
+    "threads":   "12:00",
+    "x":         "09:00",
+}
+
+
+def _next_golden_slot(platform: str, tz: str | None) -> str | None:
+    """Return ISO datetime for the next golden-hour slot of this platform.
+
+    If today's slot has passed, returns tomorrow's. Emits local datetime in
+    ISO format (Upload-Post parses this + timezone kwarg).
+    """
+    hh_mm = GOLDEN_HOUR_FIRST.get(platform)
+    if not hh_mm:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        tzinfo = ZoneInfo(tz or "Asia/Taipei")
+    except Exception:
+        tzinfo = None
+    now = datetime.now(tz=tzinfo)
+    hh, mm = hh_mm.split(":")
+    target = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=1)
+    return target.strftime("%Y-%m-%dT%H:%M:%S")
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
@@ -59,6 +91,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         if meta_file.exists() else {}
     )
     # Global schedule: if mode=scheduled, pass to Upload-Post (it handles the queue)
+    # mode=auto_per_platform → compute per-platform scheduled_date later, keep this empty.
     schedule = pmeta.get("_schedule", {}) if pmeta else {}
     schedule_kwargs = {}
     if schedule.get("mode") == "scheduled" and schedule.get("scheduled_date"):
@@ -178,7 +211,9 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         print("❌ 沒有可上傳的平台（必填欄位未填）", file=sys.stderr)
         sys.exit(1)
 
-    # Group platforms by video_version; upload each group separately
+    # Group platforms by video_version; upload each group separately.
+    # When _schedule.mode=='auto_per_platform', further split each group into
+    # per-platform calls so each platform can get its own golden-hour schedule.
     version_groups: dict[str, list[str]] = {"short": [], "long": [], "legacy": []}
     for p in platforms:
         v = _platform_meta(p).get("video_version")
@@ -189,39 +224,54 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         else:
             version_groups["legacy"].append(p)
 
-    responses = []
+    auto_per_platform = schedule.get("mode") == "auto_per_platform"
+    tz = schedule.get("timezone") or "Asia/Taipei"
+
+    # Build flat upload plan: list of (label, video_path, group, extra_kwargs)
+    upload_plan: list[tuple[str, Path, list[str], dict]] = []
     for version_key, group in version_groups.items():
         if not group:
             continue
         if version_key == "legacy":
-            video_path = output_mp4           # pipeline/.../output.mp4
+            video_path = output_mp4
         else:
             video_path = pipe_dir / version_key / "output.mp4"
             if not video_path.exists():
-                # Graceful fallback: if expected version MP4 missing, use legacy
                 print(f"⚠️  {video_path.name} 不存在，{group} 改用 legacy output.mp4", file=sys.stderr)
                 video_path = output_mp4
                 if not video_path.exists():
                     print(f"❌ legacy output.mp4 也不存在，跳過 {group}", file=sys.stderr)
                     continue
 
-        print(f"📤 上傳 {version_key} ({video_path.name}) → {group}")
+        if auto_per_platform:
+            for p in group:
+                slot = _next_golden_slot(p, tz)
+                extra = {"scheduled_date": slot, "timezone": tz} if slot else {}
+                label = f"{version_key}:{p}@{slot or 'now'}"
+                upload_plan.append((label, video_path, [p], extra))
+        else:
+            upload_plan.append((version_key, video_path, group, {}))
+
+    responses = []
+    for label, video_path, group, extra in upload_plan:
+        merged_kwargs = {**kwargs, **extra}
+        print(f"📤 上傳 {label} ({video_path.name}) → {group}")
         resp = client.upload_video(
             video_path = str(video_path),
             title      = fallback_title,
             user       = PROFILE,
             platforms  = group,
-            **kwargs,
+            **merged_kwargs,
         )
-        responses.append((version_key, resp))
+        responses.append((label, resp))
 
     # Summarize
     all_ok = all(r.get("success") for _, r in responses) if responses else False
     if responses:
-        for version_key, resp in responses:
+        for label, resp in responses:
             req_id = resp.get("request_id", "")
             status = "✅" if resp.get("success") else "❌"
-            print(f"  {status} {version_key}: request_id={req_id}")
+            print(f"  {status} {label}: request_id={req_id}")
     else:
         print("❌ 沒有任何上傳發生")
         sys.exit(1)

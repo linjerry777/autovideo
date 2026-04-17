@@ -1529,6 +1529,10 @@
             <input type="radio" x-model="scheduleMode" value="scheduled" @change="syncScheduleToMeta()" class="accent-green-500">
             <span>🕐 排程發布</span>
           </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="radio" x-model="scheduleMode" value="auto_per_platform" @change="syncScheduleToMeta()" class="accent-green-500">
+            <span>⚡ 各平台自動黃金時段</span>
+          </label>
 
           <div x-show="scheduleMode === 'scheduled'" class="flex items-center gap-2 flex-wrap">
             <input type="datetime-local" x-model="scheduledDatetime" @change="syncScheduleToMeta()"
@@ -1549,10 +1553,14 @@
         </div>
 
         <!-- Per-platform golden-hour hints -->
-        <div x-show="scheduleMode === 'scheduled'" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+        <div x-show="scheduleMode === 'scheduled' || scheduleMode === 'auto_per_platform'"
+             class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
           <template x-for="pid in [...uploadPlatforms].filter(p => _GOLDEN_HOURS[p])" :key="pid">
-            <span class="text-[10px] px-2 py-1 rounded-full bg-gray-100 text-gray-600"
-              x-text="(_PLATFORM_STYLE[pid]?.name || pid) + ': ' + _GOLDEN_HOURS[pid].note"></span>
+            <span class="text-[10px] px-2 py-1 rounded-full text-gray-600"
+              :class="scheduleMode === 'auto_per_platform' ? 'bg-orange-50 border border-orange-200' : 'bg-gray-100'"
+              x-text="scheduleMode === 'auto_per_platform'
+                ? (_PLATFORM_STYLE[pid]?.name || pid) + ' → 下個 ' + _GOLDEN_HOURS[pid].weekday[0]
+                : (_PLATFORM_STYLE[pid]?.name || pid) + ': ' + _GOLDEN_HOURS[pid].note"></span>
           </template>
         </div>
       </div>
