@@ -620,6 +620,32 @@
                 <span class="bg-gray-100 text-gray-500 rounded-lg px-2 py-0.5 text-xs font-medium" x-text="'#' + (i+1)"></span>
                 <span x-text="item.title || item.hook || '新聞 ' + (i+1)"></span>
               </div>
+
+              <!-- Virality / emotion / freshness badges -->
+              <div class="flex items-center gap-2 flex-wrap">
+                <span x-show="item.virality_score != null"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold"
+                  :class="_scoreColor(item.virality_score)">
+                  🔥 <span x-text="item.virality_score"></span>/10
+                </span>
+
+                <span x-show="item.emotion && _EMOTION_CHIP[item.emotion]"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium"
+                  :class="_EMOTION_CHIP[item.emotion]?.cls"
+                  x-text="_EMOTION_CHIP[item.emotion]?.icon + ' ' + _EMOTION_CHIP[item.emotion]?.label">
+                </span>
+
+                <span x-show="item.freshness_level && _FRESHNESS_CHIP[item.freshness_level]"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium"
+                  :class="_FRESHNESS_CHIP[item.freshness_level]?.cls"
+                  x-text="_FRESHNESS_CHIP[item.freshness_level]?.icon + ' ' + _FRESHNESS_CHIP[item.freshness_level]?.label">
+                </span>
+              </div>
+
+              <!-- Virality reason -->
+              <p x-show="item.virality_reason"
+                class="text-[11px] text-gray-500 italic leading-snug"
+                x-text="'💡 ' + item.virality_reason"></p>
               <div>
                 <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
                 <input x-model="item.hook" type="text"
@@ -1022,6 +1048,32 @@
               <span class="bg-gray-100 text-gray-500 rounded-lg px-2 py-0.5 text-xs font-medium" x-text="'#' + (i+1)"></span>
               <span x-text="item.title || item.hook || '新聞 ' + (i+1)"></span>
             </div>
+
+            <!-- Virality / emotion / freshness badges -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span x-show="item.virality_score != null"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold"
+                :class="_scoreColor(item.virality_score)">
+                🔥 <span x-text="item.virality_score"></span>/10
+              </span>
+
+              <span x-show="item.emotion && _EMOTION_CHIP[item.emotion]"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium"
+                :class="_EMOTION_CHIP[item.emotion]?.cls"
+                x-text="_EMOTION_CHIP[item.emotion]?.icon + ' ' + _EMOTION_CHIP[item.emotion]?.label">
+              </span>
+
+              <span x-show="item.freshness_level && _FRESHNESS_CHIP[item.freshness_level]"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-medium"
+                :class="_FRESHNESS_CHIP[item.freshness_level]?.cls"
+                x-text="_FRESHNESS_CHIP[item.freshness_level]?.icon + ' ' + _FRESHNESS_CHIP[item.freshness_level]?.label">
+              </span>
+            </div>
+
+            <!-- Virality reason -->
+            <p x-show="item.virality_reason"
+              class="text-[11px] text-gray-500 italic leading-snug"
+              x-text="'💡 ' + item.virality_reason"></p>
             <div>
               <label class="text-xs font-medium text-gray-400 block mb-1">Hook</label>
               <input x-model="item.hook" type="text"
@@ -2375,6 +2427,28 @@ function app() {
       x:         { weekday: ['09:00', '17:00'], note: '早晨 9-10 / 下午 17-18 最佳' },
       pinterest: { weekday: ['20:00', '23:00'], note: '週末晚間最佳' },
       reddit:    { weekday: ['06:00', '09:00'], note: '清晨 6-9 EST 最活躍' },
+    },
+
+    _EMOTION_CHIP: {
+      surprise:  { icon: '😲', label: '驚訝',  cls: 'bg-purple-50 text-purple-700 border-purple-200' },
+      anger:     { icon: '😡', label: '憤怒',  cls: 'bg-red-50 text-red-700 border-red-200' },
+      joy:       { icon: '😂', label: '好笑',  cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+      curiosity: { icon: '🤔', label: '好奇',  cls: 'bg-blue-50 text-blue-700 border-blue-200' },
+      fear:      { icon: '😨', label: '驚恐',  cls: 'bg-gray-50 text-gray-700 border-gray-200' },
+    },
+
+    _FRESHNESS_CHIP: {
+      fresh:   { icon: '🟢', label: '新鮮 <12h',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      stale:   { icon: '🟡', label: '過時 12-24h', cls: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+      old:     { icon: '🔴', label: '老舊 >24h',   cls: 'bg-red-50 text-red-700 border-red-200' },
+      unknown: { icon: '⚪', label: '時效未知',    cls: 'bg-gray-50 text-gray-500 border-gray-200' },
+    },
+
+    _scoreColor(score) {
+      if (score == null) return 'bg-gray-50 text-gray-500 border-gray-200'
+      if (score >= 8)    return 'bg-emerald-50 text-emerald-700 border-emerald-300'
+      if (score >= 6)    return 'bg-yellow-50 text-yellow-700 border-yellow-300'
+      return 'bg-red-50 text-red-700 border-red-300'
     },
 
     _PLATFORM_STYLE: {
