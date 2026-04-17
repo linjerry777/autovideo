@@ -1412,6 +1412,26 @@
               </label>
             </div>
 
+            <!-- Video version toggle (Short vs Long) -->
+            <div class="flex items-center justify-center gap-1 px-3 py-1.5 bg-black/20 text-xs" x-show="platformMeta[pid]">
+              <button type="button"
+                @click="platformMeta[pid].video_version = 'short'"
+                :class="platformMeta[pid]?.video_version === 'short'
+                  ? 'bg-white/90 text-gray-900 font-semibold'
+                  : 'text-white/60 hover:text-white'"
+                class="px-3 py-1 rounded-full transition-all">
+                📱 Short
+              </button>
+              <button type="button"
+                @click="platformMeta[pid].video_version = 'long'"
+                :class="platformMeta[pid]?.video_version === 'long'
+                  ? 'bg-white/90 text-gray-900 font-semibold'
+                  : 'text-white/60 hover:text-white'"
+                class="px-3 py-1 rounded-full transition-all">
+                💻 Long
+              </button>
+            </div>
+
             <!-- Video thumbnail (shared across all cards) -->
             <div class="relative aspect-[9/16] bg-black mx-auto" style="max-width:280px">
               <img x-show="currentJob"
@@ -3063,8 +3083,13 @@ function app() {
       try {
         const pm = await this.api('GET', `/api/jobs/${jobId}/platform_meta`)
         // Defensive: ensure all 8 platform keys exist so modal x-model bindings never hit undefined.title
+        const DEFAULT_VERSION = {
+          youtube: 'long', x: 'long', pinterest: 'long', linkedin: 'long', reddit: 'long',
+          tiktok: 'short', instagram: 'short', facebook: 'short', threads: 'short',
+        }
         for (const p of ['youtube','tiktok','instagram','facebook','threads','x','pinterest','reddit']) {
           if (!pm[p]) pm[p] = { title: '' }
+          if (!pm[p].video_version) pm[p].video_version = DEFAULT_VERSION[p] || 'long'
         }
         if (!pm._schedule) pm._schedule = { mode: 'now', scheduled_date: '', timezone: 'Asia/Taipei' }
         this.platformMeta = pm
