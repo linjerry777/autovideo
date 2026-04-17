@@ -55,9 +55,6 @@ class TriggerRequest(BaseModel):
 
 @router.post("/jobs/trigger")
 def trigger(req: TriggerRequest):
-    if job_runner.is_running():
-        raise HTTPException(409, "Pipeline already running")
-
     run_date = req.date or date_cls.today().isoformat()
     dry_run  = req.dry_run or get_setting("dry_run", "false") == "true"
 
