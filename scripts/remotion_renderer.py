@@ -166,9 +166,15 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
             "duration":     duration,
         })
 
+    # layout_mode: default "visual" (image full-bleed); accept "text" for legacy look
+    layout_mode = (raw.get("layout_mode") or "visual").lower()
+    if layout_mode not in ("visual", "text"):
+        layout_mode = "visual"
+
     return {
-        "date":  TODAY,
-        "items": items_out,
+        "date":        TODAY,
+        "items":       items_out,
+        "layout_mode": layout_mode,
     }
 
 
