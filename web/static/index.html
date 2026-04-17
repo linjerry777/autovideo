@@ -1413,22 +1413,22 @@
             </div>
 
             <!-- Video version toggle (Short vs Long) -->
-            <div class="flex items-center justify-center gap-1 px-3 py-1.5 bg-black/20 text-xs" x-show="platformMeta[pid]">
+            <div class="flex items-center justify-center gap-1 px-3 py-1.5 bg-gray-900/15 text-xs" x-show="platformMeta[pid]">
               <button type="button"
                 @click="platformMeta[pid].video_version = 'short'"
                 :class="platformMeta[pid]?.video_version === 'short'
-                  ? 'bg-white/90 text-gray-900 font-semibold'
-                  : 'text-white/60 hover:text-white'"
+                  ? 'bg-gray-900 text-white font-semibold'
+                  : 'text-gray-700 hover:text-gray-900'"
                 class="px-3 py-1 rounded-full transition-all">
-                📱 Short
+                📱 短版
               </button>
               <button type="button"
                 @click="platformMeta[pid].video_version = 'long'"
                 :class="platformMeta[pid]?.video_version === 'long'
-                  ? 'bg-white/90 text-gray-900 font-semibold'
-                  : 'text-white/60 hover:text-white'"
+                  ? 'bg-gray-900 text-white font-semibold'
+                  : 'text-gray-700 hover:text-gray-900'"
                 class="px-3 py-1 rounded-full transition-all">
-                💻 Long
+                💻 長版
               </button>
             </div>
 
