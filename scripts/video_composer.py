@@ -406,7 +406,9 @@ def main():
 
     print(f"🎬 合成 {len(items)} 個片段...")
     for i, item in enumerate(items, 1):
-        shot  = Path(item.get("screenshot") or SHOTS_DIR / f"news_{i:02d}.png")
+        edited_shot = SHOTS_DIR / f"news_{i:02d}_edited.png"
+        orig_shot   = SHOTS_DIR / f"news_{i:02d}.png"
+        shot  = Path(item.get("screenshot") or (edited_shot if edited_shot.exists() else orig_shot))
         audio = AUDIO_DIR / f"audio_{i:02d}.mp3"
         seg   = SEG_DIR   / f"seg_{i:02d}.mp4"
         broll = BROLL_DIR / f"broll_{i:02d}.mp4"

@@ -37,7 +37,9 @@ def build_props() -> dict:
         raise ValueError("news.json has no items")
     first = items[0]
     # Prefer explicit screenshot path on the item, else pipeline/screenshots/news_01.png
-    shot_path = Path(first.get("screenshot") or PIPE_DIR / "screenshots" / "news_01.png")
+    edited_shot = PIPE_DIR / "screenshots" / "news_01_edited.png"
+    orig_shot   = PIPE_DIR / "screenshots" / "news_01.png"
+    shot_path = Path(first.get("screenshot") or (edited_shot if edited_shot.exists() else orig_shot))
     screenshot_url = file_to_data_url(shot_path, "image/png") if shot_path.exists() else ""
     return {
         "hook":       first.get("hook", "AI 快訊"),

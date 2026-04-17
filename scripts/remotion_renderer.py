@@ -35,15 +35,15 @@ from datetime import date
 # ── Paths ──────────────────────────────────────────────────────────────────────
 TODAY = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
 
-BASE_DIR    = Path(__file__).parent.parent
-PIPELINE_ROOT = Path(os.environ.get("PIPELINE_DIR", BASE_DIR / "pipeline"))
+BASE_DIR    = Path(__file__).resolve().parent.parent
+PIPELINE_ROOT = Path(os.environ.get("PIPELINE_DIR", BASE_DIR / "pipeline")).resolve()
 PIPE_DIR    = PIPELINE_ROOT / TODAY
 NEWS_FILE   = PIPE_DIR / "news.json"
 AUDIO_DIR   = PIPE_DIR / "audio"
 SHOTS_DIR   = PIPE_DIR / "screenshots"
 OUTPUT      = PIPE_DIR / "output.mp4"
 
-REMOTION_DIR = Path(os.environ.get("REMOTION_DIR", BASE_DIR / "remotion"))
+REMOTION_DIR = Path(os.environ.get("REMOTION_DIR", BASE_DIR / "remotion")).resolve()
 
 
 # ── ffprobe helper ─────────────────────────────────────────────────────────────
@@ -131,7 +131,10 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
     items_out = []
     for i, item in enumerate(items_raw, 1):
         audio_path  = pipe_dir / "audio" / f"audio_{i:02d}.mp3"
-        shot_path   = Path(item.get("screenshot") or pipe_dir / "screenshots" / f"news_{i:02d}.png")
+        # Prefer user-edited version if it exists
+        edited_shot = pipe_dir / "screenshots" / f"news_{i:02d}_edited.png"
+        orig_shot   = pipe_dir / "screenshots" / f"news_{i:02d}.png"
+        shot_path   = Path(item.get("screenshot") or (edited_shot if edited_shot.exists() else orig_shot))
         timing_path = pipe_dir / "audio" / f"audio_{i:02d}_timing.json"
 
         if not audio_path.exists():
