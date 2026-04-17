@@ -1307,13 +1307,13 @@
       <!-- Edit modal -->
       <div x-show="editingPlatform" x-cloak
            class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
-           @click.self="editingPlatform = null">
+           @click.self="editingPlatform = null; showAdvanced = false">
         <div class="bg-white rounded-2xl w-[95vw] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
           <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <p class="text-sm font-semibold text-gray-700">
               🖌️ 編輯 <span x-text="_PLATFORM_STYLE[editingPlatform]?.name"></span>
             </p>
-            <button @click="editingPlatform = null"
+            <button @click="editingPlatform = null; showAdvanced = false"
               class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
               完成
             </button>
@@ -1367,14 +1367,164 @@
                 placeholder="#AI #人工智慧 #科技新聞"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"></textarea>
             </div>
+
+      <!-- Advanced fields toggle -->
+      <button @click="showAdvanced = !showAdvanced"
+        class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 flex items-center gap-1">
+        <span x-text="showAdvanced ? '▼' : '▶'"></span>
+        <span>進階設定</span>
+      </button>
+
+      <div x-show="showAdvanced" class="space-y-3 pt-3 border-t border-gray-100">
+
+        <!-- ═══ YouTube advanced ═══ -->
+        <template x-if="editingPlatform === 'youtube'">
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">類別</label>
+                <select x-model="platformMeta.youtube.categoryId"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+                  <option value="22">人物與網誌 (22)</option>
+                  <option value="25">新聞與政治 (25)</option>
+                  <option value="28">科學與科技 (28)</option>
+                  <option value="24">娛樂 (24)</option>
+                  <option value="26">教育 (26)</option>
+                  <option value="27">How-to (27)</option>
+                  <option value="10">音樂 (10)</option>
+                  <option value="20">遊戲 (20)</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">隱私</label>
+                <select x-model="platformMeta.youtube.privacyStatus"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+                  <option value="public">公開</option>
+                  <option value="unlisted">不公開（有連結才能看）</option>
+                  <option value="private">私人</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">主要語言</label>
+                <select x-model="platformMeta.youtube.defaultLanguage"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+                  <option value="zh-Hant">繁體中文</option>
+                  <option value="zh-Hans">簡體中文</option>
+                  <option value="en">English</option>
+                  <option value="ja">日本語</option>
+                  <option value="ko">한국어</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">License</label>
+                <select x-model="platformMeta.youtube.license"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+                  <option value="youtube">標準 YouTube License</option>
+                  <option value="creativeCommon">Creative Commons</option>
+                </select>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.youtube.containsSyntheticMedia"
+                  @change="platformMeta.youtube.containsSyntheticMedia = $event.target.checked">
+                <span>🤖 包含 AI 生成內容（合規必填）</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.youtube.selfDeclaredMadeForKids"
+                  @change="platformMeta.youtube.selfDeclaredMadeForKids = $event.target.checked">
+                <span>👶 兒童向內容（COPPA 合規）</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.youtube.embeddable"
+                  @change="platformMeta.youtube.embeddable = $event.target.checked">
+                <span>允許嵌入到其他網站</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.youtube.publicStatsViewable"
+                  @change="platformMeta.youtube.publicStatsViewable = $event.target.checked">
+                <span>公開觀看數與評分</span>
+              </label>
+            </div>
+          </div>
+        </template>
+
+        <!-- ═══ TikTok advanced ═══ -->
+        <template x-if="editingPlatform === 'tiktok'">
+          <div class="space-y-3">
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">隱私</label>
+                <select x-model="platformMeta.tiktok.privacy_level"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+                  <option value="PUBLIC_TO_EVERYONE">公開（所有人）</option>
+                  <option value="MUTUAL_FOLLOW_FRIENDS">相互追蹤好友</option>
+                  <option value="SELF_ONLY">僅自己可見</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs font-medium text-gray-500 block mb-1">封面時間點（ms）</label>
+                <input type="number" min="0" step="100" x-model.number="platformMeta.tiktok.cover_timestamp"
+                  class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+              </div>
+            </div>
+            <div class="space-y-2">
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.tiktok.is_aigc"
+                  @change="platformMeta.tiktok.is_aigc = $event.target.checked">
+                <span>🤖 AI 生成聲明（TikTok 2026 合規必填）</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.tiktok.disable_duet"
+                  @change="platformMeta.tiktok.disable_duet = $event.target.checked">
+                <span>禁止 Duet（合拍）</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.tiktok.disable_stitch"
+                  @change="platformMeta.tiktok.disable_stitch = $event.target.checked">
+                <span>禁止 Stitch（剪接）</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.tiktok.disable_comment"
+                  @change="platformMeta.tiktok.disable_comment = $event.target.checked">
+                <span>關閉留言</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs"><input type="checkbox" class="accent-green-500"
+                  :checked="platformMeta.tiktok.brand_content_toggle"
+                  @change="platformMeta.tiktok.brand_content_toggle = $event.target.checked">
+                <span>業配聲明（付費合作）</span>
+              </label>
+            </div>
+          </div>
+        </template>
+
+        <!-- ═══ Instagram advanced ═══ -->
+        <template x-if="editingPlatform === 'instagram'">
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs font-medium text-gray-500 block mb-1">共同製作者（逗號分隔 username）</label>
+              <input type="text" x-model="platformMeta.instagram.collaborators"
+                placeholder="friend_handle1, friend_handle2"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+            <div>
+              <label class="text-xs font-medium text-gray-500 block mb-1">@標記使用者</label>
+              <input type="text" x-model="platformMeta.instagram.user_tags"
+                placeholder="@user1, @user2"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
+            </div>
+          </div>
+        </template>
+
+      </div>
           </div>
 
           <div class="border-t border-gray-100 p-4 flex justify-end gap-2">
-            <button @click="editingPlatform = null"
+            <button @click="editingPlatform = null; showAdvanced = false"
               class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700">
               取消
             </button>
-            <button @click="savePlatformMeta().then(() => editingPlatform = null).catch(err => console.error('savePlatformMeta:', err))"
+            <button @click="savePlatformMeta().then(() => { editingPlatform = null; showAdvanced = false }).catch(err => console.error('savePlatformMeta:', err))"
               class="px-5 py-2 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white">
               儲存
             </button>
@@ -1775,6 +1925,7 @@ function app() {
     platformMeta: null,          // {youtube:{...}, tiktok:{...}, ...}
     platformMetaLoading: false,
     editingPlatform: null,       // 'youtube' | 'tiktok' | ... | null (modal open for this platform)
+    showAdvanced: false,    // toggle for modal's advanced fields section
     uploadPreviewOrigin: 'job',  // where to return on back navigation
 
     // Schedule state (mirrors platformMeta._schedule but UI-reactive)
