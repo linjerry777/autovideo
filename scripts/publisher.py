@@ -8,7 +8,7 @@ Publisher — 上傳影片到 YouTube / Instagram
     python scripts/publisher.py 2026-03-20 --platforms youtube instagram
     python scripts/publisher.py 2026-03-20 --dry-run
 """
-import io, json, os, sys, argparse
+import io, json, os, re, sys, argparse
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
@@ -76,24 +76,25 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     fallback_title = meta["title"]
     fallback_desc  = meta["description"]
 
-    def _p(platform: str) -> dict:
+    def _platform_meta(platform: str) -> dict:
         """Return platform-specific meta dict (never None)."""
-        return (pmeta or {}).get(platform, {})
+        return pmeta.get(platform, {})
 
     kwargs = dict(async_upload=True, description=fallback_desc)
 
     # Per-platform titles (override default)
     for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x"):
         if p in platforms:
-            title = _p(p).get("title") or fallback_title
+            title = _platform_meta(p).get("title") or fallback_title
             kwargs[f"{p}_title"] = title
 
     # YouTube-specific
     if "youtube" in platforms:
-        yt = _p("youtube")
+        yt = _platform_meta("youtube")
         kwargs["youtube_description"] = yt.get("description") or fallback_desc
         if yt.get("tags"):
-            kwargs["tags"] = [t.strip() for t in yt["tags"].split(",") if t.strip()]
+            # Allow ASCII comma, CJK comma（，）, ideographic comma（、）, and newlines as separators
+            kwargs["tags"] = [t.strip() for t in re.split(r"[,\uff0c\u3001\n]+", yt["tags"]) if t.strip()]
         else:
             kwargs["tags"] = ["AI", "人工智慧", "科技新聞", "AINews", "TechNews"]
         kwargs["privacyStatus"]          = "public"
@@ -110,11 +111,11 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
 
     # Facebook extra description
     if "facebook" in platforms:
-        kwargs["facebook_description"] = _p("facebook").get("description") or fallback_desc
+        kwargs["facebook_description"] = _platform_meta("facebook").get("description") or fallback_desc
 
     # Instagram first_comment (hashtag spam)
     if "instagram" in platforms:
-        fc = _p("instagram").get("first_comment", "")
+        fc = _platform_meta("instagram").get("first_comment", "")
         if fc:
             kwargs["first_comment"] = fc
 
