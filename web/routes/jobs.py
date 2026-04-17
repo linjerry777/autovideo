@@ -291,7 +291,7 @@ def upload_screenshot(job_id: int, n: int, body: UploadScreenshotRequest):
     return {"ok": True, "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}"}
 
 
-PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x"]
+PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x", "pinterest", "reddit"]
 
 
 def _seed_platform_meta(news: dict) -> dict:
@@ -312,18 +312,73 @@ def _seed_platform_meta(news: dict) -> dict:
 
     return {
         "youtube": {
-            "title":             main_title,
-            "description":       f"{long_desc}\n\n{hashtags}",
-            "tags":              "AI,人工智慧,科技新聞,AINews,TechNews",
-            "use_auto_thumbnail": True,
+            "title":                 main_title,
+            "description":           f"{long_desc}\n\n{hashtags}",
+            "tags":                  "AI,人工智慧,科技新聞,AINews,TechNews",
+            "use_auto_thumbnail":    True,
+            "categoryId":            "22",
+            "defaultLanguage":       "zh-Hant",
+            "defaultAudioLanguage":  "zh-Hant",
+            "privacyStatus":         "public",
+            "containsSyntheticMedia": True,
+            "selfDeclaredMadeForKids": False,
+            "embeddable":            True,
+            "publicStatsViewable":   True,
+            "license":               "youtube",
         },
-        "tiktok":    {"title": f"{main_title}\n\n{hashtags}"},
-        "instagram": {"title": main_title,
-                      "first_comment": hashtags},
-        "facebook":  {"title": main_title,
-                      "description": f"{long_desc}\n\n{hashtags}"},
-        "threads":   {"title": f"{main_title[:450]}\n\n{hashtags}"},
-        "x":         {"title": f"{main_title[:240]} {hashtags}"[:280]},
+        "tiktok": {
+            "title":                 f"{main_title}\n\n{hashtags}",
+            "privacy_level":         "PUBLIC_TO_EVERYONE",
+            "is_aigc":               True,
+            "cover_timestamp":       1000,
+            "disable_duet":          False,
+            "disable_comment":       False,
+            "disable_stitch":        False,
+            "brand_content_toggle":  False,
+            "brand_organic_toggle":  False,
+        },
+        "instagram": {
+            "title":                 main_title,
+            "first_comment":         hashtags,
+            "share_mode":            "REELS",
+            "share_to_feed":         True,
+            "collaborators":         "",
+            "user_tags":             "",
+        },
+        "facebook": {
+            "title":                 main_title,
+            "description":           f"{long_desc}\n\n{hashtags}",
+            "facebook_media_type":   "REELS",
+            "video_state":           "PUBLISHED",
+        },
+        "threads": {
+            "title":                 f"{main_title[:450]}\n\n{hashtags}",
+            "threads_topic_tag":     "",
+        },
+        "x": {
+            "title":                 f"{main_title[:240]} {hashtags}"[:280],
+            "poll_options":          "",
+            "poll_duration":         1440,
+            "reply_settings":        "everyone",
+            "x_long_text_as_post":   False,
+        },
+        "pinterest": {
+            "title":                 main_title,
+            "description":           f"{long_desc}\n\n{hashtags}",
+            "pinterest_board_id":    "",
+            "pinterest_link":        "",
+            "pinterest_alt_text":    main_title,
+        },
+        "reddit": {
+            "title":                 main_title,
+            "subreddit":             "",
+            "flair_id":              "",
+        },
+        "_schedule": {
+            "mode":                  "now",
+            "scheduled_date":        "",
+            "timezone":              "Asia/Taipei",
+        },
     }
 
 
