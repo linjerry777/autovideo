@@ -78,6 +78,18 @@ async def video_by_job(job_id: int, request: Request):
     return await _stream_video(f, request)
 
 
+@router.get("/jobs/{job_id}/thumbnail")
+def thumbnail_by_job(job_id: int):
+    """Serve the auto-generated 1080x1920 thumbnail PNG for a job."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    f = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "thumbnail.png"
+    if not f.exists():
+        raise HTTPException(404, "Thumbnail not yet generated")
+    return FileResponse(str(f), media_type="image/png")
+
+
 @router.get("/jobs/{job_id}/screenshots/{filename}")
 def job_screenshot(job_id: int, filename: str):
     job = get_job(job_id)

@@ -158,6 +158,16 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
                 return
             _step_update(job_id, date, "video", "done")
 
+            # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
+            try:
+                ok_th, _ = _call_script("thumbnail_renderer.py", job_key, [], log_path)
+                if not ok_th:
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write("\n[WARN] thumbnail render failed (non-fatal)\n")
+            except Exception as _e:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n[WARN] thumbnail render exception: {_e}\n")
+
             update_job(job_id, status="done", finished_at=_now())
             _broadcast(job_id, {"job_id": job_id, "status": "done"})
 
@@ -324,6 +334,16 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             su("video", "failed")
             raise RuntimeError(f"{script_name} 失敗:\n{out[-500:]}")
         su("video", "done")
+
+        # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
+        try:
+            ok_th, _ = _call_script("thumbnail_renderer.py", job_key, [], log_path)
+            if not ok_th:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write("\n[WARN] thumbnail render failed (non-fatal)\n")
+        except Exception as _e:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[WARN] thumbnail render exception: {_e}\n")
 
         # ── Step 5: 上傳 (需用戶手動觸發) ─────────────────────────
         output_mp4 = pipe_dir / "output.mp4"
