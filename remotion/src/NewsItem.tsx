@@ -8,11 +8,12 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
-import { NewsItem as NewsItemType, SceneType } from "./types";
+import { NewsItem as NewsItemType, SceneType, LayoutMode } from "./types";
 import { Subtitle } from "./Subtitle";
 import { FireScene } from "./scenes/FireScene";
 import { RaceScene } from "./scenes/RaceScene";
 import { SceneInterpreter } from "./scenes/SceneInterpreter";
+import { BackgroundLayer } from "./BackgroundLayer";
 
 const PRESET_SCENES = new Set(["fire", "race", "money", "robot", "warning", "trophy", "default"]);
 
@@ -37,6 +38,7 @@ interface NewsItemProps {
   item: NewsItemType;
   index: number;
   totalFrames: number;
+  layout_mode?: LayoutMode;
 }
 
 /**
@@ -65,6 +67,7 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
   item,
   index,
   totalFrames,
+  layout_mode = "visual",
 }) => {
   // Inside <Sequence from=N>, useCurrentFrame() is already shifted to 0 at
   // the sequence start — do NOT subtract startFrame again.
@@ -133,40 +136,50 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
     <AbsoluteFill style={{ opacity: fadeOpacity, backgroundColor: palette.bg1 }}>
       {audioSrc && <Audio src={audioSrc} startFrom={0} />}
 
-      {/* Animated gradient backdrop */}
-      <AbsoluteFill
-        style={{
-          background: `linear-gradient(${bgAngle}deg, ${palette.bg1} 0%, ${palette.bg2} ${50 + bgPulse}%, ${palette.bg3} 100%)`,
-        }}
-      />
+      {layout_mode === "visual" ? (
+        <BackgroundLayer
+          imgSrc={screenshotSrc}
+          totalFrames={totalFrames}
+          palette={{ bg1: palette.bg1, bg2: palette.bg2, bg3: palette.bg3, glow: palette.glow }}
+        />
+      ) : (
+        <>
+          {/* Text-mode: animated gradient backdrop */}
+          <AbsoluteFill
+            style={{
+              background: `linear-gradient(${bgAngle}deg, ${palette.bg1} 0%, ${palette.bg2} ${50 + bgPulse}%, ${palette.bg3} 100%)`,
+            }}
+          />
 
-      {/* Drifting glow orbs */}
-      <div
-        style={{
-          position: "absolute",
-          left: orb1X,
-          top: orb1Y,
-          width: 600,
-          height: 600,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${palette.glow} 0%, transparent 65%)`,
-          filter: "blur(40px)",
-          pointerEvents: "none",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          left: orb2X,
-          top: orb2Y,
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background: `radial-gradient(circle, ${palette.glow} 0%, transparent 65%)`,
-          filter: "blur(40px)",
-          pointerEvents: "none",
-        }}
-      />
+          {/* Text-mode: drifting glow orbs */}
+          <div
+            style={{
+              position: "absolute",
+              left: orb1X,
+              top: orb1Y,
+              width: 600,
+              height: 600,
+              borderRadius: "50%",
+              background: `radial-gradient(circle, ${palette.glow} 0%, transparent 65%)`,
+              filter: "blur(40px)",
+              pointerEvents: "none",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              left: orb2X,
+              top: orb2Y,
+              width: 500,
+              height: 500,
+              borderRadius: "50%",
+              background: `radial-gradient(circle, ${palette.glow} 0%, transparent 65%)`,
+              filter: "blur(40px)",
+              pointerEvents: "none",
+            }}
+          />
+        </>
+      )}
 
       {/* ── Contextual scene layer (between orbs and text) ── */}
       <div style={{ position: "absolute", inset: 0, opacity: sceneOpacity, zIndex: 3 }}>
@@ -230,7 +243,10 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
             background: `linear-gradient(180deg, #ffffff 0%, ${palette.accent} 100%)`,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
-            filter: `drop-shadow(0 0 30px ${palette.glow})`,
+            filter:
+              layout_mode === "visual"
+                ? `drop-shadow(0 4px 24px rgba(0,0,0,0.95)) drop-shadow(0 0 30px ${palette.glow})`
+                : `drop-shadow(0 0 30px ${palette.glow})`,
           }}
         >
           {item.hook || "AI 快訊"}
@@ -268,13 +284,16 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
               lineHeight: 1.25,
               margin: 0,
               letterSpacing: 1,
-              textShadow: "0 4px 20px rgba(0,0,0,0.8)",
+              textShadow:
+                layout_mode === "visual"
+                  ? "0 4px 24px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.9)"
+                  : "0 4px 20px rgba(0,0,0,0.8)",
             }}
           >
             {item.title}
           </h1>
 
-          {screenshotSrc && (
+          {screenshotSrc && layout_mode === "text" && (
             <div
               style={{
                 marginTop: 28,
