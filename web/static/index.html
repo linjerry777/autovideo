@@ -430,7 +430,7 @@
           <!-- 中文熱門 group -->
           <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">中文熱門</p>
           <div class="flex flex-wrap gap-2 mb-3">
-            <template x-for="[id, icon, label] in [['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['ptt','🏛️','PTT'],['dcard','🃏','Dcard'],['v2ex','💻','V2EX'],['36kr','📰','36氪'],['sspai','✏️','少數派'],['ithome','🏠','ITHome'],['huxiu','🐯','虎嗅']]" :key="id">
+            <template x-for="[id, icon, label] in [['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['ptt','🏛️','PTT'],['dcard','🃏','Dcard'],['ithome','🏠','ITHome']]" :key="id">
               <button type="button" @click="toggleSource(id)"
                 :class="selectedSources.has(id) ? 'bg-purple-50 border-purple-300 text-purple-700 ring-1 ring-purple-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
                 class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
