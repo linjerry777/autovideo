@@ -190,8 +190,8 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
                     update_job(job_id, status="failed", error=out[-300:])
                     _broadcast(job_id, {"job_id": job_id, "status": "failed"})
                     return
+                _check_cancel(job_id)
             _step_update(job_id, date, "audio", "done")
-            _check_cancel(job_id)
 
             # ── Step 3.5: AI 圖生影片 B-roll (optional) ─────────────
             ai_video_mode = get_setting("ai_video_mode", "").lower()
@@ -212,6 +212,7 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
                     update_job(job_id, status="failed", error=out[-300:])
                     _broadcast(job_id, {"job_id": job_id, "status": "failed"})
                     return
+                _check_cancel(job_id)
             _step_update(job_id, date, "video", "done")
 
             # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
@@ -375,8 +376,8 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             if not ok:
                 su("audio", "failed")
                 raise RuntimeError(f"audio_generator({v or 'legacy'}) 失敗:\n{out[-500:]}")
+            _check_cancel(job_id)
         su("audio", "done")
-        _check_cancel(job_id)
 
         # ── Step 3.5: AI 圖生影片 B-roll (optional) ─────────────────
         ai_video_mode = get_setting("ai_video_mode", "").lower()
@@ -396,6 +397,7 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             if not ok:
                 su("video", "failed")
                 raise RuntimeError(f"{script_name}({v or 'legacy'}) 失敗:\n{out[-500:]}")
+            _check_cancel(job_id)
         su("video", "done")
 
         # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
