@@ -12,6 +12,16 @@ from datetime import date
 from fish_audio_sdk import Session, TTSRequest
 from dotenv import load_dotenv
 
+# Import audio_assets (sibling-first to dodge pywin32 namespace conflict on Windows)
+try:
+    import sys as _sys
+    _script_dir = str(Path(__file__).resolve().parent)
+    if _script_dir not in _sys.path:
+        _sys.path.insert(0, _script_dir)
+    from audio_assets import pick_bgm, pick_hook_sfx
+except ImportError:
+    from scripts.audio_assets import pick_bgm, pick_hook_sfx
+
 load_dotenv(Path(__file__).parent.parent / ".env")
 
 TODAY     = sys.argv[1] if len(sys.argv) > 1 else date.today().isoformat()
@@ -273,18 +283,40 @@ def main():
             t_cursor += dur
             sent_files.append(sp)
 
-        # 合併所有句子 → 單一音訊檔
+        # Step A: concat sentences into raw narration (intermediate file)
+        raw_voice = AUDIO_DIR / f"audio_{i:02d}_voice.mp3"
         if len(sent_files) == 1:
-            sent_files[0].rename(combined)
+            sent_files[0].rename(raw_voice)
         else:
-            concat_mp3(sent_files, combined)
+            concat_mp3(sent_files, raw_voice)
             for sp in sent_files:
                 sp.unlink(missing_ok=True)
+
+        # Step B: mix with BGM + SFX (or pass through if no assets)
+        emotion = (item.get("emotion") or "").lower()
+        bgm     = pick_bgm(emotion)
+        sfx     = pick_hook_sfx(emotion)
+        offset  = mix_audio(raw_voice, combined, bgm=bgm, hook_sfx=sfx)
+
+        # Cleanup intermediate file
+        raw_voice.unlink(missing_ok=True)
+
+        # Step C: shift timing.json by leading_offset (if SFX prepended)
+        if offset > 0:
+            timings = [
+                {"text": t["text"],
+                 "start": t["start"] + offset,
+                 "end":   t["end"]   + offset}
+                for t in timings
+            ]
 
         timing_f.write_text(
             json.dumps(timings, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        print(f"      ✅ {combined.name}，總時長 {t_cursor:.1f}s")
+
+        bgm_label = bgm.name if bgm else "(no BGM)"
+        sfx_label = sfx.name if sfx else "(no SFX)"
+        print(f"      ✅ {combined.name}（BGM={bgm_label}, SFX={sfx_label}, +{offset:.1f}s offset）")
 
     print(f"\n✅ 語音已存至 {AUDIO_DIR}")
 
