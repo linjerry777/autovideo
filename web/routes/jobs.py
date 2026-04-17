@@ -460,6 +460,18 @@ def patch_layout_mode(job_id: int, body: LayoutModeUpdate):
     return {"ok": True, "layout_mode": body.layout_mode}
 
 
+@router.get("/jobs/{job_id}/audio_metadata")
+def get_audio_metadata(job_id: int):
+    """Return audio pipeline metadata (voice, BGM/SFX pick per item, offsets)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    p = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "audio" / "audio_metadata.json"
+    if not p.exists():
+        return {"voice_strategy": "", "voice_id_used": "", "items": []}
+    return _json.loads(p.read_text(encoding="utf-8"))
+
+
 class ReplaceItemRequest(BaseModel):
     cache_id: int
     mark_old_blocked: bool = True   # 是否標記被替換的 URL 為截圖封鎖
