@@ -318,6 +318,7 @@ def _seed_platform_meta(news: dict) -> dict:
 
     return {
         "youtube": {
+            "video_version":         "long",
             "title":                 main_title,
             "description":           f"{long_desc}\n\n{hashtags}",
             "tags":                  "AI,人工智慧,科技新聞,AINews,TechNews",
@@ -333,6 +334,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "license":               "youtube",
         },
         "tiktok": {
+            "video_version":         "short",
             "title":                 f"{main_title}\n\n{hashtags}",
             "privacy_level":         "PUBLIC_TO_EVERYONE",
             "is_aigc":               True,
@@ -344,6 +346,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "brand_organic_toggle":  False,
         },
         "instagram": {
+            "video_version":         "short",
             "title":                 main_title,
             "first_comment":         hashtags,
             "share_mode":            "REELS",
@@ -352,16 +355,19 @@ def _seed_platform_meta(news: dict) -> dict:
             "user_tags":             "",
         },
         "facebook": {
+            "video_version":         "short",
             "title":                 main_title,
             "description":           f"{long_desc}\n\n{hashtags}",
             "facebook_media_type":   "REELS",
             "video_state":           "PUBLISHED",
         },
         "threads": {
+            "video_version":         "short",
             "title":                 f"{main_title[:450]}\n\n{hashtags}",
             "threads_topic_tag":     "",
         },
         "x": {
+            "video_version":         "long",
             "title":                 f"{main_title[:240]} {hashtags}"[:280],
             "poll_options":          "",
             "poll_duration":         1440,
@@ -369,6 +375,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "x_long_text_as_post":   False,
         },
         "pinterest": {
+            "video_version":         "long",
             "title":                 main_title,
             "description":           f"{long_desc}\n\n{hashtags}",
             "pinterest_board_id":    "",
@@ -376,6 +383,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "pinterest_alt_text":    main_title,
         },
         "reddit": {
+            "video_version":         "long",
             "title":                 main_title,
             "subreddit":             "",
             "flair_id":              "",
