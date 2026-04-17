@@ -135,6 +135,32 @@ BACKGROUND_MODE=screenshot   # 'screenshot' | 'blur' | 'playwright_stealth'
 
 ---
 
+## Upload-Post Feature Coverage
+
+We use Upload-Post's per-platform API extensively. Coverage per platform:
+
+**YouTube** — `youtube_title`, `youtube_description`, `tags[]`, `categoryId`, `defaultLanguage`, `defaultAudioLanguage`, `privacyStatus`, `containsSyntheticMedia`, `selfDeclaredMadeForKids`, `embeddable`, `publicStatsViewable`, `license`, `thumbnail` (auto from `pipeline/.../thumbnail.png`)
+
+**TikTok** — `tiktok_title`, `privacy_level`, `is_aigc` (2026 compliance), `cover_timestamp`, `disable_duet/comment/stitch`, `brand_content_toggle`, `brand_organic_toggle`
+
+**Instagram Reels** — `instagram_title`, `first_comment` (hashtag spam), `collaborators`, `user_tags`, `media_type=REELS`
+
+**Facebook Reels** — `facebook_title`, `facebook_description`, `facebook_media_type`, `video_state` (PUBLISHED/DRAFT)
+
+**Threads** — `threads_title`, `threads_topic_tag`
+
+**X (Twitter)** — `x_title`, `poll_options`, `poll_duration`, `reply_settings`, `x_long_text_as_post`
+
+**Pinterest** — `pinterest_title`, `pinterest_description`, `pinterest_board_id` (REQUIRED), `pinterest_link`, `pinterest_alt_text`
+
+**Reddit** — `reddit_title`, `subreddit` (REQUIRED), `flair_id`
+
+**Scheduling** — `scheduled_date` + `timezone` (pass-through to Upload-Post's queue; no local scheduler)
+
+Per-platform customization lives in `pipeline/{date}/job_{id}/platform_meta.json`. UI edits via Alpine modal at `page='upload'`. Compliance defaults (`is_aigc=true`, `containsSyntheticMedia=true`) are seeded — users can uncheck for non-AI content.
+
+---
+
 ## Development Notes
 
 - **Async/Sync mix**: FastAPI is async; pipeline steps run in a background thread (sync). Do not `await` inside pipeline scripts.
