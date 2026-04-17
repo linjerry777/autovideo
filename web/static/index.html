@@ -1959,6 +1959,45 @@
     <!-- ── Settings ───────────────────────────────────────────────────── -->
     <div x-show="page==='settings'" class="p-8 max-w-xl mx-auto space-y-6">
 
+      <!-- Audio Assets Status -->
+      <div x-show="assetsStatus" class="glass rounded-2xl p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-semibold text-gray-700">🎵 Audio Assets 狀態</p>
+          <span class="text-xs text-gray-400" x-text="(assetsStatus?.total_files || 0) + ' MP3 檔'"></span>
+        </div>
+
+        <!-- All-empty warning -->
+        <div x-show="(assetsStatus?.total_files || 0) === 0"
+          class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 flex items-start gap-2">
+          <span>⚠️</span>
+          <div>
+            <p class="font-medium">尚未放入任何音樂或音效</p>
+            <p class="text-amber-600 mt-0.5">Pipeline 會 fallback 到純人聲（不影響運作）。詳情見 <code class="bg-amber-100 rounded px-1">assets/README.md</code></p>
+          </div>
+        </div>
+
+        <!-- Music per emotion -->
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+          <template x-for="[emotion, label] in [
+            ['surprise','😲 驚訝'],['fear','😨 驚恐'],['joy','😂 好笑'],
+            ['curiosity','🤔 好奇'],['anger','😡 憤怒'],['generic','📦 通用']
+          ]" :key="emotion">
+            <div class="flex items-center justify-between px-2 py-1 rounded-md"
+              :class="(assetsStatus?.music?.[emotion] || 0) > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-400'">
+              <span x-text="label"></span>
+              <span class="font-mono" x-text="(assetsStatus?.music?.[emotion] || 0)"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- SFX -->
+        <div class="flex items-center justify-between px-2 py-1 rounded-md text-xs"
+          :class="(assetsStatus?.sfx_hook || 0) > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-50 text-gray-400'">
+          <span>🔔 Hook SFX</span>
+          <span class="font-mono" x-text="(assetsStatus?.sfx_hook || 0) + ' 首'"></span>
+        </div>
+      </div>
+
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-gray-900">設定</h1>
         <p class="text-sm text-gray-500 mt-1">API 金鑰與排程設定</p>
@@ -2220,6 +2259,7 @@ function app() {
     ],
 
     settings: {},
+    assetsStatus: null,   // { music: {...}, sfx_hook: N, total_files: N }
     settingsSaved: false,
     settingsFields: [
       ['fish_audio_key',  'Fish Audio API Key',  'password', 'sk-...'],
@@ -3152,6 +3192,15 @@ function app() {
       try {
         this.settings = await this.api('GET', '/api/settings')
       } catch (e) { this.showToast('載入設定失敗：' + e.message) }
+      this.loadAssetsStatus()
+    },
+
+    async loadAssetsStatus() {
+      try {
+        this.assetsStatus = await this.api('GET', '/api/assets/status')
+      } catch (e) {
+        this.assetsStatus = null
+      }
     },
 
     async saveSettings() {

@@ -94,3 +94,35 @@ def list_llm_models(url: str = None):
         return {"provider": "ollama", "models": models}
     except Exception as e:
         return {"provider": "ollama", "models": [], "error": f"Ollama 未啟動或連線失敗：{e}"}
+
+
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+MUSIC_EMOTIONS = ["surprise", "fear", "joy", "curiosity", "anger", "generic"]
+
+
+@router.get("/assets/status")
+def get_assets_status():
+    """Count MP3 files in assets/music/* and assets/sfx/hook."""
+    music_root = BASE_DIR / "assets" / "music"
+    sfx_root   = BASE_DIR / "assets" / "sfx" / "hook"
+
+    music = {}
+    for emotion in MUSIC_EMOTIONS:
+        folder = music_root / emotion
+        if folder.exists() and folder.is_dir():
+            music[emotion] = len([p for p in folder.iterdir() if p.suffix.lower() == ".mp3" and p.is_file()])
+        else:
+            music[emotion] = 0
+
+    sfx_count = 0
+    if sfx_root.exists() and sfx_root.is_dir():
+        sfx_count = len([p for p in sfx_root.iterdir() if p.suffix.lower() == ".mp3" and p.is_file()])
+
+    total = sum(music.values()) + sfx_count
+    return {
+        "music":       music,
+        "sfx_hook":    sfx_count,
+        "total_files": total,
+    }
