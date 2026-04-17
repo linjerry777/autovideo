@@ -57,6 +57,31 @@ def call_llm(prompt: str) -> str:
     return r.json()["choices"][0]["message"]["content"].strip()
 
 
+import time as _time
+from datetime import datetime, timezone
+
+
+def _hours_since(struct_time) -> float | None:
+    """Convert feedparser's published_parsed struct_time → hours since now (UTC)."""
+    if not struct_time:
+        return None
+    try:
+        ts = _time.mktime(struct_time)
+        return (datetime.now(timezone.utc).timestamp() - ts) / 3600.0
+    except Exception:
+        return None
+
+
+def _freshness_level(hours: float | None) -> str:
+    if hours is None:
+        return "unknown"
+    if hours < 12:
+        return "fresh"
+    if hours < 24:
+        return "stale"
+    return "old"
+
+
 def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dict]:
     print(f"  Google News 搜尋：{keyword}")
     for days in [3, 7, 30]:
@@ -65,11 +90,14 @@ def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dic
             feed = feedparser.parse(url)
             items = []
             for entry in feed.entries[:limit]:
+                hours = _hours_since(entry.get("published_parsed"))
                 items.append({
-                    "title":   entry.get("title", ""),
-                    "summary": entry.get("summary", "")[:400],
-                    "url":     entry.get("link", ""),
-                    "source":  entry.get("source", {}).get("title", "") or feed.feed.get("title", "Google News"),
+                    "title":           entry.get("title", ""),
+                    "summary":         entry.get("summary", "")[:400],
+                    "url":             entry.get("link", ""),
+                    "source":          entry.get("source", {}).get("title", "") or feed.feed.get("title", "Google News"),
+                    "freshness_hours": round(hours, 1) if hours is not None else None,
+                    "freshness_level": _freshness_level(hours),
                 })
             if items:
                 if days > 3:
@@ -116,8 +144,18 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
     # 清除可能的 markdown 包裹
     raw = re.sub(r"^```[a-z]*\n?", "", raw.strip())
     raw = re.sub(r"\n?```$", "", raw.strip())
+    match = re.search(r"\[[\s\S]*\]", raw)
+    if match:
+        raw = match.group(0)
 
-    return json.loads(raw)
+    picked = json.loads(raw)
+    # Backfill freshness from matched raw items by URL (Claude doesn't know pubDate)
+    raw_by_url = {it.get("url", ""): it for it in raw_items}
+    for item in picked:
+        src = raw_by_url.get(item.get("source_url", ""), {})
+        item["freshness_hours"] = src.get("freshness_hours")
+        item["freshness_level"] = src.get("freshness_level", "unknown")
+    return picked
 
 
 def screenshot_url(url: str, out_path: Path) -> bool:
