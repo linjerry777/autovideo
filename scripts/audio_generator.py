@@ -99,6 +99,7 @@ def concat_mp3(src_files: list[Path], out: Path):
 
 LEADING_SILENCE_S = 0.3   # silence before SFX (gives breathing room)
 SFX_BGM_GAP_S     = 0.2   # silence between SFX and voice
+SFX_MAX_DUR_S     = 2.0   # hard cap — if user drops a full song in sfx/hook/, only first 2s used
 BGM_DUCK_DB       = -12   # how much BGM dips when voice plays
 BGM_BASE_DB       = -18   # BGM resting volume under voice
 
@@ -129,10 +130,14 @@ def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
         return 0.0
 
     # Build leading audio: silence + sfx + gap (only if sfx provided)
+    # SFX hard-capped to SFX_MAX_DUR_S so a full song dropped in sfx/hook/ can't inflate output
     leading_offset = 0.0
     sfx_dur        = 0.0
     if hook_sfx:
-        sfx_dur = get_duration(hook_sfx)
+        raw_sfx_dur = get_duration(hook_sfx)
+        sfx_dur = min(raw_sfx_dur, SFX_MAX_DUR_S)
+        if raw_sfx_dur > SFX_MAX_DUR_S:
+            print(f"      ⚠️  SFX {hook_sfx.name} 太長 ({raw_sfx_dur:.1f}s)，截取前 {SFX_MAX_DUR_S}s")
         leading_offset = LEADING_SILENCE_S + sfx_dur + SFX_BGM_GAP_S
 
     total_dur = leading_offset + voice_dur
@@ -162,11 +167,12 @@ def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
     filter_parts: list[str] = []
 
     if hook_sfx:
-        # Silence(0.3s) + sfx + silence(0.2s) + voice → [vfull]
+        # Silence(0.3s) + sfx(trimmed to SFX_MAX_DUR_S) + silence(0.2s) + voice → [vfull]
         filter_parts.append(
+            f"[{sfx_idx}:a]atrim=0:{sfx_dur},asetpts=PTS-STARTPTS[sfxtrim];"
             f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={LEADING_SILENCE_S}[s1];"
             f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={SFX_BGM_GAP_S}[s2];"
-            f"[s1][{sfx_idx}:a][s2][{voice_idx}:a]concat=n=4:v=0:a=1[vfull]"
+            f"[s1][sfxtrim][s2][{voice_idx}:a]concat=n=4:v=0:a=1[vfull]"
         )
         voice_label = "vfull"
     else:
