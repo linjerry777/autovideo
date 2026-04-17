@@ -131,6 +131,12 @@ SCHEDULE_HOUR=8
 DRY_RUN=false
 SKIP_UPLOAD=false
 BACKGROUND_MODE=screenshot   # 'screenshot' | 'blur' | 'playwright_stealth'
+
+# Per-strategy voice IDs (optional — fall back to FISH_AUDIO_VOICE_ID)
+FISH_AUDIO_VOICE_TECH=          # tech strategy 用沉穩男聲
+FISH_AUDIO_VOICE_ENTERTAINMENT= # entertainment 用活潑女聲
+FISH_AUDIO_VOICE_FINANCE=       # finance 用專業男聲
+FISH_AUDIO_VOICE_PET=           # pet 用可愛女聲
 ```
 
 ---
@@ -156,6 +162,25 @@ We use Upload-Post's per-platform API extensively. Coverage per platform:
 **Reddit** — `reddit_title`, `subreddit` (REQUIRED), `flair_id`
 
 **Scheduling** — `scheduled_date` + `timezone` (pass-through to Upload-Post's queue; no local scheduler)
+
+---
+
+## Audio Assets (Step 3 — 3-layer audio)
+
+`audio_generator.py` mixes 3 layers when assets exist; gracefully falls back to voice-only when they don't.
+
+```
+assets/
+├─ music/<emotion>/*.mp3   ← BGM, picked by news.json items[i].emotion
+│   (surprise / fear / joy / curiosity / anger / generic)
+└─ sfx/hook/*.mp3          ← Hook SFX prepended to first sentence (~0.4s)
+```
+
+- BGM is sidechain-ducked under voice (-18dB resting, dips to ~-30dB when voice plays)
+- Hook SFX adds ~0.9s to total audio length; `timing.json` offsets shift accordingly
+- See `assets/README.md` for recommended sources (YouTube Audio Library, Pixabay)
+
+Per-strategy voice mapping via env: `FISH_AUDIO_VOICE_{TECH,ENTERTAINMENT,FINANCE,PET}`. Each can be set to a different Fish Audio reference_id; missing keys fall back to `FISH_AUDIO_VOICE_ID`.
 
 Per-platform customization lives in `pipeline/{date}/job_{id}/platform_meta.json`. UI edits via Alpine modal at `page='upload'`. Compliance defaults (`is_aigc=true`, `containsSyntheticMedia=true`) are seeded — users can uncheck for non-AI content.
 
