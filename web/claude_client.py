@@ -103,7 +103,9 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None,
   "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
-  "script": "旁白腳本（依上述腳本長度，像在跟朋友說話）",
+  "script_short": "短版旁白（30-40 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
+  "script_long":  "長版旁白（60-80 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
+  "script":       "= script_long (legacy field, backward compat)",
   "scene_type": "動畫場景（擇一）：fire, race, money, robot, warning, trophy, default",
   "virality_score": 1-10 整數，預測這則在短影音爆的潛力,
   "virality_reason": "一句話說明分數理由",
@@ -116,6 +118,10 @@ hook_variants 必須恰好 3 個不同風格：
 - 風格 A：懸念式（「破千萬的秘密」）
 - 風格 B：打臉式（「1188 萬人搞錯了」）
 - 風格 C：提問式（「為什麼全網都...？」）
+
+script_short 和 script_long 必須是**獨立重寫**的兩份腳本，不是 Long 的截斷版。
+Short 適合 TikTok/IG/FB/Threads（節奏快、1 句關鍵）；
+Long 適合 YouTube/X/Pinterest/LinkedIn（有鋪陳、有論點）。
 
 請直接回傳 JSON 陣列，不要加任何其他文字或 markdown。"""
 
@@ -175,7 +181,9 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
   "hook": "主要開場鉤子（5-8字，從 hook_variants 選最強的）",
   "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
-  "script": "旁白腳本（80字以內，依格式結構生成，像在跟朋友說話）",
+  "script_short": "短版旁白（40-50 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
+  "script_long":  "長版旁白（100-130 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
+  "script":       "= script_long (legacy field, backward compat)",
   "scene_type": "動畫場景：fire/race/money/robot/warning/trophy/default 擇一",
   "virality_score": 1-10 整數,
   "virality_reason": "一句話說明分數理由",
@@ -186,6 +194,10 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
 }}
 
 hook_variants 必須恰好 3 個不同風格：懸念式 / 打臉式 / 提問式。
+
+script_short 和 script_long 必須是**獨立重寫**的兩份腳本，不是 Long 的截斷版。
+Short 適合 TikTok/IG/FB/Threads（節奏快、1 句關鍵）；
+Long 適合 YouTube/X/Pinterest/LinkedIn（有鋪陳、有論點）。
 
 請直接回傳 JSON 陣列，不要加任何其他文字或 markdown。"""
 

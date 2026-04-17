@@ -136,7 +136,9 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
   "hook_variants": ["懸念式 hook", "打臉式 hook", "提問式 hook"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
-  "script": "旁白腳本（60字以內，像在跟朋友說話的語氣，第一人稱）",
+  "script_short": "短版旁白（30-40 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
+  "script_long":  "長版旁白（60-80 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
+  "script":       "= script_long (legacy field, backward compat)",
   "scene_type": "動畫場景（擇一）：fire, race, money, robot, warning, trophy, default",
   "virality_score": 1-10 的整數，預測這則在 Shorts/TikTok 爆的潛力,
   "virality_reason": "一句話說明為什麼給這個分數（例如：『數字衝擊+反差感+時效新鮮』）",
@@ -152,6 +154,10 @@ hook_variants 必須生成恰好 3 個不同風格：
 
 新聞列表：
 {headlines}
+
+script_short 和 script_long 必須是**獨立重寫**的兩份腳本，不是 Long 的截斷版。
+Short 適合 TikTok/IG/FB/Threads（節奏快、1 句關鍵）；
+Long 適合 YouTube/X/Pinterest/LinkedIn（有鋪陳、有論點）。
 
 請直接回傳只有 3 則的 JSON 陣列，不要加任何其他文字或 markdown。"""
 
