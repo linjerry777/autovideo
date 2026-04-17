@@ -254,6 +254,7 @@ def main():
     items = data["items"]
     strategy = (data.get("strategy") or "").lower()
     voice_id = resolve_voice_id(strategy)
+    audio_metadata: list[dict] = []
 
     voice_label = strategy or "default"
     print(f"🎙️  生成 {len(items)} 則語音（Fish Audio · {voice_label} voice）...")
@@ -317,6 +318,25 @@ def main():
         bgm_label = bgm.name if bgm else "(no BGM)"
         sfx_label = sfx.name if sfx else "(no SFX)"
         print(f"      ✅ {combined.name}（BGM={bgm_label}, SFX={sfx_label}, +{offset:.1f}s offset）")
+        audio_metadata.append({
+            "index":    i,
+            "bgm":      bgm.name if bgm else None,
+            "sfx":      sfx.name if sfx else None,
+            "offset":   round(offset, 2),
+            "duration": round(get_duration(combined), 2),
+        })
+
+    # Write audio metadata summary for UI display
+    meta_file = AUDIO_DIR / "audio_metadata.json"
+    meta_file.write_text(
+        json.dumps({
+            "voice_strategy": strategy or "",
+            "voice_id_used":  voice_id,
+            "items":          audio_metadata,
+        }, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    print(f"📋 Audio metadata: {meta_file.name}")
 
     print(f"\n✅ 語音已存至 {AUDIO_DIR}")
 
