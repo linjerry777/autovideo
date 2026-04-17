@@ -53,6 +53,11 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         sys.exit(1)
 
     data  = json.loads(news_file.read_text(encoding="utf-8"))
+    meta_file = pipe_dir / "platform_meta.json"
+    pmeta = (
+        json.loads(meta_file.read_text(encoding="utf-8"))
+        if meta_file.exists() else {}
+    )
     items = data["items"]
     meta  = build_metadata(items)
 
@@ -67,37 +72,59 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
 
     client = UploadPostClient(API_KEY)
 
-    # 各平台共用參數
-    kwargs = dict(
-        description  = meta["description"],
-        async_upload = True,
-    )
+    # Per-platform kwargs derived from platform_meta.json (falls back to meta if missing)
+    fallback_title = meta["title"]
+    fallback_desc  = meta["description"]
 
-    # YouTube 專屬
-    yt_platforms = [p for p in platforms if p == "youtube"]
-    ig_platforms = [p for p in platforms if p in ("instagram", "threads", "facebook")]
-    tt_platforms = [p for p in platforms if p == "tiktok"]
-    other_platforms = [p for p in platforms if p in ("x", "linkedin", "bluesky", "pinterest")]
+    def _p(platform: str) -> dict:
+        """Return platform-specific meta dict (never None)."""
+        return (pmeta or {}).get(platform, {})
 
-    # 決定是否加 Instagram/Reels 參數
-    if ig_platforms:
+    kwargs = dict(async_upload=True, description=fallback_desc)
+
+    # Per-platform titles (override default)
+    for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x"):
+        if p in platforms:
+            title = _p(p).get("title") or fallback_title
+            kwargs[f"{p}_title"] = title
+
+    # YouTube-specific
+    if "youtube" in platforms:
+        yt = _p("youtube")
+        kwargs["youtube_description"] = yt.get("description") or fallback_desc
+        if yt.get("tags"):
+            kwargs["tags"] = [t.strip() for t in yt["tags"].split(",") if t.strip()]
+        else:
+            kwargs["tags"] = ["AI", "人工智慧", "科技新聞", "AINews", "TechNews"]
+        kwargs["privacyStatus"]          = "public"
+        kwargs["containsSyntheticMedia"] = True
+        kwargs["defaultAudioLanguage"]   = "zh-TW"
+        thumb_path = pipe_dir / "thumbnail.png"
+        if yt.get("use_auto_thumbnail", True) and thumb_path.exists():
+            kwargs["thumbnail"] = str(thumb_path)
+
+    # Instagram / Threads / Facebook share media_type=REELS
+    if any(p in platforms for p in ("instagram", "threads", "facebook")):
         kwargs["media_type"]    = "REELS"
         kwargs["share_to_feed"] = True
 
-    # 決定是否加 YouTube 參數
-    if yt_platforms:
-        kwargs["privacyStatus"]           = "public"
-        kwargs["tags"]                    = "AI,人工智慧,科技新聞,AINews,TechNews"
-        kwargs["containsSyntheticMedia"]  = True
-        kwargs["defaultAudioLanguage"]    = "zh-TW"
+    # Facebook extra description
+    if "facebook" in platforms:
+        kwargs["facebook_description"] = _p("facebook").get("description") or fallback_desc
 
-    # TikTok 專屬
-    if tt_platforms:
+    # Instagram first_comment (hashtag spam)
+    if "instagram" in platforms:
+        fc = _p("instagram").get("first_comment", "")
+        if fc:
+            kwargs["first_comment"] = fc
+
+    # TikTok
+    if "tiktok" in platforms:
         kwargs["privacy_level"] = "PUBLIC_TO_EVERYONE"
 
     resp = client.upload_video(
         video_path = str(output_mp4),
-        title      = meta["title"],
+        title      = fallback_title,
         user       = PROFILE,
         platforms  = platforms,
         **kwargs,
