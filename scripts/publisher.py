@@ -197,20 +197,54 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         print("❌ 沒有可上傳的平台（必填欄位未填）", file=sys.stderr)
         sys.exit(1)
 
-    resp = client.upload_video(
-        video_path = str(output_mp4),
-        title      = fallback_title,
-        user       = PROFILE,
-        platforms  = platforms,
-        **kwargs,
-    )
+    # Group platforms by video_version; upload each group separately
+    version_groups: dict[str, list[str]] = {"short": [], "long": [], "legacy": []}
+    for p in platforms:
+        v = _platform_meta(p).get("video_version")
+        if v == "short":
+            version_groups["short"].append(p)
+        elif v == "long":
+            version_groups["long"].append(p)
+        else:
+            version_groups["legacy"].append(p)
 
-    if resp.get("success"):
-        req_id = resp.get("request_id", "")
-        print(f"\n✅ 上傳成功！request_id = {req_id}")
-        print("   上傳為非同步，約 1~5 分鐘後在各平台生效")
+    responses = []
+    for version_key, group in version_groups.items():
+        if not group:
+            continue
+        if version_key == "legacy":
+            video_path = output_mp4           # pipeline/.../output.mp4
+        else:
+            video_path = pipe_dir / version_key / "output.mp4"
+            if not video_path.exists():
+                # Graceful fallback: if expected version MP4 missing, use legacy
+                print(f"⚠️  {video_path.name} 不存在，{group} 改用 legacy output.mp4", file=sys.stderr)
+                video_path = output_mp4
+                if not video_path.exists():
+                    print(f"❌ legacy output.mp4 也不存在，跳過 {group}", file=sys.stderr)
+                    continue
+
+        print(f"📤 上傳 {version_key} ({video_path.name}) → {group}")
+        resp = client.upload_video(
+            video_path = str(video_path),
+            title      = fallback_title,
+            user       = PROFILE,
+            platforms  = group,
+            **kwargs,
+        )
+        responses.append((version_key, resp))
+
+    # Summarize
+    all_ok = all(r.get("success") for _, r in responses) if responses else False
+    if responses:
+        for version_key, resp in responses:
+            req_id = resp.get("request_id", "")
+            status = "✅" if resp.get("success") else "❌"
+            print(f"  {status} {version_key}: request_id={req_id}")
     else:
-        print(f"\n❌ 上傳失敗：{resp}")
+        print("❌ 沒有任何上傳發生")
+        sys.exit(1)
+    if not all_ok:
         sys.exit(1)
 
 
