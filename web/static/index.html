@@ -6,6 +6,13 @@
 <title>AutoVideo — AI 短影音自動化</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+<!-- tui-image-editor (MS-Paint-style screenshot editing) -->
+<link rel="stylesheet" href="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.min.css">
+<link rel="stylesheet" href="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.min.css">
+<script src="https://uicdn.toast.com/tui.code-snippet/v1.5.2/tui-code-snippet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.2.0/fabric.min.js"></script>
+<script src="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.min.js"></script>
+<script src="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -647,6 +654,10 @@
                     </div>
                     <p class="text-sm text-gray-700 line-clamp-2 leading-snug" x-text="shot.title || '—'"></p>
                     <div class="flex gap-2 mt-3">
+                      <button @click="openEditor(shot.index)" x-show="shot.url && shot.type !== 'broll'"
+                        class="text-xs text-blue-600 hover:text-blue-700 border border-blue-200 bg-blue-50 hover:bg-blue-100 rounded-lg px-3 py-1.5 transition-all">
+                        🖌️ 編輯
+                      </button>
                       <button @click="retakeScreenshot(shot.index)"
                         class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 transition-all hover:border-gray-300">
                         重拍
@@ -776,6 +787,136 @@
         </div>
 
       </div><!-- /pipeline -->
+    </div><!-- /news mode -->
+
+      <!-- ══ 趨勢模式 ══ -->
+      <div x-show="videoMode==='trending'">
+
+        <!-- Step 1: 選來源 -->
+        <div x-show="trendingStep==='config'" class="glass rounded-2xl p-6 space-y-5">
+          <div>
+            <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-2">趨勢來源（不需關鍵字，直接抓熱門）</p>
+            <div class="flex flex-wrap gap-2">
+              <template x-for="[id, icon, label] in [
+                ['reddit','🤖','Reddit'],['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US'],
+                ['ptt','🏛️','PTT'],['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['dcard','🃏','Dcard']
+              ]" :key="id">
+                <button type="button" @click="trendingToggleSource(id)"
+                  :class="trendingSelectedSources.has(id)
+                    ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200'
+                    : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                  class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
+                  <span x-show="trendingSelectedSources.has(id)" class="text-orange-600 text-xs">✓</span>
+                  <span x-text="icon + ' ' + label"></span>
+                </button>
+              </template>
+            </div>
+          </div>
+          <button @click="fetchTrending()"
+            :disabled="trendingSelectedSources.size === 0"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all">
+            🔥 抓取趨勢
+          </button>
+        </div>
+
+        <!-- Step 2: fetching -->
+        <div x-show="trendingStep==='fetching'" class="glass rounded-2xl p-12 text-center">
+          <div class="w-10 h-10 rounded-full border-2 border-orange-500 border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p class="text-sm text-gray-500">正在抓取熱門話題…</p>
+        </div>
+
+        <!-- Step 3: select -->
+        <div x-show="trendingStep==='select'" class="space-y-3">
+          <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-600">選擇要製作的話題（最多 5 則）</p>
+            <div class="flex gap-2">
+              <span class="text-sm text-gray-400" x-text="`${trendingSelectedIds.size}/5 已選`"></span>
+              <button @click="trendingStep='config'" class="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-gray-300">修改來源</button>
+              <button @click="fetchTrending(true)" class="text-xs text-orange-600 border border-orange-200 rounded-lg px-2.5 py-1 hover:border-orange-300">🔄 重抓</button>
+            </div>
+          </div>
+          <template x-for="group in groupedTrending()" :key="group.source_type">
+            <div class="glass rounded-2xl overflow-hidden">
+              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full border"
+                  :class="(_sourceConfig[group.source_type]||{}).cls||'text-gray-600 bg-gray-100 border-gray-200'"
+                  x-text="group.label"></span>
+                <span class="text-xs text-gray-400" x-text="`${group.items.length} 則`"></span>
+              </div>
+              <div class="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+                <template x-for="item in group.items" :key="item.url || item.title">
+                  <label class="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    :class="trendingSelectedIds.has(item.url || item.title) ? 'bg-orange-50' : ''">
+                    <input type="checkbox" class="mt-1 accent-orange-500"
+                      :disabled="!trendingSelectedIds.has(item.url || item.title) && trendingSelectedIds.size >= 5"
+                      :checked="trendingSelectedIds.has(item.url || item.title)"
+                      @change="trendingToggleItem(item)">
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-medium text-gray-800 line-clamp-2" x-text="item.title"></p>
+                      <p class="text-xs text-gray-400 mt-0.5 truncate" x-text="item.summary"></p>
+                    </div>
+                  </label>
+                </template>
+              </div>
+            </div>
+          </template>
+          <button @click="analyzeTrending()"
+            :disabled="trendingSelectedIds.size === 0"
+            :class="trendingSelectedIds.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-orange-600'"
+            class="w-full py-3 rounded-xl text-sm font-semibold bg-orange-500 text-white transition-all">
+            🤖 AI 分析格式與帳號（<span x-text="trendingSelectedIds.size"></span> 則）
+          </button>
+        </div>
+
+        <!-- Step 4: analyzing -->
+        <div x-show="trendingStep==='analyzing'" class="glass rounded-2xl p-12 text-center">
+          <div class="w-10 h-10 rounded-full border-2 border-orange-500 border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p class="text-sm text-gray-500">Claude 分析格式與帳號分類中…</p>
+        </div>
+
+        <!-- Step 5: confirm -->
+        <div x-show="trendingStep==='confirm'" class="space-y-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm font-medium text-gray-700">確認格式 &amp; 帳號，可修改後送出</p>
+            <button @click="trendingStep='select'" class="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1">← 重選</button>
+          </div>
+          <template x-for="(item, idx) in trendingEnriched" :key="idx">
+            <div class="glass rounded-2xl p-5 space-y-3">
+              <div class="flex items-center gap-2 flex-wrap">
+                <!-- Format badge (clickable cycle) -->
+                <button @click="cycleTrendingFormat(idx)"
+                  class="text-xs font-semibold px-3 py-1 rounded-full border transition-all"
+                  :class="{
+                    'bg-blue-50 border-blue-200 text-blue-700': item.format==='explainer',
+                    'bg-purple-50 border-purple-200 text-purple-700': item.format==='top5',
+                    'bg-red-50 border-red-200 text-red-700': item.format==='reaction',
+                    'bg-amber-50 border-amber-200 text-amber-700': item.format==='story',
+                  }"
+                  x-text="{'top5':'🏆 Top5','explainer':'💡 解說','reaction':'😲 反應','story':'📖 故事'}[item.format]||item.format">
+                </button>
+                <!-- Account badge (clickable cycle) -->
+                <button @click="cycleTrendingAccount(idx)"
+                  class="text-xs font-semibold px-3 py-1 rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:border-orange-300 transition-all"
+                  x-text="item.account_suggestion + ' ▾'">
+                </button>
+                <span class="text-xs text-gray-400 ml-auto" x-text="item.source_name"></span>
+              </div>
+              <p class="text-sm font-semibold text-gray-800" x-text="item.hook + ' — ' + item.title"></p>
+              <textarea
+                x-model="trendingEnriched[idx].script"
+                rows="3"
+                class="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none">
+              </textarea>
+            </div>
+          </template>
+          <button @click="triggerTrendingJobs()"
+            class="w-full py-3 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all">
+            🚀 送出產生影片（<span x-text="trendingEnriched.length"></span> 則）
+          </button>
+        </div>
+
+      </div>
+      <!-- ══ 趨勢模式 end ══ -->
     </div><!-- /page=new -->
 
     <!-- ── Job Detail ─────────────────────────────────────────────────── -->
@@ -933,27 +1074,11 @@
               :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"></video>
           </template>
         </div>
-        <!-- Platform picker -->
-        <div x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
-             class="flex flex-wrap gap-2">
-          <template x-for="p in ['youtube','tiktok','instagram']" :key="p">
-            <label class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 cursor-pointer hover:bg-gray-100 text-xs">
-              <input type="checkbox" :value="p"
-                :checked="uploadPlatforms.has(p)"
-                @change="togglePlatform(p)"
-                class="accent-green-600">
-              <span class="font-medium" x-text="p==='youtube' ? '▶️ YouTube' : p==='tiktok' ? '🎵 TikTok' : '📷 Instagram'"></span>
-            </label>
-          </template>
-        </div>
-
         <div class="flex gap-3">
           <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
             @click="uploadJob()"
-            :disabled="uploadPlatforms.size === 0"
-            :class="uploadPlatforms.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
-            上傳到 <span x-text="uploadPlatforms.size"></span> 個平台
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
+            上傳到平台
           </button>
           <span x-show="currentJob?.step_upload==='uploading'"
             class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium py-2.5">
@@ -984,137 +1109,7 @@
         </button>
       </div>
 
-      </div><!-- end 新聞模式 -->
-
-      <!-- ══ 趨勢模式 ══ -->
-      <div x-show="videoMode==='trending'">
-
-        <!-- Step 1: 選來源 -->
-        <div x-show="trendingStep==='config'" class="glass rounded-2xl p-6 space-y-5">
-          <div>
-            <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-2">趨勢來源（不需關鍵字，直接抓熱門）</p>
-            <div class="flex flex-wrap gap-2">
-              <template x-for="[id, icon, label] in [
-                ['reddit','🤖','Reddit'],['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US'],
-                ['ptt','🏛️','PTT'],['bilibili','📺','Bilibili'],['zhihu','💬','知乎'],['dcard','🃏','Dcard']
-              ]" :key="id">
-                <button type="button" @click="trendingToggleSource(id)"
-                  :class="trendingSelectedSources.has(id)
-                    ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200'
-                    : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
-                  class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
-                  <span x-show="trendingSelectedSources.has(id)" class="text-orange-600 text-xs">✓</span>
-                  <span x-text="icon + ' ' + label"></span>
-                </button>
-              </template>
-            </div>
-          </div>
-          <button @click="fetchTrending()"
-            :disabled="trendingSelectedSources.size === 0"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all">
-            🔥 抓取趨勢
-          </button>
-        </div>
-
-        <!-- Step 2: fetching -->
-        <div x-show="trendingStep==='fetching'" class="glass rounded-2xl p-12 text-center">
-          <div class="w-10 h-10 rounded-full border-2 border-orange-500 border-t-transparent animate-spin mx-auto mb-4"></div>
-          <p class="text-sm text-gray-500">正在抓取熱門話題…</p>
-        </div>
-
-        <!-- Step 3: select -->
-        <div x-show="trendingStep==='select'" class="space-y-3">
-          <div class="flex items-center justify-between">
-            <p class="text-sm text-gray-600">選擇要製作的話題（最多 5 則）</p>
-            <div class="flex gap-2">
-              <span class="text-sm text-gray-400" x-text="`${trendingSelectedIds.size}/5 已選`"></span>
-              <button @click="trendingStep='config'" class="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1 hover:border-gray-300">修改來源</button>
-              <button @click="fetchTrending(true)" class="text-xs text-orange-600 border border-orange-200 rounded-lg px-2.5 py-1 hover:border-orange-300">🔄 重抓</button>
-            </div>
-          </div>
-          <template x-for="group in groupedTrending()" :key="group.source_type">
-            <div class="glass rounded-2xl overflow-hidden">
-              <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full border"
-                  :class="(_sourceConfig[group.source_type]||{}).cls||'text-gray-600 bg-gray-100 border-gray-200'"
-                  x-text="group.label"></span>
-                <span class="text-xs text-gray-400" x-text="`${group.items.length} 則`"></span>
-              </div>
-              <div class="divide-y divide-gray-50 max-h-72 overflow-y-auto">
-                <template x-for="item in group.items" :key="item.url || item.title">
-                  <label class="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                    :class="trendingSelectedIds.has(item.url || item.title) ? 'bg-orange-50' : ''">
-                    <input type="checkbox" class="mt-1 accent-orange-500"
-                      :disabled="!trendingSelectedIds.has(item.url || item.title) && trendingSelectedIds.size >= 5"
-                      :checked="trendingSelectedIds.has(item.url || item.title)"
-                      @change="trendingToggleItem(item)">
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium text-gray-800 line-clamp-2" x-text="item.title"></p>
-                      <p class="text-xs text-gray-400 mt-0.5 truncate" x-text="item.summary"></p>
-                    </div>
-                  </label>
-                </template>
-              </div>
-            </div>
-          </template>
-          <button @click="analyzeTrending()"
-            :disabled="trendingSelectedIds.size === 0"
-            :class="trendingSelectedIds.size === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-orange-600'"
-            class="w-full py-3 rounded-xl text-sm font-semibold bg-orange-500 text-white transition-all">
-            🤖 AI 分析格式與帳號（<span x-text="trendingSelectedIds.size"></span> 則）
-          </button>
-        </div>
-
-        <!-- Step 4: analyzing -->
-        <div x-show="trendingStep==='analyzing'" class="glass rounded-2xl p-12 text-center">
-          <div class="w-10 h-10 rounded-full border-2 border-orange-500 border-t-transparent animate-spin mx-auto mb-4"></div>
-          <p class="text-sm text-gray-500">Claude 分析格式與帳號分類中…</p>
-        </div>
-
-        <!-- Step 5: confirm -->
-        <div x-show="trendingStep==='confirm'" class="space-y-4">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm font-medium text-gray-700">確認格式 &amp; 帳號，可修改後送出</p>
-            <button @click="trendingStep='select'" class="text-xs text-gray-500 border border-gray-200 rounded-lg px-2.5 py-1">← 重選</button>
-          </div>
-          <template x-for="(item, idx) in trendingEnriched" :key="idx">
-            <div class="glass rounded-2xl p-5 space-y-3">
-              <div class="flex items-center gap-2 flex-wrap">
-                <!-- Format badge (clickable cycle) -->
-                <button @click="cycleTrendingFormat(idx)"
-                  class="text-xs font-semibold px-3 py-1 rounded-full border transition-all"
-                  :class="{
-                    'bg-blue-50 border-blue-200 text-blue-700': item.format==='explainer',
-                    'bg-purple-50 border-purple-200 text-purple-700': item.format==='top5',
-                    'bg-red-50 border-red-200 text-red-700': item.format==='reaction',
-                    'bg-amber-50 border-amber-200 text-amber-700': item.format==='story',
-                  }"
-                  x-text="{'top5':'🏆 Top5','explainer':'💡 解說','reaction':'😲 反應','story':'📖 故事'}[item.format]||item.format">
-                </button>
-                <!-- Account badge (clickable cycle) -->
-                <button @click="cycleTrendingAccount(idx)"
-                  class="text-xs font-semibold px-3 py-1 rounded-full border bg-gray-50 border-gray-200 text-gray-700 hover:border-orange-300 transition-all"
-                  x-text="item.account_suggestion + ' ▾'">
-                </button>
-                <span class="text-xs text-gray-400 ml-auto" x-text="item.source_name"></span>
-              </div>
-              <p class="text-sm font-semibold text-gray-800" x-text="item.hook + ' — ' + item.title"></p>
-              <textarea
-                x-model="trendingEnriched[idx].script"
-                rows="3"
-                class="w-full text-sm bg-white border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-300 resize-none">
-              </textarea>
-            </div>
-          </template>
-          <button @click="triggerTrendingJobs()"
-            class="w-full py-3 rounded-xl text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600 transition-all">
-            🚀 送出產生影片（<span x-text="trendingEnriched.length"></span> 則）
-          </button>
-        </div>
-
-      </div>
-      <!-- ══ 趨勢模式 end ══ -->
-    </div>
+    </div><!-- /page=job -->
 
     <!-- ── Accounts ───────────────────────────────────────────────────── -->
     <div x-show="page==='accounts'" class="p-8 max-w-4xl mx-auto space-y-6">
@@ -1436,6 +1431,29 @@
     class="fixed bottom-5 right-5 bg-gray-900 text-white rounded-xl px-4 py-3 text-sm shadow-lg flex items-center gap-2 z-50"
     x-text="toast"></div>
 
+  <!-- ── Screenshot Editor Modal ─────────────────────────────────────── -->
+  <div x-show="editorOpen" x-cloak
+       class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6">
+    <div class="bg-white rounded-2xl w-[95vw] h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <p class="text-sm font-semibold text-gray-700">
+          🖌️ 編輯截圖 #<span x-text="editorShotIndex"></span>
+        </p>
+        <div class="flex gap-2">
+          <button @click="closeEditor()"
+            class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
+            取消
+          </button>
+          <button @click="saveEditor()"
+            class="text-xs text-white bg-green-600 hover:bg-green-700 rounded-lg px-4 py-1.5 font-medium">
+            儲存
+          </button>
+        </div>
+      </div>
+      <div id="tui-editor-container" class="flex-1 overflow-hidden"></div>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -1471,6 +1489,10 @@ function app() {
     screenshots: [],
     scriptItems: [],
     replacePanelOpen: null,   // shot.index of open replace panel
+    // Screenshot editor modal
+    editorOpen: false,
+    editorShotIndex: null,
+    editorInstance: null,
     uploadKeySet: false,
     youtubeKeySet: false,
     uploadPlatforms: new Set(['youtube','tiktok','instagram']),
@@ -1997,6 +2019,67 @@ function app() {
         }
         this.showToast('截圖完成')
       } catch (e) { this.showToast('截圖失敗：' + e.message) }
+    },
+
+    openEditor(shotIndex) {
+      const shot = this.screenshots.find(s => s.index === shotIndex)
+      if (!shot || !shot.url) {
+        this.showToast('此項沒有可編輯的圖片')
+        return
+      }
+      this.editorShotIndex = shotIndex
+      this.editorOpen = true
+      // Wait for modal to mount before instantiating
+      this.$nextTick(() => {
+        const el = document.getElementById('tui-editor-container')
+        if (!el) return
+        el.innerHTML = ''
+        this.editorInstance = new tui.ImageEditor(el, {
+          includeUI: {
+            loadImage: {
+              path: 'http://localhost:8000' + shot.url + '?t=' + Date.now(),
+              name: 'screenshot',
+            },
+            theme: { 'common.bi.image': '', 'common.backgroundColor': '#f9fafb' },
+            menu: ['crop', 'flip', 'rotate', 'draw', 'shape', 'icon', 'text', 'filter'],
+            initMenu: 'draw',
+            uiSize: { width: '100%', height: '100%' },
+            menuBarPosition: 'bottom',
+          },
+          cssMaxWidth: 900,
+          cssMaxHeight: 600,
+          usageStatistics: false,
+        })
+      })
+    },
+
+    closeEditor() {
+      if (this.editorInstance) {
+        try { this.editorInstance.destroy() } catch (e) {}
+        this.editorInstance = null
+      }
+      this.editorOpen = false
+      this.editorShotIndex = null
+    },
+
+    async saveEditor() {
+      if (!this.editorInstance) return
+      try {
+        const dataUrl = this.editorInstance.toDataURL({ format: 'png' })
+        const res = await this.api('POST',
+          `/api/jobs/${this.currentJob.id}/screenshots/${this.editorShotIndex}/upload`,
+          { data_url: dataUrl })
+        // Refresh screenshot URL (bust cache via timestamp)
+        const idx = this.screenshots.findIndex(s => s.index === this.editorShotIndex)
+        if (idx !== -1 && res.url) {
+          this.screenshots[idx] = {
+            ...this.screenshots[idx],
+            url: res.url + '?t=' + Date.now(),
+          }
+        }
+        this.showToast('已儲存編輯後圖片')
+        this.closeEditor()
+      } catch (e) { this.showToast('儲存失敗：' + e.message) }
     },
 
     async continueJob() {
