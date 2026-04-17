@@ -61,7 +61,11 @@ export interface NewsItem {
   duration: number;
 }
 
+export type LayoutMode = "visual" | "text";
+
 export interface NewsVideoProps extends Record<string, unknown> {
   date: string;
   items: NewsItem[];
+  /** Visual = image full-bleed bg; Text = gradient + orbs. Defaults to "visual" in renderer. */
+  layout_mode?: LayoutMode;
 }
