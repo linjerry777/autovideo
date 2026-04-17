@@ -373,6 +373,26 @@
             </template>
           </div>
         </div>
+        <div class="space-y-2">
+          <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">內容策略</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="[id, icon, label, desc] in [
+              ['tech',          '🔬', '科技',   '30-60s · 先說結論 · YouTube'],
+              ['entertainment', '🎭', '娛樂',   '7-15s · 情緒衝擊 · TikTok+IG'],
+              ['finance',       '💰', '財經',   '30-60s · 數字衝擊 · YouTube+X'],
+              ['pet',           '🤖', 'AI寵物', '15-30s · 可愛互動 · TikTok+IG']
+            ]" :key="id">
+              <button type="button" @click="strategy=id; applyStrategyPlatforms()"
+                :class="strategy===id
+                  ? 'bg-green-50 border-green-300 text-green-700 ring-1 ring-green-200'
+                  : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
+                class="border rounded-lg px-3 py-2 text-sm font-medium transition-all text-left flex flex-col gap-0.5 min-w-[170px]">
+                <span x-text="icon + ' ' + label" class="text-sm"></span>
+                <span x-text="desc" class="text-[10px] text-gray-400 font-normal"></span>
+              </button>
+            </template>
+          </div>
+        </div>
         <div>
           <div class="flex items-center justify-between mb-2">
             <label class="text-sm font-medium text-gray-700">新聞來源</label>
@@ -1482,6 +1502,7 @@ function app() {
     appendLangs: new Set(),          // multi-lang selection for append
     appending: false,
     selectedSources: new Set(['google','bing','bilibili','zhihu']),  // per-source toggle
+    strategy: 'tech',   // tech | entertainment | finance | pet
     newsItems: [],      // currently displayed items (may be filtered)
     newsPool: [],       // all fetched items (for replacement)
     selectedIds: new Set(),
@@ -1747,6 +1768,10 @@ function app() {
       return map[suggestion] || ''
     },
 
+    _accountToStrategy(suggestion) {
+      return { '科技帳號': 'tech', '娛樂帳號': 'entertainment', '財經帳號': 'finance' }[suggestion] || 'tech'
+    },
+
     async triggerTrendingJobs() {
       if (this.trendingEnriched.length === 0) return
       const today = new Date().toISOString().split('T')[0]
@@ -1773,6 +1798,7 @@ function app() {
             dry_run:         false,
             selected_news:   [newsItem],
             account_profile: profile || null,
+            strategy:        this._accountToStrategy(item.account_suggestion),
           })
           successCount++
         } catch (e) {
@@ -1797,6 +1823,18 @@ function app() {
         all:   ['google', 'bing', 'bilibili', 'zhihu', 'ptt', 'dcard', 'reddit', 'youtube_tw', 'youtube_us', 'hackernews'],
       }
       this.selectedSources = new Set(presets[preset] || presets.news)
+    },
+
+    _STRATEGY_PLATFORMS: {
+      tech:          ['youtube', 'tiktok', 'x'],
+      entertainment: ['tiktok', 'instagram', 'facebook'],
+      finance:       ['youtube', 'x', 'linkedin'],
+      pet:           ['tiktok', 'instagram', 'facebook'],
+    },
+
+    applyStrategyPlatforms() {
+      const plats = this._STRATEGY_PLATFORMS[this.strategy] || this._STRATEGY_PLATFORMS.tech
+      this.uploadPlatforms = new Set(plats)
     },
 
     async fetchNews(force = false) {
@@ -1887,6 +1925,7 @@ function app() {
           lang: [...this.newLangs][0] || 'zh-TW',   // primary lang for script generation
           selected_cache_ids: cacheIds,
           selected_news: selectedNews,
+          strategy: this.strategy,
         })
         // Stay on generate page, show pipeline inline
         await this.loadInlineJob(data.job_id)
