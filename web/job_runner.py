@@ -11,6 +11,26 @@ BASE_DIR = Path(__file__).parent.parent
 SCRIPTS  = BASE_DIR / "scripts"
 PYTHON   = sys.executable
 
+
+def _detect_versions(job_key: str) -> list[str | None]:
+    """Return list of versions to render.
+
+    If news.json has script_short + script_long fields on items → ['short', 'long']
+    Else → [None] (legacy single-render)
+    """
+    news_file = BASE_DIR / "pipeline" / job_key / "news.json"
+    if not news_file.exists():
+        return [None]
+    try:
+        data = _json.loads(news_file.read_text(encoding="utf-8"))
+        items = data.get("items", [])
+        if items and all(it.get("script_short") and it.get("script_long") for it in items):
+            return ["short", "long"]
+    except Exception:
+        pass
+    return [None]
+
+
 # ── 同時只允許一個 job 跑 ─────────────────────────────────────────────
 _lock = threading.Lock()
 _running_job_id: int | None = None
@@ -158,14 +178,18 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
             update_job(job_id, status="running")
             _broadcast(job_id, {"job_id": job_id, "status": "running"})
 
+            versions = _detect_versions(job_key)
             _step_update(job_id, date, "audio", "running")
-            extra = ["--dry-run"] if dry_run else []
-            ok, out = _call_script("audio_generator.py", job_key, extra, log_path)
-            if not ok:
-                _step_update(job_id, date, "audio", "failed")
-                update_job(job_id, status="failed", error=out[-300:])
-                _broadcast(job_id, {"job_id": job_id, "status": "failed"})
-                return
+            for v in versions:
+                extra_audio = ["--dry-run"] if dry_run else []
+                if v:
+                    extra_audio = ["--version", v] + extra_audio
+                ok, out = _call_script("audio_generator.py", job_key, extra_audio, log_path)
+                if not ok:
+                    _step_update(job_id, date, "audio", "failed")
+                    update_job(job_id, status="failed", error=out[-300:])
+                    _broadcast(job_id, {"job_id": job_id, "status": "failed"})
+                    return
             _step_update(job_id, date, "audio", "done")
             _check_cancel(job_id)
 
@@ -180,12 +204,14 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
             renderer = get_setting("video_renderer", "ffmpeg").lower()
             script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
             _step_update(job_id, date, "video", "running")
-            ok, out = _call_script(script_name, job_key, [], log_path)
-            if not ok:
-                _step_update(job_id, date, "video", "failed")
-                update_job(job_id, status="failed", error=out[-300:])
-                _broadcast(job_id, {"job_id": job_id, "status": "failed"})
-                return
+            for v in versions:
+                extra_video = ["--version", v] if v else []
+                ok, out = _call_script(script_name, job_key, extra_video, log_path)
+                if not ok:
+                    _step_update(job_id, date, "video", "failed")
+                    update_job(job_id, status="failed", error=out[-300:])
+                    _broadcast(job_id, {"job_id": job_id, "status": "failed"})
+                    return
             _step_update(job_id, date, "video", "done")
 
             # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
@@ -338,13 +364,17 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         del _pause_events[job_id]
         _check_cancel(job_id)
 
-        # ── Step 3: 語音生成 ────────────────────────────────────────
+        # ── Step 3: 語音生成 (dual-version or legacy) ───────────────
+        versions = _detect_versions(job_key)
         su("audio", "running")
-        extra = ["--dry-run"] if dry_run else []
-        ok, out = _call_script("audio_generator.py", job_key, extra, log_path)
-        if not ok:
-            su("audio", "failed")
-            raise RuntimeError(f"audio_generator 失敗:\n{out[-500:]}")
+        for v in versions:
+            extra_audio = ["--dry-run"] if dry_run else []
+            if v:
+                extra_audio = ["--version", v] + extra_audio
+            ok, out = _call_script("audio_generator.py", job_key, extra_audio, log_path)
+            if not ok:
+                su("audio", "failed")
+                raise RuntimeError(f"audio_generator({v or 'legacy'}) 失敗:\n{out[-500:]}")
         su("audio", "done")
         _check_cancel(job_id)
 
@@ -356,14 +386,16 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             su("ai_video", "done" if ok_av else "skipped")
             _check_cancel(job_id)
 
-        # ── Step 4: 合成影片 ────────────────────────────────────────
+        # ── Step 4: 合成影片 (dual-version or legacy) ────────────────
         renderer = get_setting("video_renderer", "ffmpeg").lower()
         script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
         su("video", "running")
-        ok, out = _call_script(script_name, job_key, [], log_path)
-        if not ok:
-            su("video", "failed")
-            raise RuntimeError(f"{script_name} 失敗:\n{out[-500:]}")
+        for v in versions:
+            extra_video = ["--version", v] if v else []
+            ok, out = _call_script(script_name, job_key, extra_video, log_path)
+            if not ok:
+                su("video", "failed")
+                raise RuntimeError(f"{script_name}({v or 'legacy'}) 失敗:\n{out[-500:]}")
         su("video", "done")
 
         # ── Step 4.5: Thumbnail (best-effort) ────────────────────────
