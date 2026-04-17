@@ -2037,6 +2037,10 @@ function app() {
       this.$nextTick(() => {
         const el = document.getElementById('tui-editor-container')
         if (!el) return
+        if (this.editorInstance) {
+          try { this.editorInstance.destroy() } catch (e) { console.warn('editor destroy failed:', e) }
+          this.editorInstance = null
+        }
         el.innerHTML = ''
         this.editorInstance = new tui.ImageEditor(el, {
           includeUI: {
@@ -2059,7 +2063,7 @@ function app() {
 
     closeEditor() {
       if (this.editorInstance) {
-        try { this.editorInstance.destroy() } catch (e) {}
+        try { this.editorInstance.destroy() } catch (e) { console.warn('editor destroy failed:', e) }
         this.editorInstance = null
       }
       this.editorOpen = false
