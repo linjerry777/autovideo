@@ -382,7 +382,7 @@
               ['finance',       '💰', '財經',   '30-60s · 數字衝擊 · YouTube+X'],
               ['pet',           '🤖', 'AI寵物', '15-30s · 可愛互動 · TikTok+IG']
             ]" :key="id">
-              <button type="button" @click="strategy=id; applyStrategyPlatforms()"
+              <button type="button" @click="if (strategy !== id) { strategy=id; applyStrategyPlatforms() }"
                 :class="strategy===id
                   ? 'bg-green-50 border-green-300 text-green-700 ring-1 ring-green-200'
                   : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
