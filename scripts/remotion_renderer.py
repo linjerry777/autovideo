@@ -141,12 +141,12 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
 
     items_out = []
     for i, item in enumerate(items_raw, 1):
-        audio_path  = pipe_dir / "audio" / f"audio_{i:02d}.mp3"
+        audio_path  = AUDIO_DIR / f"audio_{i:02d}.mp3"
         # Prefer user-edited version if it exists
         edited_shot = pipe_dir / "screenshots" / f"news_{i:02d}_edited.png"
         orig_shot   = pipe_dir / "screenshots" / f"news_{i:02d}.png"
         shot_path   = Path(item.get("screenshot") or (edited_shot if edited_shot.exists() else orig_shot))
-        timing_path = pipe_dir / "audio" / f"audio_{i:02d}_timing.json"
+        timing_path = AUDIO_DIR / f"audio_{i:02d}_timing.json"
 
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
