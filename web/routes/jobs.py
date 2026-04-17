@@ -185,13 +185,17 @@ def job_screenshots(job_id: int):
                 "exists":   True,
                 "type":     "broll",
             })
-        elif (shots_dir / png).exists():
+        elif (shots_dir / png).exists() or (shots_dir / png.replace(".png", "_edited.png")).exists():
+            edited_name = png.replace(".png", "_edited.png")
+            has_edited  = (shots_dir / edited_name).exists()
+            display     = edited_name if has_edited else png
             result.append({
                 "index":    i,
-                "filename": png,
-                "url":      f"/api/media/jobs/{job_id}/screenshots/{png}",
+                "filename": display,
+                "url":      f"/api/media/jobs/{job_id}/screenshots/{display}",
                 "exists":   True,
                 "type":     "screenshot",
+                "edited":   has_edited,
             })
         else:
             result.append({
@@ -285,10 +289,12 @@ def upload_screenshot(job_id: int, n: int, body: UploadScreenshotRequest):
 
     shots_dir = pipe_dir / "screenshots"
     shots_dir.mkdir(parents=True, exist_ok=True)
-    shot_path = shots_dir / f"news_{n:02d}.png"
+    shot_path = shots_dir / f"news_{n:02d}_edited.png"   # edited variant never overwritten by retake
     shot_path.write_bytes(png_bytes)
 
-    return {"ok": True, "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}"}
+    return {"ok": True,
+            "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}",
+            "edited": True}
 
 
 PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x", "pinterest", "reddit"]
