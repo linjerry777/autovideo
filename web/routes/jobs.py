@@ -291,6 +291,84 @@ def upload_screenshot(job_id: int, n: int, body: UploadScreenshotRequest):
     return {"ok": True, "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}"}
 
 
+PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x"]
+
+
+def _seed_platform_meta(news: dict) -> dict:
+    """Build default per-platform meta from news.json items (option B: shared baseline)."""
+    items = news.get("items", [])
+    if not items:
+        titles    = [""]
+        hooks     = [""]
+        scripts   = [""]
+    else:
+        titles  = [it.get("title", "")  for it in items]
+        hooks   = [it.get("hook", "")   for it in items]
+        scripts = [it.get("script") or it.get("summary", "") for it in items]
+
+    main_title = " | ".join(t for t in titles if t)[:100]
+    long_desc  = "\n\n".join(f"【{h}】{s}" for h, s in zip(hooks, scripts) if s)
+    hashtags   = "#AI快訊 #人工智慧 #科技新聞"
+
+    return {
+        "youtube": {
+            "title":             main_title,
+            "description":       f"{long_desc}\n\n{hashtags}",
+            "tags":              "AI,人工智慧,科技新聞,AINews,TechNews",
+            "use_auto_thumbnail": True,
+        },
+        "tiktok":    {"title": f"{main_title}\n\n{hashtags}"},
+        "instagram": {"title": main_title,
+                      "first_comment": hashtags},
+        "facebook":  {"title": main_title,
+                      "description": f"{long_desc}\n\n{hashtags}"},
+        "threads":   {"title": f"{main_title[:450]}\n\n{hashtags}"},
+        "x":         {"title": f"{main_title[:240]} {hashtags}"[:280]},
+    }
+
+
+@router.get("/jobs/{job_id}/platform_meta")
+def get_platform_meta(job_id: int):
+    """Return per-platform meta (seeded from news.json if file doesn't exist yet)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    pipe_dir    = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+    meta_file   = pipe_dir / "platform_meta.json"
+    news_file   = pipe_dir / "news.json"
+
+    if meta_file.exists():
+        return _json.loads(meta_file.read_text(encoding="utf-8"))
+
+    if not news_file.exists():
+        raise HTTPException(400, "news.json not found; cannot seed platform meta")
+
+    news = _json.loads(news_file.read_text(encoding="utf-8"))
+    return _seed_platform_meta(news)
+
+
+class PlatformMetaUpdate(BaseModel):
+    platform_meta: dict   # full shape {youtube: {...}, tiktok: {...}, ...}
+
+
+@router.put("/jobs/{job_id}/platform_meta")
+def put_platform_meta(job_id: int, body: PlatformMetaUpdate):
+    """Save per-platform meta (overwrites platform_meta.json)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+    pipe_dir.mkdir(parents=True, exist_ok=True)
+    meta_file = pipe_dir / "platform_meta.json"
+    meta_file.write_text(
+        _json.dumps(body.platform_meta, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {"ok": True}
+
+
 class ReplaceItemRequest(BaseModel):
     cache_id: int
     mark_old_blocked: bool = True   # 是否標記被替換的 URL 為截圖封鎖
