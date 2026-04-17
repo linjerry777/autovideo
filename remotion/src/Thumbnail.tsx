@@ -101,6 +101,10 @@ export const Thumbnail: React.FC<ThumbnailProps> = ({ hook, title, screenshot, p
             padding: "20px 40px",
             letterSpacing: 2,
             display: "inline-block",
+            maxWidth: 960,
+            lineHeight: 1.25,
+            whiteSpace: "normal",
+            wordBreak: "break-word",
             textShadow: "0 4px 20px rgba(0,0,0,0.9)",
             border: `2px solid ${p.accent}80`,
           }}

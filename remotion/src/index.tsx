@@ -55,9 +55,9 @@ export const RemotionRoot: React.FC = () => {
         id="Thumbnail"
         component={Thumbnail}
         durationInFrames={1}
-        fps={30}
-        width={1080}
-        height={1920}
+        fps={FPS}
+        width={WIDTH}
+        height={HEIGHT}
         defaultProps={{
           hook: "AI 快訊",
           title: "範例標題",
