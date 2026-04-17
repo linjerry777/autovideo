@@ -50,6 +50,7 @@ class TriggerRequest(BaseModel):
     selected_news:      list[dict] | None = None   # 前端預選的新聞，有則跳過爬蟲
     selected_cache_ids: list[int] | None  = None   # 對應快取 ID
     account_profile:    str | None        = None   # 覆蓋預設 Upload-Post profile
+    strategy:           str | None        = None   # tech|entertainment|finance|pet
 
 
 @router.post("/jobs/trigger")
@@ -77,6 +78,7 @@ def trigger(req: TriggerRequest):
         dry_run         = dry_run,
         pre_news        = req.selected_news,
         account_profile = req.account_profile,
+        strategy        = req.strategy,
     )
     if not started:
         update_job(job_id, status="failed", error="Lock acquire failed")
@@ -333,6 +335,9 @@ def replace_item(job_id: int, n: int, body: ReplaceItemRequest):
         if old_url:
             mark_news_blocked_by_url(old_url)
 
+    # Load strategy from news.json if present
+    strategy = data.get("strategy") or None
+
     # Claude 重新生成腳本（單篇）
     raw = [{
         "title":   cached["title"],
@@ -341,7 +346,7 @@ def replace_item(job_id: int, n: int, body: ReplaceItemRequest):
         "source":  cached["source"],
     }]
     try:
-        enriched = enrich_news_items(raw, job.get("topic"))
+        enriched = enrich_news_items(raw, job.get("topic"), strategy)
     except Exception as e:
         raise HTTPException(500, f"Claude 生成失敗: {e}")
 

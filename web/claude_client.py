@@ -63,11 +63,26 @@ def call_claude(prompt: str, timeout: int = 180) -> tuple[str, dict]:
     return content.strip(), usage
 
 
-def enrich_news_items(raw_items: list[dict], topic: str | None = None) -> list[dict]:
+_STRATEGY_PRESETS = {
+    "tech":          {"script_len": "80~110 字",
+                      "hook_style": "先說結論（1 秒內拋出核心賣點），適合技術解說"},
+    "entertainment": {"script_len": "30~50 字",
+                      "hook_style": "情緒衝擊（驚喜/反轉/搞笑），開頭必須在 1 秒內抓住注意力"},
+    "finance":       {"script_len": "80~110 字",
+                      "hook_style": "數字衝擊（先報關鍵數字再解釋），語氣專業"},
+    "pet":           {"script_len": "40~60 字",
+                      "hook_style": "可愛/互動（特寫情緒，用問句或感嘆引發共鳴）"},
+}
+
+
+def enrich_news_items(raw_items: list[dict], topic: str | None = None,
+                     strategy: str | None = None) -> list[dict]:
     """
     raw_items: [{title, summary, url, source}, ...]
-    回傳: [{hook, title, summary, script, source_url, source_name}, ...]
+    strategy:  tech | entertainment | finance | pet   (None → 預設科技風格)
+    回傳: [{hook, title, summary, script, scene_type, source_url, source_name}, ...]
     """
+    preset = _STRATEGY_PRESETS.get((strategy or "tech").lower(), _STRATEGY_PRESETS["tech"])
     lines = "\n".join([
         f"{i+1}. [{it['source']}] {it['title']}\n   URL: {it['url']}\n   {it.get('summary','')[:120]}"
         for i, it in enumerate(raw_items)
@@ -76,14 +91,18 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None) -> list[d
     prompt = f"""請使用繁體中文回答。
 {topic_line}以下是用戶選定的新聞，請為每則生成短影音所需的內容。
 
+內容策略：
+- 腳本長度：{preset['script_len']}
+- Hook 風格：{preset['hook_style']}
+
 {lines}
 
 每則請用以下 JSON 格式（照順序）：
 {{
-  "hook": "開場鉤子（5-8字，製造懸念或衝擊）",
+  "hook": "開場鉤子（5-8字，按上述 Hook 風格生成）",
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
-  "script": "旁白腳本（60字以內，像在跟朋友說話）",
+  "script": "旁白腳本（依上述腳本長度，像在跟朋友說話）",
   "scene_type": "動畫場景類型（從以下擇一，依據新聞主題）：fire（攻擊/爆炸/燃燒）, race（競賽/追趕/對決）, money（融資/估值/賺錢）, robot（AI/機器人/科技突破）, warning（爭議/警告/風險）, trophy（創紀錄/得獎/突破）, default（其他）",
   "source_url": "原始 URL（從列表複製）",
   "source_name": "媒體名稱"
@@ -94,17 +113,14 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None) -> list[d
     raw, usage = call_claude(prompt)
     if not raw:
         raise ValueError("Claude 回傳空白內容")
-    # 嘗試直接找 JSON 陣列（忽略前後說明文字）
     match = re.search(r"\[[\s\S]*\]", raw)
     if match:
         raw = match.group(0)
     else:
-        # fallback: 清除 markdown fence
         raw = re.sub(r"^```[a-z]*\n?", "", raw.strip())
         raw = re.sub(r"\n?```$", "", raw.strip())
     try:
         items = json.loads(raw)
-        # Claude 有時對單篇回傳 {} 而非 [{}]
         if isinstance(items, dict):
             items = [items]
         _last_usage.update(usage)
