@@ -1334,7 +1334,7 @@
               class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700">
               取消
             </button>
-            <button @click="savePlatformMeta().then(() => editingPlatform = null).catch(() => {})"
+            <button @click="savePlatformMeta().then(() => editingPlatform = null).catch(err => console.error('savePlatformMeta:', err))"
               class="px-5 py-2 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white">
               儲存
             </button>
@@ -2384,7 +2384,12 @@ function app() {
     async loadPlatformMeta(jobId) {
       this.platformMetaLoading = true
       try {
-        this.platformMeta = await this.api('GET', `/api/jobs/${jobId}/platform_meta`)
+        const pm = await this.api('GET', `/api/jobs/${jobId}/platform_meta`)
+        // Defensive: ensure all 6 platform keys exist so modal x-model bindings never hit undefined.title
+        for (const p of ['youtube','tiktok','instagram','facebook','threads','x']) {
+          if (!pm[p]) pm[p] = { title: '' }
+        }
+        this.platformMeta = pm
       } catch (e) {
         this.showToast('載入平台設定失敗：' + e.message)
         this.platformMeta = null
