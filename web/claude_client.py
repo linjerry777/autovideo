@@ -99,14 +99,23 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None,
 
 每則請用以下 JSON 格式（照順序）：
 {{
-  "hook": "開場鉤子（5-8字，按上述 Hook 風格生成）",
+  "hook": "主要開場鉤子（5-8字，從 hook_variants 中選最強的）",
+  "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
   "script": "旁白腳本（依上述腳本長度，像在跟朋友說話）",
-  "scene_type": "動畫場景類型（從以下擇一，依據新聞主題）：fire（攻擊/爆炸/燃燒）, race（競賽/追趕/對決）, money（融資/估值/賺錢）, robot（AI/機器人/科技突破）, warning（爭議/警告/風險）, trophy（創紀錄/得獎/突破）, default（其他）",
+  "scene_type": "動畫場景（擇一）：fire, race, money, robot, warning, trophy, default",
+  "virality_score": 1-10 整數，預測這則在短影音爆的潛力,
+  "virality_reason": "一句話說明分數理由",
+  "emotion": "主導情緒：surprise | anger | joy | curiosity | fear 擇一",
   "source_url": "原始 URL（從列表複製）",
   "source_name": "媒體名稱"
 }}
+
+hook_variants 必須恰好 3 個不同風格：
+- 風格 A：懸念式（「破千萬的秘密」）
+- 風格 B：打臉式（「1188 萬人搞錯了」）
+- 風格 C：提問式（「為什麼全網都...？」）
 
 請直接回傳 JSON 陣列，不要加任何其他文字或 markdown。"""
 
@@ -163,14 +172,20 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
 {{
   "format": "top5 | explainer | reaction | story 擇一",
   "category": "tech | entertainment | finance 擇一",
-  "hook": "開場鉤子（5-8字，製造懸念或衝擊）",
+  "hook": "主要開場鉤子（5-8字，從 hook_variants 選最強的）",
+  "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
   "script": "旁白腳本（80字以內，依格式結構生成，像在跟朋友說話）",
   "scene_type": "動畫場景：fire/race/money/robot/warning/trophy/default 擇一",
+  "virality_score": 1-10 整數,
+  "virality_reason": "一句話說明分數理由",
+  "emotion": "surprise | anger | joy | curiosity | fear 擇一",
   "account_suggestion": "科技帳號 | 娛樂帳號 | 財經帳號 擇一",
   "source_url": "原始 URL",
   "source_name": "來源名稱"
 }}
+
+hook_variants 必須恰好 3 個不同風格：懸念式 / 打臉式 / 提問式。
 
 請直接回傳 JSON 陣列，不要加任何其他文字或 markdown。"""
 
