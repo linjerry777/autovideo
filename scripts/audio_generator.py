@@ -78,6 +78,112 @@ def concat_mp3(src_files: list[Path], out: Path):
     Path(lst).unlink(missing_ok=True)
 
 
+LEADING_SILENCE_S = 0.3   # silence before SFX (gives breathing room)
+SFX_BGM_GAP_S     = 0.2   # silence between SFX and voice
+BGM_DUCK_DB       = -12   # how much BGM dips when voice plays
+BGM_BASE_DB       = -18   # BGM resting volume under voice
+
+
+def _ffmpeg_path_arg(p: Path) -> str:
+    """ffmpeg-safe path string (forward slashes, no escapes)."""
+    return str(p).replace("\\", "/")
+
+
+def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
+              hook_sfx: Path | None = None) -> float:
+    """Mix voice with optional BGM (sidechain-ducked) and optional Hook SFX (prepended).
+
+    Output structure when both BGM and SFX present:
+      [silence 0.3s][hook_sfx][gap 0.2s][voice]
+        all of the above mixed with [bgm_looped at -18dB, ducked to -30dB when voice signal]
+
+    Returns the leading offset in seconds (silence + sfx duration + gap) so caller
+    can shift timing.json. Returns 0.0 when no SFX is added.
+    """
+    voice_dur = get_duration(voice)
+
+    # Case 1: no BGM and no SFX → just copy voice through
+    if not bgm and not hook_sfx:
+        if voice != out:
+            import shutil
+            shutil.copy(voice, out)
+        return 0.0
+
+    # Build leading audio: silence + sfx + gap (only if sfx provided)
+    leading_offset = 0.0
+    sfx_dur        = 0.0
+    if hook_sfx:
+        sfx_dur = get_duration(hook_sfx)
+        leading_offset = LEADING_SILENCE_S + sfx_dur + SFX_BGM_GAP_S
+
+    total_dur = leading_offset + voice_dur
+
+    # Build ffmpeg filter graph
+    cmd = [FFMPEG, "-y"]
+
+    # Voice always input 0
+    cmd += ["-i", _ffmpeg_path_arg(voice)]
+    voice_idx = 0
+
+    if hook_sfx:
+        cmd += ["-i", _ffmpeg_path_arg(hook_sfx)]
+        sfx_idx = 1
+        next_idx = 2
+    else:
+        sfx_idx = None
+        next_idx = 1
+
+    if bgm:
+        cmd += ["-stream_loop", "-1", "-i", _ffmpeg_path_arg(bgm)]
+        bgm_idx = next_idx
+    else:
+        bgm_idx = None
+
+    # Build filter
+    filter_parts: list[str] = []
+
+    if hook_sfx:
+        # Silence(0.3s) + sfx + silence(0.2s) + voice → [vfull]
+        filter_parts.append(
+            f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={LEADING_SILENCE_S}[s1];"
+            f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={SFX_BGM_GAP_S}[s2];"
+            f"[s1][{sfx_idx}:a][s2][{voice_idx}:a]concat=n=4:v=0:a=1[vfull]"
+        )
+        voice_label = "vfull"
+    else:
+        voice_label = f"{voice_idx}:a"
+
+    if bgm:
+        # BGM trimmed to total_dur, lowered to BGM_BASE_DB, sidechain-ducked by voice
+        filter_parts.append(
+            f"[{bgm_idx}:a]atrim=0:{total_dur},volume={BGM_BASE_DB}dB[bgmraw];"
+            f"[{voice_label}]asplit=2[vmain][vsc];"
+            f"[bgmraw][vsc]sidechaincompress=threshold=0.05:ratio=8:attack=20:release=300:makeup=1[bgmducked];"
+            f"[vmain][bgmducked]amix=inputs=2:duration=first:dropout_transition=0[mixout]"
+        )
+        out_label = "mixout"
+    else:
+        # Just the (silence+sfx+voice) chain
+        out_label = voice_label
+
+    filter_complex = ";".join(filter_parts) if filter_parts else None
+    if filter_complex:
+        cmd += ["-filter_complex", filter_complex, "-map", f"[{out_label}]"]
+    else:
+        cmd += ["-map", f"{voice_idx}:a"]
+
+    cmd += ["-c:a", "libmp3lame", "-b:a", "192k", _ffmpeg_path_arg(out)]
+
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"      ⚠️  ffmpeg mix 失敗，fallback 純人聲: {r.stderr[-200:]}")
+        # Fallback: just copy voice
+        import shutil
+        shutil.copy(voice, out)
+        return 0.0
+    return leading_offset
+
+
 # ── 句子切分 ─────────────────────────────────────────────────────────
 
 def split_sentences(script: str, max_len: int = 25) -> list[str]:
