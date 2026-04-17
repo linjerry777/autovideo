@@ -58,6 +58,13 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         json.loads(meta_file.read_text(encoding="utf-8"))
         if meta_file.exists() else {}
     )
+    # Global schedule: if mode=scheduled, pass to Upload-Post (it handles the queue)
+    schedule = pmeta.get("_schedule", {}) if pmeta else {}
+    schedule_kwargs = {}
+    if schedule.get("mode") == "scheduled" and schedule.get("scheduled_date"):
+        schedule_kwargs["scheduled_date"] = schedule["scheduled_date"]
+        if schedule.get("timezone"):
+            schedule_kwargs["timezone"] = schedule["timezone"]
     items = data["items"]
     meta  = build_metadata(items)
 
@@ -81,47 +88,114 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         return pmeta.get(platform, {})
 
     kwargs = dict(async_upload=True, description=fallback_desc)
+    kwargs.update(schedule_kwargs)   # scheduled_date + timezone if set
 
-    # Per-platform titles (override default)
-    for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x"):
+    # Per-platform titles for all platforms
+    for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x", "pinterest", "reddit"):
         if p in platforms:
             title = _platform_meta(p).get("title") or fallback_title
             kwargs[f"{p}_title"] = title
 
-    # YouTube-specific
+    # ── YouTube
     if "youtube" in platforms:
         yt = _platform_meta("youtube")
         kwargs["youtube_description"] = yt.get("description") or fallback_desc
         if yt.get("tags"):
-            # Allow ASCII comma, CJK comma（，）, ideographic comma（、）, and newlines as separators
             kwargs["tags"] = [t.strip() for t in re.split(r"[,\uff0c\u3001\n]+", yt["tags"]) if t.strip()]
         else:
             kwargs["tags"] = ["AI", "人工智慧", "科技新聞", "AINews", "TechNews"]
-        kwargs["privacyStatus"]          = "public"
-        kwargs["containsSyntheticMedia"] = True
-        kwargs["defaultAudioLanguage"]   = "zh-TW"
+        kwargs["privacyStatus"]            = yt.get("privacyStatus", "public")
+        kwargs["categoryId"]               = yt.get("categoryId", "22")
+        kwargs["defaultLanguage"]          = yt.get("defaultLanguage", "zh-Hant")
+        kwargs["defaultAudioLanguage"]     = yt.get("defaultAudioLanguage", "zh-Hant")
+        kwargs["containsSyntheticMedia"]   = yt.get("containsSyntheticMedia", True)
+        kwargs["selfDeclaredMadeForKids"]  = yt.get("selfDeclaredMadeForKids", False)
+        kwargs["embeddable"]               = yt.get("embeddable", True)
+        kwargs["publicStatsViewable"]      = yt.get("publicStatsViewable", True)
+        kwargs["license"]                  = yt.get("license", "youtube")
         thumb_path = pipe_dir / "thumbnail.png"
         if yt.get("use_auto_thumbnail", True) and thumb_path.exists():
             kwargs["thumbnail"] = str(thumb_path)
 
-    # Instagram / Threads / Facebook share media_type=REELS
+    # ── TikTok
+    if "tiktok" in platforms:
+        tt = _platform_meta("tiktok")
+        kwargs["privacy_level"]         = tt.get("privacy_level", "PUBLIC_TO_EVERYONE")
+        kwargs["is_aigc"]               = tt.get("is_aigc", True)
+        kwargs["cover_timestamp"]       = int(tt.get("cover_timestamp", 1000))
+        kwargs["disable_duet"]          = tt.get("disable_duet", False)
+        kwargs["disable_comment"]       = tt.get("disable_comment", False)
+        kwargs["disable_stitch"]        = tt.get("disable_stitch", False)
+        kwargs["brand_content_toggle"]  = tt.get("brand_content_toggle", False)
+        kwargs["brand_organic_toggle"]  = tt.get("brand_organic_toggle", False)
+
+    # ── Instagram / Threads / Facebook share media_type=REELS
     if any(p in platforms for p in ("instagram", "threads", "facebook")):
         kwargs["media_type"]    = "REELS"
         kwargs["share_to_feed"] = True
 
-    # Facebook extra description
-    if "facebook" in platforms:
-        kwargs["facebook_description"] = _platform_meta("facebook").get("description") or fallback_desc
-
-    # Instagram first_comment (hashtag spam)
+    # Instagram
     if "instagram" in platforms:
-        fc = _platform_meta("instagram").get("first_comment", "")
+        ig = _platform_meta("instagram")
+        fc = ig.get("first_comment", "")
         if fc:
             kwargs["first_comment"] = fc
+        if ig.get("collaborators"):
+            kwargs["collaborators"] = ig["collaborators"]
+        if ig.get("user_tags"):
+            kwargs["user_tags"]     = ig["user_tags"]
 
-    # TikTok
-    if "tiktok" in platforms:
-        kwargs["privacy_level"] = "PUBLIC_TO_EVERYONE"
+    # Facebook
+    if "facebook" in platforms:
+        fb = _platform_meta("facebook")
+        kwargs["facebook_description"] = fb.get("description") or fallback_desc
+        kwargs["facebook_media_type"]  = fb.get("facebook_media_type", "REELS")
+        kwargs["video_state"]          = fb.get("video_state", "PUBLISHED")
+
+    # Threads
+    if "threads" in platforms:
+        th = _platform_meta("threads")
+        if th.get("threads_topic_tag"):
+            kwargs["threads_topic_tag"] = th["threads_topic_tag"][:50]
+
+    # X (Twitter)
+    if "x" in platforms:
+        xp = _platform_meta("x")
+        if xp.get("poll_options"):
+            opts = [o.strip() for o in xp["poll_options"].split("|") if o.strip()]
+            if 2 <= len(opts) <= 4:
+                kwargs["poll_options"]  = opts
+                kwargs["poll_duration"] = int(xp.get("poll_duration", 1440))
+        kwargs["reply_settings"]      = xp.get("reply_settings", "everyone")
+        kwargs["x_long_text_as_post"] = xp.get("x_long_text_as_post", False)
+
+    # Pinterest (board_id required — drop platform if empty)
+    if "pinterest" in platforms:
+        pn = _platform_meta("pinterest")
+        if not pn.get("pinterest_board_id"):
+            print("⚠️  Pinterest 未填 board_id，跳過 Pinterest 上傳", file=sys.stderr)
+            platforms = [p for p in platforms if p != "pinterest"]
+        else:
+            kwargs["pinterest_board_id"]    = pn["pinterest_board_id"]
+            kwargs["pinterest_description"] = pn.get("description") or fallback_desc
+            kwargs["pinterest_alt_text"]    = pn.get("pinterest_alt_text") or fallback_title
+            if pn.get("pinterest_link"):
+                kwargs["pinterest_link"] = pn["pinterest_link"]
+
+    # Reddit (subreddit required — drop platform if empty)
+    if "reddit" in platforms:
+        rd = _platform_meta("reddit")
+        if not rd.get("subreddit"):
+            print("⚠️  Reddit 未填 subreddit，跳過 Reddit 上傳", file=sys.stderr)
+            platforms = [p for p in platforms if p != "reddit"]
+        else:
+            kwargs["subreddit"] = rd["subreddit"]
+            if rd.get("flair_id"):
+                kwargs["flair_id"] = rd["flair_id"]
+
+    if not platforms:
+        print("❌ 沒有可上傳的平台（必填欄位未填）", file=sys.stderr)
+        sys.exit(1)
 
     resp = client.upload_video(
         video_path = str(output_mp4),
@@ -147,7 +221,7 @@ if __name__ == "__main__":
     parser.add_argument("--platforms", nargs="+",
                         default=["youtube", "instagram"],
                         choices=["youtube","instagram","tiktok","facebook",
-                                 "threads","linkedin","x","pinterest","bluesky"],
+                                 "threads","linkedin","x","pinterest","bluesky","reddit"],
                         help="目標平台（預設：youtube instagram）")
     parser.add_argument("--dry-run", action="store_true",
                         help="只顯示預覽，不實際上傳")
