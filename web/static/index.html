@@ -51,7 +51,7 @@
   <option value="warning">⚠️ 爭議/警告/風險</option>
   <option value="trophy">🏆 突破/獲獎/創紀錄</option>
 </datalist>
-<div x-data="app()" x-init="init()" x-cloak class="flex h-screen overflow-hidden">
+<div x-data="app()" x-init="init(); $watch('page', (newPage) => { if (newPage !== 'upload') platformMeta = null })" x-cloak class="flex h-screen overflow-hidden">
 
   <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
   <aside class="w-[220px] shrink-0 flex flex-col bg-white border-r border-gray-200 h-screen">

@@ -625,9 +625,6 @@ def cancel_job(job_id: int):
 @router.post("/jobs/{job_id}/regenerate")
 def regenerate_job(job_id: int):
     """用相同主題重新生成影片"""
-    if job_runner.is_running():
-        raise HTTPException(409, "Pipeline already running")
-
     job = get_job(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -642,15 +639,12 @@ def regenerate_job(job_id: int):
         topic        = job.get("topic"),
         platforms    = ",".join(platforms),
     )
-    started = job_runner.trigger_job(
+    job_runner.trigger_job(
         job_id  = new_id,
         date    = run_date,
         topic   = job.get("topic"),
         platforms = platforms,
         dry_run = dry_run,
     )
-    if not started:
-        update_job(new_id, status="failed", error="Lock acquire failed")
-        raise HTTPException(409, "Pipeline already running")
 
     return {"job_id": new_id, "date": run_date, "status": "queued"}
