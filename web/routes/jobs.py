@@ -1,4 +1,5 @@
 import json as _json, shutil, threading
+import base64 as _base64
 from datetime import date as date_cls
 from pathlib import Path
 from fastapi import APIRouter, HTTPException
@@ -257,6 +258,44 @@ def retake_screenshot(job_id: int, n: int, body: RetakeRequest = None):
     return {"ok": True, "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}"}
 
 
+class UploadScreenshotRequest(BaseModel):
+    data_url: str   # "data:image/png;base64,<b64>"
+
+
+@router.post("/jobs/{job_id}/screenshots/{n}/upload")
+def upload_screenshot(job_id: int, n: int, body: UploadScreenshotRequest):
+    """Overwrite screenshot n with client-edited PNG (base64 data URL)."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+    news_file = pipe_dir / "news.json"
+    if not news_file.exists():
+        raise HTTPException(400, "news.json not found")
+
+    data  = _json.loads(news_file.read_text(encoding="utf-8"))
+    items = data.get("items", [])
+    if n < 1 or n > len(items):
+        raise HTTPException(400, f"Item {n} out of range (1–{len(items)})")
+
+    # Strip data URL prefix and decode
+    url = body.data_url
+    if "," in url:
+        url = url.split(",", 1)[1]
+    try:
+        png_bytes = _base64.b64decode(url)
+    except Exception:
+        raise HTTPException(400, "Invalid base64 payload")
+
+    shots_dir = pipe_dir / "screenshots"
+    shots_dir.mkdir(parents=True, exist_ok=True)
+    shot_path = shots_dir / f"news_{n:02d}.png"
+    shot_path.write_bytes(png_bytes)
+
+    return {"ok": True, "url": f"/api/media/jobs/{job_id}/screenshots/{shot_path.name}"}
+
+
 class ReplaceItemRequest(BaseModel):
     cache_id: int
     mark_old_blocked: bool = True   # 是否標記被替換的 URL 為截圖封鎖
@@ -427,9 +466,11 @@ def retry_step(job_id: int, step: str):
 
     job_key = f"{job['date']}/job_{job_id}"
     dry_run = get_setting("dry_run", "false") == "true"
+    renderer = get_setting("video_renderer", "ffmpeg").lower()
+    video_script = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
     script_map = {
         "audio":  ("audio_generator.py",  []),
-        "video":  ("video_composer.py",    []),
+        "video":  (video_script,           []),
     }
 
     if step == "upload":
