@@ -1245,6 +1245,46 @@
         </template>
       </div>
 
+      <!-- Schedule bar -->
+      <div x-show="!platformMetaLoading && platformMeta" class="glass rounded-2xl p-5 space-y-3">
+        <div class="flex items-center gap-4 flex-wrap">
+          <p class="text-xs font-semibold text-gray-500">發布時機</p>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="radio" x-model="scheduleMode" value="now" @change="syncScheduleToMeta()" class="accent-green-500">
+            <span>🚀 立刻發布</span>
+          </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="radio" x-model="scheduleMode" value="scheduled" @change="syncScheduleToMeta()" class="accent-green-500">
+            <span>🕐 排程發布</span>
+          </label>
+
+          <div x-show="scheduleMode === 'scheduled'" class="flex items-center gap-2 flex-wrap">
+            <input type="datetime-local" x-model="scheduledDatetime" @change="syncScheduleToMeta()"
+              class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30">
+            <select x-model="scheduleTimezone" @change="syncScheduleToMeta()"
+              class="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-sm">
+              <option value="Asia/Taipei">Asia/Taipei (UTC+8)</option>
+              <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
+              <option value="America/Los_Angeles">US/Pacific</option>
+              <option value="America/New_York">US/Eastern</option>
+              <option value="UTC">UTC</option>
+            </select>
+            <button @click="suggestBestTime()"
+              class="text-xs text-orange-600 border border-orange-200 bg-orange-50 hover:bg-orange-100 rounded-lg px-3 py-1.5 font-medium">
+              ✨ 建議時間
+            </button>
+          </div>
+        </div>
+
+        <!-- Per-platform golden-hour hints -->
+        <div x-show="scheduleMode === 'scheduled'" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+          <template x-for="pid in [...uploadPlatforms]" :key="pid">
+            <span class="text-[10px] px-2 py-1 rounded-full bg-gray-100 text-gray-600"
+              x-text="(_PLATFORM_STYLE[pid]?.name || pid) + ': ' + (_GOLDEN_HOURS[pid]?.note || '')"></span>
+          </template>
+        </div>
+      </div>
+
       <!-- Action bar -->
       <div x-show="!platformMetaLoading && platformMeta" class="glass rounded-2xl p-5 flex items-center justify-between sticky bottom-4">
         <div class="text-xs text-gray-500">
@@ -1737,6 +1777,11 @@ function app() {
     editingPlatform: null,       // 'youtube' | 'tiktok' | ... | null (modal open for this platform)
     uploadPreviewOrigin: 'job',  // where to return on back navigation
 
+    // Schedule state (mirrors platformMeta._schedule but UI-reactive)
+    scheduleMode: 'now',            // 'now' | 'scheduled'
+    scheduledDatetime: '',          // "2026-04-20T08:00"
+    scheduleTimezone: 'Asia/Taipei',
+
     // Accounts page state
     accountsApi: null,
     accountsList: [],
@@ -2045,6 +2090,19 @@ function app() {
       entertainment: ['tiktok', 'instagram', 'facebook'],
       finance:       ['youtube', 'x', 'linkedin'],
       pet:           ['tiktok', 'instagram', 'facebook'],
+    },
+
+    // Golden-hour windows per platform (local time, hour ranges)
+    // Data: Buffer/Moonb 2026 studies — keep edits in ONE place when data changes
+    _GOLDEN_HOURS: {
+      youtube:   { weekday: ['14:00', '20:00'], note: '平日 14-16 / 20-23 最佳（前 2-4h 決定推送）' },
+      tiktok:    { weekday: ['07:00', '20:00'], note: '晨間 6-10 / 晚間 19-23 最佳' },
+      instagram: { weekday: ['12:00', '19:00'], note: '週二 13-19 / 週三 12-21 最佳' },
+      facebook:  { weekday: ['13:00', '16:00'], note: '午後 13-16 最佳' },
+      threads:   { weekday: ['12:00', '19:00'], note: '同 IG 節奏' },
+      x:         { weekday: ['09:00', '17:00'], note: '早晨 9-10 / 下午 17-18 最佳' },
+      pinterest: { weekday: ['20:00', '23:00'], note: '週末晚間最佳' },
+      reddit:    { weekday: ['06:00', '09:00'], note: '清晨 6-9 EST 最活躍' },
     },
 
     _PLATFORM_STYLE: {
@@ -2390,6 +2448,18 @@ function app() {
           if (!pm[p]) pm[p] = { title: '' }
         }
         this.platformMeta = pm
+        // Restore schedule UI state from meta
+        const sched = pm._schedule || {}
+        this.scheduleMode       = sched.mode || 'now'
+        this.scheduleTimezone   = sched.timezone || 'Asia/Taipei'
+        if (sched.scheduled_date) {
+          const d = new Date(sched.scheduled_date)
+          const pad = n => String(n).padStart(2, '0')
+          this.scheduledDatetime =
+            `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+        } else {
+          this.scheduledDatetime = ''
+        }
       } catch (e) {
         this.showToast('載入平台設定失敗：' + e.message)
         this.platformMeta = null
@@ -2408,6 +2478,41 @@ function app() {
         this.showToast('儲存失敗：' + e.message)
         throw e   // propagate so callers can short-circuit
       }
+    },
+
+    // Find the earliest golden-hour window across currently enabled platforms
+    suggestBestTime() {
+      if (this.uploadPlatforms.size === 0) {
+        this.showToast('請先啟用至少一個平台')
+        return
+      }
+      const windows = [...this.uploadPlatforms]
+        .map(p => this._GOLDEN_HOURS[p]?.weekday?.[0])
+        .filter(Boolean)
+        .sort()
+      const earliestHour = windows[0] || '10:00'
+      const d = new Date()
+      d.setDate(d.getDate() + 1)  // tomorrow
+      const [hh, mm] = earliestHour.split(':')
+      d.setHours(parseInt(hh), parseInt(mm), 0, 0)
+      const pad = n => String(n).padStart(2, '0')
+      this.scheduledDatetime =
+        `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+      this.scheduleMode = 'scheduled'
+      this.syncScheduleToMeta()
+      this.showToast(`已填入 ${earliestHour} — 覆蓋最多啟用平台的黃金時段`)
+    },
+
+    // Push UI state back into platformMeta._schedule
+    syncScheduleToMeta() {
+      if (!this.platformMeta) return
+      if (!this.platformMeta._schedule) this.platformMeta._schedule = {}
+      this.platformMeta._schedule.mode           = this.scheduleMode
+      this.platformMeta._schedule.scheduled_date =
+        this.scheduleMode === 'scheduled' && this.scheduledDatetime
+          ? new Date(this.scheduledDatetime).toISOString()
+          : ''
+      this.platformMeta._schedule.timezone       = this.scheduleTimezone
     },
 
     openUploadPreview() {
