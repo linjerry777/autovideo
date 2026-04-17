@@ -9,6 +9,21 @@ import json, os, sys, io, requests
 from pathlib import Path
 from urllib.parse import quote
 
+# Import og_image_fetcher (works both when run as script and imported as module)
+# Note: pywin32 installs a `scripts` namespace package at site-packages/win32/scripts,
+# which shadows our local `scripts/` dir. Import sibling module by name instead,
+# ensuring the script's own directory is on sys.path.
+try:
+    import sys as _sys
+    from pathlib import Path as _Path
+    _script_dir = str(_Path(__file__).resolve().parent)
+    if _script_dir not in _sys.path:
+        _sys.path.insert(0, _script_dir)
+    from og_image_fetcher import fetch_hero_image
+except ModuleNotFoundError:
+    # Fallback: someone is importing us as `scripts.screenshot_collector` from repo root
+    from scripts.og_image_fetcher import fetch_hero_image
+
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
@@ -88,7 +103,15 @@ def main():
                 except Exception:
                     url = raw_url  # 解析失敗就用原始 URL
 
-            # ── 方法 1：Playwright 截圖 ──────────────────────────────
+            # ── 方法 0：OG image（最快、最高品質、最不怕反爬）─────────
+            if url:
+                ok, og_source = fetch_hero_image(url, shot_path)
+                if ok:
+                    size_kb = shot_path.stat().st_size // 1024
+                    print(f"  [{i}] ✅ {og_source} ({size_kb}KB)")
+                    continue
+
+            # ── 方法 1：Playwright 截圖（OG 失敗 fallback）────────────
             if url:
                 print(f"  [{i}] 截圖：{url[:80]}...")
                 try:
@@ -120,7 +143,7 @@ def main():
                 except Exception as e:
                     print(f"  [{i}] ⚠️ 截圖失敗：{e}")
 
-            # ── 方法 2：Unsplash 搜圖備案 ─────────────────────────────
+            # ── 方法 2：Unsplash 搜圖（最後 fallback）──────────────────
             keyword = item.get("title") or item.get("hook") or "technology news"
             print(f"    🔍 Unsplash 搜圖：{keyword[:40]}...")
             if _unsplash_fallback(keyword, shot_path):
