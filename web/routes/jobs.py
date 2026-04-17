@@ -1,4 +1,4 @@
-import json as _json, shutil, threading
+import json as _json, os, shutil, threading
 import base64 as _base64
 from datetime import date as date_cls
 from pathlib import Path
@@ -362,10 +362,12 @@ def put_platform_meta(job_id: int, body: PlatformMetaUpdate):
     pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
     pipe_dir.mkdir(parents=True, exist_ok=True)
     meta_file = pipe_dir / "platform_meta.json"
-    meta_file.write_text(
+    tmp_file  = meta_file.with_suffix(".json.tmp")
+    tmp_file.write_text(
         _json.dumps(body.platform_meta, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    os.replace(tmp_file, meta_file)   # atomic on Windows + POSIX
     return {"ok": True}
 
 
