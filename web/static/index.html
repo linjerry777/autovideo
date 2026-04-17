@@ -1263,6 +1263,84 @@
           </button>
         </div>
       </div>
+
+      <!-- Edit modal -->
+      <div x-show="editingPlatform" x-cloak
+           class="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+           @click.self="editingPlatform = null">
+        <div class="bg-white rounded-2xl w-[95vw] max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-700">
+              🖌️ 編輯 <span x-text="_PLATFORM_STYLE[editingPlatform]?.name"></span>
+            </p>
+            <button @click="editingPlatform = null"
+              class="text-xs text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5">
+              完成
+            </button>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-5 space-y-4" x-show="editingPlatform && platformMeta">
+            <!-- Title (all platforms) -->
+            <div>
+              <label class="text-xs font-medium text-gray-500 block mb-1">
+                標題 / 文案 <span class="text-gray-400"
+                  x-text="'(' + (platformMeta[editingPlatform]?.title || '').length + ' 字)'"></span>
+              </label>
+              <textarea x-model="platformMeta[editingPlatform].title" rows="3"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"></textarea>
+              <p x-show="editingPlatform==='x'" class="text-[10px] text-gray-400 mt-1">X 單則貼文最多 280 字</p>
+              <p x-show="editingPlatform==='tiktok'" class="text-[10px] text-gray-400 mt-1">TikTok caption 含 #hashtag 最多 2200 字</p>
+            </div>
+
+            <!-- YouTube/Facebook: description -->
+            <div x-show="['youtube','facebook'].includes(editingPlatform)">
+              <label class="text-xs font-medium text-gray-500 block mb-1">影片描述</label>
+              <textarea x-model="platformMeta[editingPlatform].description" rows="5"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"></textarea>
+            </div>
+
+            <!-- YouTube: tags -->
+            <div x-show="editingPlatform==='youtube'">
+              <label class="text-xs font-medium text-gray-500 block mb-1">標籤（逗號分隔）</label>
+              <input x-model="platformMeta[editingPlatform].tags" type="text"
+                placeholder="AI,人工智慧,科技"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500">
+            </div>
+
+            <!-- YouTube: auto thumbnail toggle -->
+            <div x-show="editingPlatform==='youtube'" class="flex items-center gap-2">
+              <input type="checkbox" id="yt-thumb"
+                :checked="platformMeta[editingPlatform].use_auto_thumbnail"
+                @change="platformMeta[editingPlatform].use_auto_thumbnail = $event.target.checked"
+                class="accent-green-500">
+              <label for="yt-thumb" class="text-xs text-gray-700">
+                使用自動生成的封面縮圖（1080×1920）
+              </label>
+            </div>
+
+            <!-- Instagram: first_comment -->
+            <div x-show="editingPlatform==='instagram'">
+              <label class="text-xs font-medium text-gray-500 block mb-1">
+                首條留言（自動發布 hashtag，避免洗版 caption）
+              </label>
+              <textarea x-model="platformMeta[editingPlatform].first_comment" rows="2"
+                placeholder="#AI #人工智慧 #科技新聞"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500"></textarea>
+            </div>
+          </div>
+
+          <div class="border-t border-gray-100 p-4 flex justify-end gap-2">
+            <button @click="editingPlatform = null"
+              class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700">
+              取消
+            </button>
+            <button @click="savePlatformMeta().then(() => editingPlatform = null).catch(() => {})"
+              class="px-5 py-2 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white">
+              儲存
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     <!-- /page=upload -->
 
@@ -2403,16 +2481,27 @@ function app() {
     },
 
     async uploadJob() {
-      if (this.uploadPlatforms.size === 0) {
-        this.showToast('請先勾選至少一個平台')
+      if (!this.currentJob) return
+      const platforms = [...this.uploadPlatforms]
+      if (platforms.length === 0) {
+        this.showToast('沒有選擇任何平台')
         return
       }
+      // If we have platform_meta loaded (from upload preview page), save it before uploading
+      if (this.platformMeta) {
+        try {
+          await this.api('PUT', `/api/jobs/${this.currentJob.id}/platform_meta`,
+                         { platform_meta: this.platformMeta })
+        } catch (e) {
+          this.showToast('儲存草稿失敗：' + e.message)
+          return
+        }
+      }
       try {
-        await this.api('POST', `/api/jobs/${this.currentJob.id}/upload`, {
-          platforms: [...this.uploadPlatforms],
-        })
+        await this.api('POST', `/api/jobs/${this.currentJob.id}/upload`, { platforms })
         this.currentJob.step_upload = 'uploading'
-        this.showToast(`上傳中… (${[...this.uploadPlatforms].join(', ')})`)
+        this.subscribeSSE(this.currentJob.id)
+        this.showToast(`開始上傳到 ${platforms.length} 個平台…`)
       } catch (e) { this.showToast('上傳失敗：' + e.message) }
     },
 
