@@ -3,6 +3,7 @@ import React from "react";
 import { NewsVideo, calcTotalFrames } from "./NewsVideo";
 import { NewsVideoProps } from "./types";
 import { CalculateMetadataFunction } from "remotion";
+import { Thumbnail, ThumbnailProps } from "./Thumbnail";
 
 const FPS = 30;
 const WIDTH = 1080;
@@ -39,16 +40,31 @@ const calculateMetadata: CalculateMetadataFunction<NewsVideoProps> = ({
 
 export const RemotionRoot: React.FC = () => {
   return (
-    <Composition
-      id="NewsVideo"
-      component={NewsVideo}
-      durationInFrames={FPS * 30}   // placeholder; overridden by calculateMetadata
-      fps={FPS}
-      width={WIDTH}
-      height={HEIGHT}
-      defaultProps={defaultProps}
-      calculateMetadata={calculateMetadata}
-    />
+    <>
+      <Composition
+        id="NewsVideo"
+        component={NewsVideo}
+        durationInFrames={FPS * 30}   // placeholder; overridden by calculateMetadata
+        fps={FPS}
+        width={WIDTH}
+        height={HEIGHT}
+        defaultProps={defaultProps}
+        calculateMetadata={calculateMetadata}
+      />
+      <Composition
+        id="Thumbnail"
+        component={Thumbnail}
+        durationInFrames={1}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          hook: "AI 快訊",
+          title: "範例標題",
+          screenshot: "",
+        } as ThumbnailProps}
+      />
+    </>
   );
 };
 
