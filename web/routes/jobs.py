@@ -70,7 +70,7 @@ def trigger(req: TriggerRequest):
         selected_cache_ids = ",".join(str(x) for x in (req.selected_cache_ids or [])),
     )
 
-    started = job_runner.trigger_job(
+    job_runner.trigger_job(
         job_id          = job_id,
         date            = run_date,
         topic           = req.topic,
@@ -80,10 +80,6 @@ def trigger(req: TriggerRequest):
         account_profile = req.account_profile,
         strategy        = req.strategy,
     )
-    if not started:
-        update_job(job_id, status="failed", error="Lock acquire failed")
-        raise HTTPException(409, "Pipeline already running")
-
     return {"job_id": job_id, "date": run_date, "status": "queued"}
 
 

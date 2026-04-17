@@ -17,6 +17,9 @@ _running_job_id: int | None = None
 _pause_events:  dict[int, threading.Event] = {}  # job_id → Event (set = continue)
 _cancel_flags:  dict[int, bool] = {}              # job_id → True = 取消中
 
+import collections as _collections
+_job_queue: _collections.deque = _collections.deque()   # pending job params (dicts)
+
 
 def cancel_job(job_id: int):
     """標記 job 為取消，下一個步驟前會中止"""
@@ -63,6 +66,15 @@ def _broadcast(job_id: int, data: dict):
 
 
 _main_loop: asyncio.AbstractEventLoop | None = None
+
+
+def _start_next_queued():
+    """Start the next queued job if one is waiting. Called after current job finishes."""
+    if not _job_queue:
+        return
+    params = _job_queue.popleft()
+    trigger_job(**params)
+
 
 def set_event_loop(loop: asyncio.AbstractEventLoop):
     global _main_loop
@@ -182,6 +194,7 @@ def resume_from_audio(job_id: int, job_key: str, dry_run: bool) -> bool:
             _cancel_flags.pop(job_id, None)
             _running_job_id = None
             _lock.release()
+            _start_next_queued()
 
     threading.Thread(target=_run, daemon=True).start()
     return True
@@ -370,6 +383,7 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         _cancel_flags.pop(job_id, None)
         _running_job_id = None
         _lock.release()
+        _start_next_queued()
 
 
 def trigger_job(job_id: int, date: str, topic: str | None = None,
@@ -378,12 +392,19 @@ def trigger_job(job_id: int, date: str, topic: str | None = None,
                 pre_news: list[dict] | None = None,
                 account_profile: str | None = None,
                 strategy: str | None = None) -> bool:
-    """Returns True if job was started, False if already running."""
+    """Returns True always — job runs immediately or is enqueued for sequential execution."""
     global _running_job_id
     if platforms is None:
         platforms = get_setting("platforms", "youtube,instagram").split(",")
     if not _lock.acquire(blocking=False):
-        return False
+        _job_queue.append({
+            "job_id": job_id, "date": date, "topic": topic,
+            "platforms": platforms, "skip_upload": skip_upload,
+            "dry_run": dry_run, "pre_news": pre_news,
+            "account_profile": account_profile,
+            "strategy": strategy,
+        })
+        return True
     _running_job_id = job_id
     t = threading.Thread(
         target=_run_pipeline,
