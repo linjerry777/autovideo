@@ -67,11 +67,26 @@ def concat_mp3(src_files: list[Path], out: Path):
 
 # ── 句子切分 ─────────────────────────────────────────────────────────
 
-def split_sentences(script: str) -> list[str]:
-    """依中文句號/感嘆/問號切句；若無標點則整段"""
+def split_sentences(script: str, max_len: int = 25) -> list[str]:
+    """Split script into subtitle-friendly chunks.
+
+    Stage 1: split on 。！？
+    Stage 2: any chunk > max_len (CJK chars) → split further on 、，；
+    """
     parts = re.split(r'(?<=[。！？])\s*', script)
     parts = [p.strip() for p in parts if p.strip()]
-    return parts if parts else [script]
+
+    refined: list[str] = []
+    for p in parts:
+        if len(p) <= max_len:
+            refined.append(p)
+            continue
+        # Split long chunk on 、 ， ；
+        subparts = re.split(r'(?<=[、，；])\s*', p)
+        subparts = [s.strip() for s in subparts if s.strip()]
+        refined.extend(subparts if subparts else [p])
+
+    return refined if refined else [script]
 
 
 # ── TTS ──────────────────────────────────────────────────────────────
