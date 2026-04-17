@@ -37,8 +37,16 @@ def _pick_random(folder: Path) -> Path | None:
 def pick_bgm(emotion: str | None) -> Path | None:
     """Pick a BGM track for the given emotion.
 
-    Fallback chain: <emotion>/ → generic/ → None
+    Fallback chain: hot/ (if populated) → <emotion>/ → generic/ → None
+
+    The hot/ folder lets the user override emotion-picking with currently
+    trending tracks (e.g., from fb_music_trends.py). Drop an .mp3 there and
+    every new job picks from hot/ instead of emotion-keyed folders.
     """
+    hot = _pick_random(MUSIC_ROOT / "hot")
+    if hot:
+        return hot
+
     em = (emotion or "").lower()
     if em in KNOWN_EMOTIONS:
         choice = _pick_random(MUSIC_ROOT / em)

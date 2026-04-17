@@ -1550,9 +1550,9 @@
 
         <!-- Per-platform golden-hour hints -->
         <div x-show="scheduleMode === 'scheduled'" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-          <template x-for="pid in [...uploadPlatforms]" :key="pid">
+          <template x-for="pid in [...uploadPlatforms].filter(p => _GOLDEN_HOURS[p])" :key="pid">
             <span class="text-[10px] px-2 py-1 rounded-full bg-gray-100 text-gray-600"
-              x-text="(_PLATFORM_STYLE[pid]?.name || pid) + ': ' + (_GOLDEN_HOURS[pid]?.note || '')"></span>
+              x-text="(_PLATFORM_STYLE[pid]?.name || pid) + ': ' + _GOLDEN_HOURS[pid].note"></span>
           </template>
         </div>
       </div>
