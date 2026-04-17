@@ -52,11 +52,7 @@ ALL_SOURCES = {
     "youtube_us":   {"label": "YouTube Trending US", "icon": "▶️", "default": False, "group": "en"},
     "hackernews":   {"label": "Hacker News",         "icon": "🦊", "default": False, "group": "en"},
     "last30days":   {"label": "Social (Reddit·HN)",  "icon": "🌐", "default": False, "group": "en"},
-    "v2ex":         {"label": "V2EX",               "icon": "💻", "default": False, "group": "zh"},
-    "36kr":         {"label": "36氪",               "icon": "📰", "default": False, "group": "zh"},
-    "sspai":        {"label": "少數派",             "icon": "✏️", "default": False, "group": "zh"},
     "ithome":       {"label": "IT之家",             "icon": "🏠", "default": False, "group": "zh"},
-    "huxiu":        {"label": "虎嗅",               "icon": "🐯", "default": False, "group": "zh"},
 }
 
 DEFAULT_SOURCES = [k for k, v in ALL_SOURCES.items() if v["default"]]
@@ -488,11 +484,7 @@ def _fetch_rss_source(source_id: str, rss_url: str, keyword: str = None, limit: 
 
 
 CURATED_RSS = {
-    "v2ex":  "https://www.v2ex.com/index.xml",
-    "36kr":  "https://36kr.com/feed",
-    "sspai": "https://sspai.com/feed",
-    "ithome":"https://www.ithome.com/rss/",
-    "huxiu": "https://www.huxiu.com/rss/",
+    "ithome": "https://www.ithome.com/rss/",
 }
 
 # ── 主要聚合函數 ───────────────────────────────────────────────────────────────
