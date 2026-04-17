@@ -111,27 +111,44 @@ def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dic
 
 
 def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
+    def _fresh_tag(it):
+        h = it.get("freshness_hours")
+        if h is None: return "[時效未知]"
+        return f"[{h:.0f}h前]" if h < 48 else f"[{h/24:.0f}d前]"
+
     headlines = "\n".join([
-        f"{i+1}. [{item['source']}] {item['title']}\n   URL: {item['url']}\n   {item['summary'][:120]}"
+        f"{i+1}. {_fresh_tag(item)} [{item['source']}] {item['title']}\n   URL: {item['url']}\n   {item['summary'][:120]}"
         for i, item in enumerate(raw_items[:40])
     ])
 
     topic_line = f"主題：{TOPIC}（只選跟這個主題直接相關的新聞）\n\n" if TOPIC else ""
     _kw = TOPIC or DEFAULT_KEYWORD
-    prompt = f"""以下是搜尋「{_kw}」得到的新聞列表。請挑出 3 則最具爆點、最能引起共鳴的新聞，適合在短影音（Shorts/Reels/TikTok）分享。
+    prompt = f"""以下是搜尋「{_kw}」得到的新聞列表（標頭含時效標籤，例如 [4h前]）。請挑出 3 則最具爆點、最能引起共鳴的新聞，適合在短影音（Shorts/Reels/TikTok）分享。
 
-{topic_line}優先選：有數字衝擊感、意外反轉、重大突破、爭議話題的新聞。
+{topic_line}優先選：
+1. 時效 ≤ 12h 的新聞（Shorts 演算法偏好新鮮內容）
+2. 有數字衝擊、意外反轉、重大突破、爭議話題
+3. 情緒張力強（驚訝/憤怒/好笑/好奇/驚恐）
 
-每則新聞請用以下 JSON 格式，source_url 必須從列表中完整複製：
+每則請用以下 JSON 格式，source_url 必須從列表中完整複製：
 {{
-  "hook": "開場鉤子（5-8字，製造懸念或衝擊，例如：「這個 AI 嚇到所有人」）",
+  "hook": "主要開場鉤子（5-8字，從 hook_variants 中選最強的那個）",
+  "hook_variants": ["懸念式 hook", "打臉式 hook", "提問式 hook"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
   "script": "旁白腳本（60字以內，像在跟朋友說話的語氣，第一人稱）",
-  "scene_type": "動畫場景類型（從以下擇一）：fire（攻擊/爆炸/燃燒）, race（競賽/追趕/對決）, money（融資/估值/賺錢）, robot（AI/機器人/科技突破）, warning（爭議/警告/風險）, trophy（創紀錄/得獎/突破）, default（其他）",
+  "scene_type": "動畫場景（擇一）：fire, race, money, robot, warning, trophy, default",
+  "virality_score": 1-10 的整數，預測這則在 Shorts/TikTok 爆的潛力,
+  "virality_reason": "一句話說明為什麼給這個分數（例如：『數字衝擊+反差感+時效新鮮』）",
+  "emotion": "主導情緒：surprise | anger | joy | curiosity | fear 擇一",
   "source_url": "完整的新聞原始 URL",
   "source_name": "媒體名稱"
 }}
+
+hook_variants 必須生成恰好 3 個不同風格：
+- 風格 A：懸念式（「破千萬的秘密」「沒人告訴你的」）
+- 風格 B：打臉式（「1188 萬人搞錯了」「你以為 X 是 Y 其實...」）
+- 風格 C：提問式（「為什麼全網都...？」「這事怎麼發生的？」）
 
 新聞列表：
 {headlines}
