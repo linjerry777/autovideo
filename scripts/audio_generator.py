@@ -21,7 +21,20 @@ NEWS_FILE = PIPE_DIR / "news.json"
 AUDIO_DIR = PIPE_DIR / "audio"
 
 API_KEY  = os.getenv("FISH_AUDIO_API_KEY", "")
-VOICE_ID = os.getenv("FISH_AUDIO_VOICE_ID", "")
+DEFAULT_VOICE_ID = os.getenv("FISH_AUDIO_VOICE_ID", "")
+
+# Per-strategy voice mapping (env vars are optional — fall back to default)
+STRATEGY_VOICE_MAP = {
+    "tech":          os.getenv("FISH_AUDIO_VOICE_TECH",          "") or DEFAULT_VOICE_ID,
+    "entertainment": os.getenv("FISH_AUDIO_VOICE_ENTERTAINMENT", "") or DEFAULT_VOICE_ID,
+    "finance":       os.getenv("FISH_AUDIO_VOICE_FINANCE",       "") or DEFAULT_VOICE_ID,
+    "pet":           os.getenv("FISH_AUDIO_VOICE_PET",           "") or DEFAULT_VOICE_ID,
+}
+
+
+def resolve_voice_id(strategy: str | None) -> str:
+    """Pick voice_id by strategy, falling back to default."""
+    return STRATEGY_VOICE_MAP.get((strategy or "").lower(), DEFAULT_VOICE_ID)
 
 
 # ── ffmpeg/ffprobe 偵測 ───────────────────────────────────────────────
@@ -91,16 +104,17 @@ def split_sentences(script: str, max_len: int = 25) -> list[str]:
 
 # ── TTS ──────────────────────────────────────────────────────────────
 
-def text_to_speech(text: str, out_path: Path) -> None:
+def text_to_speech(text: str, out_path: Path, voice_id: str | None = None) -> None:
     if not API_KEY:
         raise RuntimeError("❌ 缺少 FISH_AUDIO_API_KEY")
-    if not VOICE_ID:
-        raise RuntimeError("❌ 缺少 FISH_AUDIO_VOICE_ID")
+    use_voice = voice_id or DEFAULT_VOICE_ID
+    if not use_voice:
+        raise RuntimeError("❌ 缺少 FISH_AUDIO_VOICE_ID（或 strategy 對應的 voice）")
 
     session = Session(API_KEY)
     chunks  = []
     for chunk in session.tts(TTSRequest(
-        reference_id = VOICE_ID,
+        reference_id = use_voice,
         text         = text,
         format       = "mp3",
         mp3_bitrate  = 128,
@@ -122,8 +136,11 @@ def main():
 
     data  = json.loads(NEWS_FILE.read_text(encoding="utf-8"))
     items = data["items"]
+    strategy = (data.get("strategy") or "").lower()
+    voice_id = resolve_voice_id(strategy)
 
-    print(f"🎙️  生成 {len(items)} 則語音（Fish Audio 哈基米）...")
+    voice_label = strategy or "default"
+    print(f"🎙️  生成 {len(items)} 則語音（Fish Audio · {voice_label} voice）...")
 
     for i, item in enumerate(items, 1):
         combined = AUDIO_DIR / f"audio_{i:02d}.mp3"
@@ -144,7 +161,7 @@ def main():
         for j, sent in enumerate(sentences, 1):
             sp = AUDIO_DIR / f"audio_{i:02d}_s{j:02d}.mp3"
             print(f"      句{j}: {sent[:30]}...")
-            text_to_speech(sent, sp)
+            text_to_speech(sent, sp, voice_id=voice_id)
             dur = get_duration(sp)
             timings.append({"text": sent, "start": t_cursor, "end": t_cursor + dur})
             t_cursor += dur
