@@ -29,6 +29,16 @@ def cancel_job(job_id: int):
         ev = _pause_events.get(key)
         if ev:
             ev.set()
+    # If the job is still queued (not yet running), mark it cancelled immediately
+    # so the UI reflects the state without waiting for queue drain.
+    for entry in list(_job_queue):
+        if entry.get("job_id") == job_id:
+            _job_queue.remove(entry)
+            _cancel_flags.pop(job_id, None)
+            update_job(job_id, status="cancelled",
+                       finished_at=datetime.now(timezone.utc).isoformat())
+            _broadcast(job_id, {"job_id": job_id, "status": "cancelled"})
+            break
 
 
 # ── SSE 事件廣播 ──────────────────────────────────────────────────────
@@ -69,11 +79,19 @@ _main_loop: asyncio.AbstractEventLoop | None = None
 
 
 def _start_next_queued():
-    """Start the next queued job if one is waiting. Called after current job finishes."""
-    if not _job_queue:
+    """Start the next non-cancelled queued job. Cancelled queue entries are marked
+    cancelled in DB and skipped."""
+    while _job_queue:
+        params = _job_queue.popleft()
+        jid = params.get("job_id")
+        if jid is not None and _cancel_flags.get(jid):
+            # Job was cancelled while queued — update DB and skip
+            _cancel_flags.pop(jid, None)
+            update_job(jid, status="cancelled", finished_at=datetime.now(timezone.utc).isoformat())
+            _broadcast(jid, {"job_id": jid, "status": "cancelled"})
+            continue
+        trigger_job(**params)
         return
-    params = _job_queue.popleft()
-    trigger_job(**params)
 
 
 def set_event_loop(loop: asyncio.AbstractEventLoop):
