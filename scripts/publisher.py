@@ -91,7 +91,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     kwargs.update(schedule_kwargs)   # scheduled_date + timezone if set
 
     # Per-platform titles for all platforms
-    for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x", "pinterest", "reddit"):
+    for p in ("youtube", "tiktok", "instagram", "facebook", "threads", "x"):
         if p in platforms:
             title = _platform_meta(p).get("title") or fallback_title
             kwargs[f"{p}_title"] = title
@@ -145,12 +145,17 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         if ig.get("user_tags"):
             kwargs["user_tags"]     = ig["user_tags"]
 
-    # Facebook
+    # Facebook (page_id required — drop platform if empty)
     if "facebook" in platforms:
         fb = _platform_meta("facebook")
-        kwargs["facebook_description"] = fb.get("description") or fallback_desc
-        kwargs["facebook_media_type"]  = fb.get("facebook_media_type", "REELS")
-        kwargs["video_state"]          = fb.get("video_state", "PUBLISHED")
+        if not fb.get("facebook_page_id"):
+            print("⚠️  Facebook 未填 facebook_page_id（粉絲團 ID），跳過 Facebook 上傳", file=sys.stderr)
+            platforms = [p for p in platforms if p != "facebook"]
+        else:
+            kwargs["facebook_page_id"]     = fb["facebook_page_id"]
+            kwargs["facebook_description"] = fb.get("description") or fallback_desc
+            kwargs["facebook_media_type"]  = fb.get("facebook_media_type", "REELS")
+            kwargs["video_state"]          = fb.get("video_state", "PUBLISHED")
 
     # Threads
     if "threads" in platforms:
@@ -168,30 +173,6 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
                 kwargs["poll_duration"] = int(xp.get("poll_duration", 1440))
         kwargs["reply_settings"]      = xp.get("reply_settings", "everyone")
         kwargs["x_long_text_as_post"] = xp.get("x_long_text_as_post", False)
-
-    # Pinterest (board_id required — drop platform if empty)
-    if "pinterest" in platforms:
-        pn = _platform_meta("pinterest")
-        if not pn.get("pinterest_board_id"):
-            print("⚠️  Pinterest 未填 board_id，跳過 Pinterest 上傳", file=sys.stderr)
-            platforms = [p for p in platforms if p != "pinterest"]
-        else:
-            kwargs["pinterest_board_id"]    = pn["pinterest_board_id"]
-            kwargs["pinterest_description"] = pn.get("description") or fallback_desc
-            kwargs["pinterest_alt_text"]    = pn.get("pinterest_alt_text") or fallback_title
-            if pn.get("pinterest_link"):
-                kwargs["pinterest_link"] = pn["pinterest_link"]
-
-    # Reddit (subreddit required — drop platform if empty)
-    if "reddit" in platforms:
-        rd = _platform_meta("reddit")
-        if not rd.get("subreddit"):
-            print("⚠️  Reddit 未填 subreddit，跳過 Reddit 上傳", file=sys.stderr)
-            platforms = [p for p in platforms if p != "reddit"]
-        else:
-            kwargs["subreddit"] = rd["subreddit"]
-            if rd.get("flair_id"):
-                kwargs["flair_id"] = rd["flair_id"]
 
     if not platforms:
         print("❌ 沒有可上傳的平台（必填欄位未填）", file=sys.stderr)
@@ -255,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument("--platforms", nargs="+",
                         default=["youtube", "instagram"],
                         choices=["youtube","instagram","tiktok","facebook",
-                                 "threads","linkedin","x","pinterest","bluesky","reddit"],
+                                 "threads","x"],
                         help="目標平台（預設：youtube instagram）")
     parser.add_argument("--dry-run", action="store_true",
                         help="只顯示預覽，不實際上傳")

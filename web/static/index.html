@@ -379,7 +379,7 @@
             <template x-for="[id, icon, label, desc] in [
               ['tech',          '🔬', '科技',   '腳本 80-110 字 · 先說結論 · 自動發 YT+TT+X'],
               ['entertainment', '🎭', '娛樂',   '腳本 30-50 字 · 情緒衝擊 · 自動發 TT+IG+FB'],
-              ['finance',       '💰', '財經',   '腳本 80-110 字 · 數字衝擊 · 自動發 YT+X+LinkedIn'],
+              ['finance',       '💰', '財經',   '腳本 80-110 字 · 數字衝擊 · 自動發 YT+X'],
               ['pet',           '🤖', 'AI寵物', '腳本 40-60 字 · 可愛互動 · 自動發 TT+IG+FB']
             ]" :key="id">
               <button type="button" @click="if (strategy !== id) { strategy=id; applyStrategyPlatforms() }"
@@ -637,7 +637,7 @@
             <span x-text="({
               tech:          '🔬 科技 · 腳本 80-110 字 · 預設發 YouTube+TikTok+X',
               entertainment: '🎭 娛樂 · 腳本 30-50 字 · 預設發 TikTok+IG+Facebook',
-              finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X+LinkedIn',
+              finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X',
               pet:           '🤖 AI寵物 · 腳本 40-60 字 · 預設發 TikTok+IG+Facebook'
             })[strategy] || '預設策略'"></span>
             <span class="text-gray-400">(生成時決定，完成後無法更改)</span>
@@ -1169,7 +1169,7 @@
           <span x-text="({
             tech:          '🔬 科技 · 腳本 80-110 字 · 預設發 YouTube+TikTok+X',
             entertainment: '🎭 娛樂 · 腳本 30-50 字 · 預設發 TikTok+IG+Facebook',
-            finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X+LinkedIn',
+            finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X',
             pet:           '🤖 AI寵物 · 腳本 40-60 字 · 預設發 TikTok+IG+Facebook'
           })[strategy] || '預設策略'"></span>
           <span class="text-gray-400">(生成時決定，完成後無法更改)</span>
@@ -1436,7 +1436,7 @@
            class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
            id="platform-cards">
 
-        <template x-for="pid in ['youtube','tiktok','instagram','facebook','threads','x','pinterest','reddit']" :key="pid">
+        <template x-for="pid in ['youtube','tiktok','instagram','facebook','threads','x']" :key="pid">
           <div class="relative rounded-2xl overflow-hidden shadow-lg border border-gray-200"
                :class="_PLATFORM_STYLE[pid].bg + ' ' + _PLATFORM_STYLE[pid].text">
 
@@ -1828,6 +1828,15 @@
         <!-- ═══ Facebook advanced ═══ -->
         <template x-if="editingPlatform === 'facebook'">
           <div class="space-y-3">
+            <div>
+              <label class="text-xs font-medium text-gray-500 block mb-1">
+                粉絲團 ID <span class="text-red-500">*必填</span>
+              </label>
+              <input type="text" x-model="platformMeta.facebook.facebook_page_id"
+                placeholder="例如 123456789012345"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm font-mono">
+              <p class="text-[10px] text-gray-400 mt-1">不填會上傳到個人塗鴉牆。粉絲團 ID 在 FB 粉絲團 → 關於 → 頁面透明度可取得</p>
+            </div>
             <div class="grid grid-cols-2 gap-3">
               <div>
                 <label class="text-xs font-medium text-gray-500 block mb-1">媒體類型</label>
@@ -1857,53 +1866,6 @@
               <label class="text-xs font-medium text-gray-500 block mb-1">主題標籤（單一，1-50 字，不含 . &amp; 符號）</label>
               <input type="text" x-model="platformMeta.threads.threads_topic_tag"
                 placeholder="AI"
-                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-            </div>
-          </div>
-        </template>
-
-        <!-- ═══ Pinterest advanced — board_id REQUIRED ═══ -->
-        <template x-if="editingPlatform === 'pinterest'">
-          <div class="space-y-3">
-            <div>
-              <label class="text-xs font-medium text-gray-500 block mb-1">
-                Board ID <span class="text-red-500">*必填</span>
-              </label>
-              <input type="text" x-model="platformMeta.pinterest.pinterest_board_id"
-                placeholder="e.g. 1234567890123456789"
-                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-              <p class="text-[10px] text-gray-400 mt-1">Pinterest 規定必須指定 board — 從你的 Pinterest 網址取得</p>
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500 block mb-1">導流連結（選填）</label>
-              <input type="url" x-model="platformMeta.pinterest.pinterest_link"
-                placeholder="https://your-site.com/article"
-                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500 block mb-1">Alt 文字（無障礙）</label>
-              <input type="text" x-model="platformMeta.pinterest.pinterest_alt_text"
-                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-            </div>
-          </div>
-        </template>
-
-        <!-- ═══ Reddit advanced — subreddit REQUIRED ═══ -->
-        <template x-if="editingPlatform === 'reddit'">
-          <div class="space-y-3">
-            <div>
-              <label class="text-xs font-medium text-gray-500 block mb-1">
-                Subreddit <span class="text-red-500">*必填</span>
-              </label>
-              <input type="text" x-model="platformMeta.reddit.subreddit"
-                placeholder="r/ 後面的部分，例如 technology"
-                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-              <p class="text-[10px] text-gray-400 mt-1">必須指定發文版，且你必須符合該版規則（9:1 比例不違規）</p>
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500 block mb-1">Flair ID（選填）</label>
-              <input type="text" x-model="platformMeta.reddit.flair_id"
-                placeholder="從該版取得"
                 class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
             </div>
           </div>
@@ -2676,7 +2638,7 @@ function app() {
     _STRATEGY_PLATFORMS: {
       tech:          ['youtube', 'tiktok', 'x'],
       entertainment: ['tiktok', 'instagram', 'facebook'],
-      finance:       ['youtube', 'x', 'linkedin'],
+      finance:       ['youtube', 'x'],
       pet:           ['tiktok', 'instagram', 'facebook'],
     },
 
@@ -2689,8 +2651,6 @@ function app() {
       facebook:  { weekday: ['13:00', '16:00'], note: '午後 13-16 最佳' },
       threads:   { weekday: ['12:00', '19:00'], note: '同 IG 節奏' },
       x:         { weekday: ['09:00', '17:00'], note: '早晨 9-10 / 下午 17-18 最佳' },
-      pinterest: { weekday: ['20:00', '23:00'], note: '週末晚間最佳' },
-      reddit:    { weekday: ['06:00', '09:00'], note: '清晨 6-9 EST 最活躍' },
     },
 
     _EMOTION_CHIP: {
@@ -2723,8 +2683,6 @@ function app() {
       facebook:  { bg: 'bg-[#18191A]',           text: 'text-white',    accent: '#1877F2', name: 'Facebook Reels', logo: 'fb' },
       threads:   { bg: 'bg-black',               text: 'text-white',    accent: '#ffffff', name: 'Threads',        logo: 'th' },
       x:         { bg: 'bg-black',               text: 'text-white',    accent: '#1D9BF0', name: 'X (Twitter)',    logo: 'x'  },
-      pinterest: { bg: 'bg-white',               text: 'text-gray-900', accent: '#E60023', name: 'Pinterest',      logo: 'pn' },
-      reddit:    { bg: 'bg-[#FF4500]',           text: 'text-white',    accent: '#ffffff', name: 'Reddit',         logo: 'rd' },
     },
 
     applyStrategyPlatforms() {
@@ -3127,10 +3085,10 @@ function app() {
         const pm = await this.api('GET', `/api/jobs/${jobId}/platform_meta`)
         // Defensive: ensure all 8 platform keys exist so modal x-model bindings never hit undefined.title
         const DEFAULT_VERSION = {
-          youtube: 'long', x: 'long', pinterest: 'long', linkedin: 'long', reddit: 'long',
+          youtube: 'long', x: 'long',
           tiktok: 'short', instagram: 'short', facebook: 'short', threads: 'short',
         }
-        for (const p of ['youtube','tiktok','instagram','facebook','threads','x','pinterest','reddit']) {
+        for (const p of ['youtube','tiktok','instagram','facebook','threads','x']) {
           if (!pm[p]) pm[p] = { title: '' }
           if (!pm[p].video_version) pm[p].video_version = DEFAULT_VERSION[p] || 'long'
         }

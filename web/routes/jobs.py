@@ -360,6 +360,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "description":           f"{long_desc}\n\n{hashtags}",
             "facebook_media_type":   "REELS",
             "video_state":           "PUBLISHED",
+            "facebook_page_id":      "",
         },
         "threads": {
             "video_version":         "short",
@@ -373,20 +374,6 @@ def _seed_platform_meta(news: dict) -> dict:
             "poll_duration":         1440,
             "reply_settings":        "everyone",
             "x_long_text_as_post":   False,
-        },
-        "pinterest": {
-            "video_version":         "long",
-            "title":                 main_title,
-            "description":           f"{long_desc}\n\n{hashtags}",
-            "pinterest_board_id":    "",
-            "pinterest_link":        "",
-            "pinterest_alt_text":    main_title,
-        },
-        "reddit": {
-            "video_version":         "long",
-            "title":                 main_title,
-            "subreddit":             "",
-            "flair_id":              "",
         },
         "_schedule": {
             "mode":                  "now",
