@@ -47,6 +47,7 @@ def build_props() -> dict:
 
 
 def render(props: dict, output: Path):
+    output.unlink(missing_ok=True)
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", delete=False, encoding="utf-8"
