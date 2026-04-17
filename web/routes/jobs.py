@@ -432,6 +432,34 @@ def put_platform_meta(job_id: int, body: PlatformMetaUpdate):
     return {"ok": True}
 
 
+class LayoutModeUpdate(BaseModel):
+    layout_mode: str   # "visual" | "text"
+
+
+@router.patch("/jobs/{job_id}/layout_mode")
+def patch_layout_mode(job_id: int, body: LayoutModeUpdate):
+    """Update layout_mode in news.json (atomic write). Values: visual | text."""
+    if body.layout_mode not in ("visual", "text"):
+        raise HTTPException(400, "layout_mode must be 'visual' or 'text'")
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+    news_file = pipe_dir / "news.json"
+    if not news_file.exists():
+        raise HTTPException(400, "news.json not found")
+
+    data = _json.loads(news_file.read_text(encoding="utf-8"))
+    data["layout_mode"] = body.layout_mode
+
+    tmp = news_file.with_suffix(".json.tmp")
+    tmp.write_text(_json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, news_file)
+    return {"ok": True, "layout_mode": body.layout_mode}
+
+
 class ReplaceItemRequest(BaseModel):
     cache_id: int
     mark_old_blocked: bool = True   # 是否標記被替換的 URL 為截圖封鎖
