@@ -784,11 +784,9 @@
 
             <div class="flex gap-3 items-center">
               <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
-                @click="uploadJob()"
-                :disabled="!uploadKeySet || uploadPlatforms.size === 0"
-                :class="(!uploadKeySet || uploadPlatforms.size === 0) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
-                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
-                上傳到 <span x-text="uploadPlatforms.size"></span> 個平台
+                @click="openUploadPreview()"
+                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
+                🎬 前往上傳預覽
               </button>
               <span x-show="currentJob?.step_upload==='uploading'"
                 class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium">
@@ -1128,9 +1126,9 @@
         </div>
         <div class="flex gap-3">
           <button x-show="currentJob?.step_upload !== 'done' && currentJob?.step_upload !== 'uploading'"
-            @click="uploadJob()"
+            @click="openUploadPreview()"
             class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 text-white transition-all glow-sm">
-            上傳到平台
+            🎬 前往上傳預覽
           </button>
           <span x-show="currentJob?.step_upload==='uploading'"
             class="inline-flex items-center gap-2 text-sm text-amber-600 font-medium py-2.5">
@@ -1162,6 +1160,51 @@
       </div>
 
     </div><!-- /page=job -->
+
+    <!-- ── Upload Preview ─────────────────────────────────────────── -->
+    <div x-show="page==='upload'" class="p-8 max-w-6xl mx-auto space-y-6">
+      <div class="flex items-center gap-3">
+        <button @click="page='job'" class="text-sm text-gray-400 hover:text-gray-600 transition-colors flex items-center gap-1">
+          ← 返回
+        </button>
+        <div class="h-4 w-px bg-gray-200"></div>
+        <h1 class="text-xl font-bold text-gray-900">
+          📤 上傳預覽 — Job #<span x-text="currentJob?.id ?? '...'"></span>
+        </h1>
+      </div>
+
+      <!-- Loading state -->
+      <div x-show="platformMetaLoading" class="glass rounded-2xl p-12 text-center">
+        <div class="w-10 h-10 rounded-full border-2 border-green-500 border-t-transparent animate-spin mx-auto mb-4"></div>
+        <p class="text-sm text-gray-500">載入中…</p>
+      </div>
+
+      <!-- Platform cards grid (filled in Task 5) -->
+      <div x-show="!platformMetaLoading && platformMeta" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+           id="platform-cards">
+        <!-- Cards will render here (Task 5) -->
+      </div>
+
+      <!-- Action bar -->
+      <div x-show="!platformMetaLoading && platformMeta" class="glass rounded-2xl p-5 flex items-center justify-between sticky bottom-4">
+        <div class="text-xs text-gray-500">
+          將上傳到 <span x-text="uploadPlatforms.size"></span> 個平台
+        </div>
+        <div class="flex gap-3">
+          <button @click="savePlatformMeta()"
+            class="px-4 py-2 rounded-xl text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 transition-all">
+            💾 儲存草稿
+          </button>
+          <button @click="savePlatformMeta().then(() => uploadJob())"
+            :disabled="uploadPlatforms.size === 0 || !uploadKeySet"
+            :class="(uploadPlatforms.size === 0 || !uploadKeySet) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+            class="px-5 py-2 rounded-xl text-sm font-semibold bg-green-600 text-white transition-all glow-sm">
+            🚀 全部上傳
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- /page=upload -->
 
     <!-- ── Accounts ───────────────────────────────────────────────────── -->
     <div x-show="page==='accounts'" class="p-8 max-w-4xl mx-auto space-y-6">
@@ -1549,6 +1592,11 @@ function app() {
     uploadKeySet: false,
     youtubeKeySet: false,
     uploadPlatforms: new Set(['youtube','tiktok','instagram']),
+
+    // Upload preview page state
+    platformMeta: null,          // {youtube:{...}, tiktok:{...}, ...}
+    platformMetaLoading: false,
+    editingPlatform: null,       // 'youtube' | 'tiktok' | ... | null (modal open for this platform)
 
     // Accounts page state
     accountsApi: null,
@@ -2164,6 +2212,35 @@ function app() {
         this.subscribeSSE(this.currentJob.id)
         this.showToast('繼續生成語音與影片…')
       } catch (e) { this.showToast('繼續失敗：' + e.message) }
+    },
+
+    async loadPlatformMeta(jobId) {
+      this.platformMetaLoading = true
+      try {
+        this.platformMeta = await this.api('GET', `/api/jobs/${jobId}/platform_meta`)
+      } catch (e) {
+        this.showToast('載入平台設定失敗：' + e.message)
+        this.platformMeta = null
+      } finally {
+        this.platformMetaLoading = false
+      }
+    },
+
+    async savePlatformMeta() {
+      if (!this.platformMeta || !this.currentJob) return
+      try {
+        await this.api('PUT', `/api/jobs/${this.currentJob.id}/platform_meta`,
+                       { platform_meta: this.platformMeta })
+        this.showToast('已儲存')
+      } catch (e) {
+        this.showToast('儲存失敗：' + e.message)
+      }
+    },
+
+    openUploadPreview() {
+      if (!this.currentJob) return
+      this.page = 'upload'
+      this.loadPlatformMeta(this.currentJob.id)
     },
 
     platformIcon(p) {
