@@ -70,8 +70,11 @@ def _download(url: str, out: Path, referer: str) -> bool:
         with urlopen(req, timeout=30) as r:
             out.write_bytes(r.read())
         return True
-    except (HTTPError, URLError) as e:
-        print(f"    ❌ download failed: {e}", file=sys.stderr)
+    except Exception as e:   # HTTPError, URLError, TimeoutError, etc — never let one bad CDN kill the loop
+        print(f"    ❌ download failed: {type(e).__name__}: {e}", file=sys.stderr)
+        # Clean up partial file if it got created
+        if out.exists() and out.stat().st_size < 1024:
+            out.unlink(missing_ok=True)
         return False
 
 
@@ -100,11 +103,26 @@ def main():
                     help="Max commercial tracks to download (default 10)")
     ap.add_argument("--region", default=None,
                     help="Country code (US, TW, JP, ...). Default: TikTok picks")
+    ap.add_argument("--genre", default=None,
+                    help="Filter commercial tracks by genre (case-insensitive substring, e.g. 'Electronic', 'Hip Hop'). Multiple: comma-separated.")
+    ap.add_argument("--mood", default=None,
+                    help="Filter commercial tracks by mood (e.g. 'Dynamic', 'Happy'). Multiple: comma-separated.")
     ap.add_argument("--no-download", action="store_true",
                     help="Write trends.json only, skip MP3 downloads")
     ap.add_argument("--clean", action="store_true",
                     help="Wipe assets/music/hot/ before downloading")
     args = ap.parse_args()
+
+    def _match_filter(track: dict) -> bool:
+        if args.genre:
+            wanted = [g.strip().lower() for g in args.genre.split(",")]
+            if not any(g in (track.get("genre") or "").lower() for g in wanted):
+                return False
+        if args.mood:
+            wanted = [m.strip().lower() for m in args.mood.split(",")]
+            if not any(m in (track.get("mood") or "").lower() for m in wanted):
+                return False
+        return True
 
     if args.clean and HOT_DIR.exists():
         for child in HOT_DIR.iterdir():
@@ -173,10 +191,14 @@ def main():
     if args.no_download:
         return
 
-    # Download Commercial Library tracks (top N)
+    # Download Commercial Library tracks (top N, optionally filtered by genre/mood)
     com_dir = HOT_DIR / "commercial"
     com_dir.mkdir(exist_ok=True)
-    to_dl = commercial["tracks"][:args.count]
+    filtered = [t for t in commercial["tracks"] if _match_filter(t)]
+    if args.genre or args.mood:
+        filt_desc = f"genre={args.genre or '*'} mood={args.mood or '*'}"
+        print(f"   filter matched {len(filtered)}/{len(commercial['tracks'])}  ({filt_desc})")
+    to_dl = filtered[:args.count]
     print(f"\n⬇️  downloading {len(to_dl)} Commercial Library tracks → {com_dir.relative_to(REPO_ROOT)}/")
     ok = 0
     for i, t in enumerate(to_dl, 1):
