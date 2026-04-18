@@ -229,21 +229,36 @@ class TelegramBot:
         if not job:
             _send(self.token, chat, "🎉 完成！（找不到輸出路徑）")
             return
-        mp4 = Path(job.get("output_path") or "")
-        if not mp4.exists():
+
+        # Resolve candidate MP4s: legacy single-file OR dual-version long/short.
+        job_dir = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}"
+        candidates: list[tuple[str, Path]] = []
+        legacy = Path(job.get("output_path") or "")
+        if legacy.exists():
+            candidates.append(("", legacy))
+        for v in ("long", "short"):
+            vp = job_dir / v / "output.mp4"
+            if vp.exists():
+                candidates.append((v, vp))
+
+        if not candidates:
             _send(self.token, chat, f"🎉 Pipeline 完成！\n找不到 MP4，請至 Web UI 下載。")
             return
-        size_mb = mp4.stat().st_size / 1024 / 1024
-        if size_mb > 50:
-            _send(self.token, chat,
-                  f"🎉 影片完成！檔案 {size_mb:.1f} MB 超過 Telegram 限制，請至 Web UI 下載。\n"
-                  f"路徑：<code>{mp4}</code>")
-            return
-        _send(self.token, chat, f"🎉 影片完成！({size_mb:.1f} MB) 傳送中…")
-        result = _send_file(self.token, chat, mp4, caption=f"AutoVideo #{job_id}")
-        if not result.get("ok"):
-            _send(self.token, chat,
-                  f"⚠️ 傳送失敗：{result.get('description','')}\n請至 Web UI 下載。")
+
+        for label, mp4 in candidates:
+            tag = f"（{label} 版）" if label else ""
+            size_mb = mp4.stat().st_size / 1024 / 1024
+            if size_mb > 50:
+                _send(self.token, chat,
+                      f"🎉 影片{tag} 完成！檔案 {size_mb:.1f} MB 超過 Telegram 上限，請至 Web UI 下載。\n"
+                      f"路徑：<code>{mp4}</code>")
+                continue
+            _send(self.token, chat, f"🎉 影片{tag} 完成！({size_mb:.1f} MB) 傳送中…")
+            result = _send_file(self.token, chat, mp4,
+                                caption=f"AutoVideo #{job_id}{tag}")
+            if not result.get("ok"):
+                _send(self.token, chat,
+                      f"⚠️ {tag} 傳送失敗：{result.get('description','')}\n請至 Web UI 下載。")
 
     # ── Command handlers ──────────────────────────────────────────────────────
 
