@@ -343,10 +343,12 @@ def _seed_platform_meta(news: dict) -> dict:
     main_title = " | ".join(t for t in titles if t)[:100]
     long_desc  = "\n\n".join(f"【{h}】{s}" for h, s in zip(hooks, scripts) if s)
 
-    # Hashtag set follows the content strategy (tech/entertainment/finance/pet/generic)
-    strategy = (news.get("strategy") or "tech").lower()
-    hashtags    = _HASHTAGS_BY_STRATEGY.get(strategy,    _HASHTAGS_BY_STRATEGY["tech"])
-    yt_tags_csv = _YOUTUBE_TAGS_BY_STRATEGY.get(strategy, _YOUTUBE_TAGS_BY_STRATEGY["tech"])
+    # Hashtag / FB page routing by content strategy.
+    # Empty strategy (plain news mode, no explicit tag) routes to 'generic' → Mascot page,
+    # per user directive '時事跟娛樂發到 Mascot 粉絲團；科技才發到雙層甜甜圈'.
+    strategy = (news.get("strategy") or "generic").lower()
+    hashtags    = _HASHTAGS_BY_STRATEGY.get(strategy,    _HASHTAGS_BY_STRATEGY["generic"])
+    yt_tags_csv = _YOUTUBE_TAGS_BY_STRATEGY.get(strategy, _YOUTUBE_TAGS_BY_STRATEGY["generic"])
     fb_page_id  = _FB_PAGE_BY_STRATEGY.get(strategy,     FACEBOOK_PAGE_ID_DEFAULT)
 
     return {
