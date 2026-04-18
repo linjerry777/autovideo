@@ -294,7 +294,6 @@ class TelegramBot:
         from web import job_runner
         from web.db import create_job, get_setting
         from web.routes.news import _fetch_youtube_trending
-        from web.claude_client import enrich_trending_items
         from datetime import date
 
         if job_runner.is_running():
@@ -317,16 +316,9 @@ class TelegramBot:
             return
 
         first = raw_items[0]
-        _send(self.token, chat, f"🎯 選到：{first['title'][:60]}\n🤖 Claude 生腳本中…")
-        try:
-            items = enrich_trending_items([first])
-        except Exception as e:
-            _send(self.token, chat, f"❌ Claude 生腳本失敗：{e}")
-            return
-        if not items:
-            _send(self.token, chat, "❌ Claude 回傳空結果")
-            return
-
+        # Raw YouTube-trending item has 'source'/'title'/'summary'/'url' — pipeline's
+        # enrich_news_items(strategy=...) consumes it directly. Do NOT pre-enrich via
+        # enrich_trending_items here: pipeline would then re-enrich and KeyError on 'source'.
         today     = date.today().isoformat()
         platforms = get_setting("platforms", "youtube,instagram").split(",")
         dry_run   = get_setting("dry_run", "false").lower() == "true"
@@ -340,15 +332,15 @@ class TelegramBot:
             topic=None,
             platforms=platforms,
             dry_run=dry_run,
-            pre_news=items,         # pre-enriched, skips Claude re-run in pipeline
+            pre_news=[first],       # raw YouTube item; pipeline's Claude enrich handles rest
             strategy=strategy,
         )
         if ok:
             _send(self.token, chat,
-                  f"🚀 Job #{job_id} 啟動\n"
-                  f"策略：{strategy}\n"
-                  f"標題：{first['title'][:60]}\n"
-                  f"進度 / 審核暫停點都會自動推播…")
+                  f"🎯 選到：{first['title'][:60]}\n"
+                  f"🚀 Job #{job_id} 啟動，策略 {strategy}\n"
+                  f"🤖 Claude 生腳本 + 截圖 + 語音 + 影片合成中…\n"
+                  f"進度 / 審核暫停點都會自動推播")
         else:
             _send(self.token, chat, "❌ 啟動失敗")
             self._job_chat = None
