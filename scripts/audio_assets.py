@@ -24,11 +24,19 @@ SFX_ROOT   = REPO_ROOT / "assets" / "sfx"
 KNOWN_EMOTIONS = {"surprise", "fear", "joy", "curiosity", "anger"}
 
 
-def _pick_random(folder: Path) -> Path | None:
-    """Return a random .mp3 from folder (recursive=False), or None."""
+_AUDIO_EXTS = {".mp3", ".m4a", ".aac", ".wav", ".ogg"}
+
+
+def _pick_random(folder: Path, recursive: bool = False) -> Path | None:
+    """Return a random audio file from folder, or None.
+
+    Default is non-recursive. Pass recursive=True to walk subdirs (used by hot/
+    which has nested commercial/ and popular/ subfolders from tiktok_music_fetcher).
+    """
     if not folder.exists() or not folder.is_dir():
         return None
-    candidates = [p for p in folder.iterdir() if p.suffix.lower() == ".mp3" and p.is_file()]
+    iterator = folder.rglob("*") if recursive else folder.iterdir()
+    candidates = [p for p in iterator if p.suffix.lower() in _AUDIO_EXTS and p.is_file()]
     if not candidates:
         return None
     return random.choice(candidates)
@@ -43,7 +51,7 @@ def pick_bgm(emotion: str | None) -> Path | None:
     trending tracks (e.g., from fb_music_trends.py). Drop an .mp3 there and
     every new job picks from hot/ instead of emotion-keyed folders.
     """
-    hot = _pick_random(MUSIC_ROOT / "hot")
+    hot = _pick_random(MUSIC_ROOT / "hot", recursive=True)
     if hot:
         return hot
 
