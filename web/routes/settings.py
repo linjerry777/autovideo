@@ -42,6 +42,7 @@ class SettingsUpdate(BaseModel):
     trending_profile_tech:          str | None = None
     trending_profile_entertainment: str | None = None
     trending_profile_finance:       str | None = None
+    trending_profile_pet:           str | None = None
 
 
 @router.get("/settings")
