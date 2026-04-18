@@ -166,6 +166,7 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
 
         items_out.append({
             "hook":         item.get("hook", "AI 快訊"),
+            "stat_badge":   item.get("stat_badge") or "",
             "title":        item.get("title", ""),
             "script":       (
                 item.get("script_short") if VERSION == "short"

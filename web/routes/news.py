@@ -339,6 +339,10 @@ def _fetch_youtube_trending(keyword: str = None, region: str = "TW", limit: int 
                 "url":         f"https://www.youtube.com/watch?v={vid}",
                 "source":      f"YouTube Trending · {region}",
                 "source_type": f"youtube_{region.lower()}",
+                # Raw stats preserved so claude_client.enrich_trending_items can derive stat_badge
+                "view_count":    views,
+                "comment_count": comments,
+                "channel":       channel,
             })
         if len(items) < 5 and keyword:
             return _fetch_youtube_trending(None, region, limit)

@@ -38,6 +38,37 @@ VIEWPORT_H    = 800
 UNSPLASH_KEY  = os.getenv("UNSPLASH_KEY", "")
 
 
+YT_ID_RE = None   # lazy-compiled
+
+
+def _youtube_thumbnail(url: str, out_path: Path) -> tuple[bool, str]:
+    """If url is a YouTube video, fetch its thumbnail directly (skip Playwright).
+
+    Returns (ok, label). Tries maxres → hqdefault → mq. YouTube guarantees hqdefault exists.
+    """
+    global YT_ID_RE
+    if not YT_ID_RE:
+        import re as _re
+        YT_ID_RE = _re.compile(
+            r"(?:youtube\.com/(?:watch\?.*?v=|shorts/|embed/|v/)|youtu\.be/)([A-Za-z0-9_-]{11})"
+        )
+    m = YT_ID_RE.search(url or "")
+    if not m:
+        return (False, "")
+    vid = m.group(1)
+    for variant in ("maxresdefault.jpg", "hqdefault.jpg", "mqdefault.jpg"):
+        thumb_url = f"https://img.youtube.com/vi/{vid}/{variant}"
+        try:
+            r = requests.get(thumb_url, timeout=10)
+            # YouTube returns a grey placeholder for missing maxres — check size
+            if r.ok and len(r.content) > 5_000:
+                out_path.write_bytes(r.content)
+                return (True, f"youtube-thumb:{variant}")
+        except Exception:
+            continue
+    return (False, "")
+
+
 def _unsplash_fallback(query: str, out_path: Path) -> bool:
     """用 Unsplash 搜尋關鍵字，下載第一張圖片。成功回傳 True。"""
     if not UNSPLASH_KEY:
@@ -102,6 +133,14 @@ def main():
                     print(f"  [{i}] 解析後 URL：{url[:80]}...")
                 except Exception:
                     url = raw_url  # 解析失敗就用原始 URL
+
+            # ── 方法 -1：YouTube 連結直接抓 thumbnail（跳過 Playwright，無 UI chrome）──
+            if url:
+                yt_ok, yt_source = _youtube_thumbnail(url, shot_path)
+                if yt_ok:
+                    size_kb = shot_path.stat().st_size // 1024
+                    print(f"  [{i}] ✅ {yt_source} ({size_kb}KB)")
+                    continue
 
             # ── 方法 0：OG image（最快、最高品質、最不怕反爬）─────────
             if url:

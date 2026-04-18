@@ -53,6 +53,7 @@ export interface NewsItem {
   title: string;
   script: string;
   source: string;
+  stat_badge?: string;           // optional trending-style big number overlay (e.g. "2,000,000 觀看")
   scene_type?: SceneType;        // 原始文字（可編輯）
   scene_recipe?: SceneRecipe | null;   // LLM-resolved 結構
   screenshot: string;

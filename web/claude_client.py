@@ -153,8 +153,18 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
     format: top5 | explainer | reaction | story
     category: tech | entertainment | finance
     """
+    def _fmt_stats(it: dict) -> str:
+        """Raw stats become a hint line so Claude can write a punchy stat_badge."""
+        parts = []
+        v = it.get("view_count")
+        if v: parts.append(f"view_count={v}")
+        c = it.get("comment_count")
+        if c: parts.append(f"comment_count={c}")
+        return f"   stats: {', '.join(parts)}" if parts else ""
+
     lines = "\n".join([
         f"{i+1}. [{it.get('source','')}] {it['title']}\n   URL: {it.get('url','')}\n   {it.get('summary','')[:120]}"
+        + (("\n" + _fmt_stats(it)) if _fmt_stats(it) else "")
         for i, it in enumerate(raw_items)
     ])
 
@@ -188,12 +198,18 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
   "virality_score": 1-10 整數,
   "virality_reason": "一句話說明分數理由",
   "emotion": "surprise | anger | joy | curiosity | fear 擇一",
+  "stat_badge": "從 stats 或 title 抽出最衝擊的數字當 overlay（例：'2,000,000 觀看'、'+500%'、'破億播放'、'24小時榜首'）。沒可用數字就留空字串。",
   "account_suggestion": "科技帳號 | 娛樂帳號 | 財經帳號 擇一",
   "source_url": "原始 URL",
   "source_name": "來源名稱"
 }}
 
 hook_variants 必須恰好 3 個不同風格：懸念式 / 打臉式 / 提問式。
+
+stat_badge 必須是**短且視覺強**的 overlay 字串（<12 字），會被放大在影片中間。
+- 若提示的 stats 有 view_count，格式化為「X萬觀看」或「X百萬觀看」（中文讀數優先）
+- 若 title 本身含「兩百萬人朝聖」這種修辭數字，直接採用
+- 找不到就填 ""，前端會隱藏 badge
 
 script_short 和 script_long 必須是**獨立重寫**的兩份腳本，不是 Long 的截斷版。
 Short 適合 TikTok/IG/FB/Threads（節奏快、1 句關鍵）；

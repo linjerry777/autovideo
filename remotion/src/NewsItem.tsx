@@ -257,6 +257,46 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
         </span>
       </div>
 
+      {/* Stat badge — big pulsing number overlay (trending-style) */}
+      {item.stat_badge && (
+        <div
+          style={{
+            position: "absolute",
+            top: 570,
+            left: 0,
+            right: 0,
+            display: "flex",
+            justifyContent: "center",
+            opacity: interpolate(localFrame, [12, 22], [0, 1], {
+              extrapolateLeft: "clamp",
+              extrapolateRight: "clamp",
+            }),
+            transform: `scale(${1 + Math.sin((localFrame / fps) * 2.2) * 0.03})`,
+            zIndex: 14,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: FONT_CJK,
+              fontSize: 92,
+              fontWeight: 900,
+              padding: "18px 56px",
+              borderRadius: 999,
+              background: `linear-gradient(135deg, ${palette.accent} 0%, #ffffff 50%, ${palette.accent} 100%)`,
+              backgroundSize: "200% 100%",
+              backgroundPosition: `${(localFrame / fps) * 100 % 200}% 50%`,
+              color: "#000",
+              letterSpacing: 2,
+              boxShadow: `0 20px 60px rgba(0,0,0,0.7), 0 0 40px ${palette.glow}`,
+              border: "4px solid #fff",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.stat_badge}
+          </div>
+        </div>
+      )}
+
       {/* Info card */}
       <div
         style={{
