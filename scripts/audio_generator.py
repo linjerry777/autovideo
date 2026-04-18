@@ -100,6 +100,7 @@ def concat_mp3(src_files: list[Path], out: Path):
 LEADING_SILENCE_S = 0.3   # silence before SFX (gives breathing room)
 SFX_BGM_GAP_S     = 0.2   # silence between SFX and voice
 SFX_MAX_DUR_S     = 2.0   # hard cap — if user drops a full song in sfx/hook/, only first 2s used
+SFX_VOLUME_DB     = -9    # SFX attenuation; -9dB ≈ half loudness so it punches but doesn't overwhelm voice
 BGM_DUCK_DB       = -12   # how much BGM dips when voice plays
 BGM_BASE_DB       = -18   # BGM resting volume under voice
 
@@ -167,9 +168,9 @@ def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
     filter_parts: list[str] = []
 
     if hook_sfx:
-        # Silence(0.3s) + sfx(trimmed to SFX_MAX_DUR_S) + silence(0.2s) + voice → [vfull]
+        # Silence(0.3s) + sfx(trimmed + attenuated) + silence(0.2s) + voice → [vfull]
         filter_parts.append(
-            f"[{sfx_idx}:a]atrim=0:{sfx_dur},asetpts=PTS-STARTPTS[sfxtrim];"
+            f"[{sfx_idx}:a]atrim=0:{sfx_dur},asetpts=PTS-STARTPTS,volume={SFX_VOLUME_DB}dB[sfxtrim];"
             f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={LEADING_SILENCE_S}[s1];"
             f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={SFX_BGM_GAP_S}[s2];"
             f"[s1][sfxtrim][s2][{voice_idx}:a]concat=n=4:v=0:a=1[vfull]"
