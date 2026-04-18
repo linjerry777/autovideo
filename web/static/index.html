@@ -3051,6 +3051,15 @@ function app() {
     async saveEditor() {
       if (!this.editorInstance) return
       try {
+        // Safety net: if user dragged a crop rect but forgot to press Apply,
+        // commit it now before toDataURL (otherwise crop is dropped silently).
+        try {
+          const rect = this.editorInstance.getCropzoneRect?.()
+          if (rect && rect.width > 0 && rect.height > 0) {
+            await this.editorInstance.crop(rect)
+          }
+        } catch (e) { console.warn('auto-apply crop skipped:', e) }
+
         const dataUrl = this.editorInstance.toDataURL({ format: 'png' })
         const res = await this.api('POST',
           `/api/jobs/${this.currentJob.id}/screenshots/${this.editorShotIndex}/upload`,
