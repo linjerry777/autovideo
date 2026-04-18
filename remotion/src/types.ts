@@ -69,4 +69,6 @@ export interface NewsVideoProps extends Record<string, unknown> {
   items: NewsItem[];
   /** Visual = image full-bleed bg; Text = gradient + orbs. Defaults to "visual" in renderer. */
   layout_mode?: LayoutMode;
+  /** Optional data-URL of assets/brand/mascot.png; renders as bottom-right presenter when set. */
+  mascot?: string;
 }

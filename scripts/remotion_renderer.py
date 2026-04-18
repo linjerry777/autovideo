@@ -187,10 +187,15 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
     if layout_mode not in ("visual", "text"):
         layout_mode = "visual"
 
+    # Optional brand mascot (persistent bottom-right overlay across all items)
+    mascot_path = BASE_DIR / "assets" / "brand" / "mascot.png"
+    mascot_url  = file_to_data_url(mascot_path, "image/png") if mascot_path.exists() else ""
+
     return {
         "date":        TODAY,
         "items":       items_out,
         "layout_mode": layout_mode,
+        "mascot":      mascot_url,
     }
 
 

@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Sequence } from "remotion";
 import { NewsVideoProps } from "./types";
 import { NewsItemComponent } from "./NewsItem";
+import { MascotOverlay } from "./MascotOverlay";
 
 const FPS = 30;
 
@@ -12,7 +13,7 @@ const FPS = 30;
  * A 0.3s crossfade is applied by having each Sequence start 9 frames
  * before the previous one ends (handled via opacity in NewsItemComponent).
  */
-export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visual" }) => {
+export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visual", mascot = "" }) => {
   // Build per-item frame ranges
   const FADE_FRAMES = 9; // 0.3s @ 30fps
 
@@ -47,6 +48,8 @@ export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visu
           />
         </Sequence>
       ))}
+      {/* Persistent mascot presenter — outside sequences so it stays on screen across items */}
+      <MascotOverlay src={mascot} />
     </AbsoluteFill>
   );
 };
