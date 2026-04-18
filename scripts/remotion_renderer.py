@@ -51,8 +51,17 @@ if VERSION:
     AUDIO_DIR = PIPE_DIR / VERSION / "audio"
     OUTPUT    = PIPE_DIR / VERSION / "output.mp4"
 else:
-    AUDIO_DIR = PIPE_DIR / "audio"
-    OUTPUT    = PIPE_DIR / "output.mp4"
+    # Auto-detect: dual-version job has no root /audio/ but has long/audio/ + short/audio/.
+    # Default to 'long' when user forgot --version on a dual-version job (gives helpful log).
+    legacy_audio = PIPE_DIR / "audio"
+    if not legacy_audio.exists() and (PIPE_DIR / "long" / "audio").exists():
+        print(f"[info] dual-version job detected, no --version flag given → defaulting to 'long'", flush=True)
+        VERSION   = "long"
+        AUDIO_DIR = PIPE_DIR / "long" / "audio"
+        OUTPUT    = PIPE_DIR / "long" / "output.mp4"
+    else:
+        AUDIO_DIR = legacy_audio
+        OUTPUT    = PIPE_DIR / "output.mp4"
 
 REMOTION_DIR = Path(os.environ.get("REMOTION_DIR", BASE_DIR / "remotion")).resolve()
 
