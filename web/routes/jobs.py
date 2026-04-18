@@ -320,10 +320,10 @@ _YOUTUBE_TAGS_BY_STRATEGY = {
 # Tech goes to 雙層甜甜圈; everything else (news, entertainment, pet) defaults to Mascot page.
 _FB_PAGE_BY_STRATEGY = {
     "tech":          "1100141579843223",   # 雙層甜甜圈
-    "entertainment": "61569203069316",     # 小狼狽 Mascot
-    "pet":           "61569203069316",     # same Mascot page for now (swap if 奶烙 gets own page)
+    "entertainment": "1012830001921459",   # Doro / Mascot
+    "pet":           "1012830001921459",   # same Mascot page for now (swap if 奶烙 gets own page)
     "finance":       "1100141579843223",   # fallback to tech page (finance strategy dropped)
-    "generic":       "61569203069316",     # generic (news without specific strategy) → Mascot
+    "generic":       "1012830001921459",   # generic (news without specific strategy) → Mascot
 }
 FACEBOOK_PAGE_ID_DEFAULT = _FB_PAGE_BY_STRATEGY["generic"]
 
