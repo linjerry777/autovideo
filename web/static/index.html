@@ -100,6 +100,15 @@
         <span class="font-medium" :class="page==='accounts' ? 'text-green-700' : ''">帳號</span>
       </button>
 
+      <button @click="page='analytics'; loadAnalytics()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='analytics' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='analytics'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <!-- Chart icon -->
+        <svg class="w-[15px] h-[15px] flex-shrink-0" :class="page==='analytics' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6a1 1 0 011-1h1a1 1 0 011 1v13m4 0V10a1 1 0 011-1h1a1 1 0 011 1v9m-9 0V14a1 1 0 00-1-1H5a1 1 0 00-1 1v5m16 0H3"/></svg>
+        <span class="font-medium" :class="page==='analytics' ? 'text-green-700' : ''">流量分析</span>
+      </button>
+
       <button @click="page='settings'; loadSettings()"
         class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
         :class="page==='settings' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
@@ -2071,6 +2080,74 @@
     </div>
 
     <!-- ── Settings ───────────────────────────────────────────────────── -->
+    <!-- ═══════ ANALYTICS PAGE ═══════ -->
+    <div x-show="page==='analytics'" class="p-8 max-w-6xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-900">📊 流量分析</h2>
+          <p class="text-sm text-gray-500 mt-1" x-text="analyticsSummary ? (`${analyticsSummary.total_videos} 支影片 · ${formatNum(analyticsSummary.total_views)} 總觀看`) : '尚未抓取數據'"></p>
+        </div>
+        <button @click="refreshAnalytics()" :disabled="analyticsRefreshing"
+          class="px-4 py-2 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white transition-all">
+          <span x-show="!analyticsRefreshing">🔄 重新抓取（YT + FB）</span>
+          <span x-show="analyticsRefreshing">⏳ 抓取中…</span>
+        </button>
+      </div>
+
+      <div x-show="!analyticsJobs.length && !analyticsLoading" class="glass rounded-2xl p-12 text-center text-gray-500">
+        <p class="text-sm">還沒有分析資料。</p>
+        <p class="text-xs mt-2">前提：job 已 status=done + .env 有 <code>YOUTUBE_API_KEY</code> / <code>YOUTUBE_CHANNEL_ID</code> / <code>META_PAGE_ACCESS_TOKEN</code>。</p>
+        <p class="text-xs mt-1">按右上「重新抓取」觸發 analytics_fetcher.py。</p>
+      </div>
+
+      <template x-for="j in analyticsJobs" :key="j.job_id">
+        <div class="glass rounded-2xl p-5 space-y-3">
+          <div class="flex items-start justify-between gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 text-xs text-gray-500">
+                <span>#<span x-text="j.job_id"></span></span>
+                <span>·</span>
+                <span x-text="j.date"></span>
+                <span>·</span>
+                <span x-text="j.finished_at ? j.finished_at.slice(0,16).replace('T',' ') : ''"></span>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 truncate" x-text="j.topic || '(無主題)'"></p>
+            </div>
+            <div class="flex gap-4 text-right flex-shrink-0">
+              <div>
+                <p class="text-[10px] text-gray-400">總觀看</p>
+                <p class="text-lg font-bold text-green-600" x-text="formatNum(j.total_views)"></p>
+              </div>
+              <div>
+                <p class="text-[10px] text-gray-400">❤️</p>
+                <p class="text-sm font-semibold text-gray-700" x-text="formatNum(j.total_likes)"></p>
+              </div>
+              <div>
+                <p class="text-[10px] text-gray-400">💬</p>
+                <p class="text-sm font-semibold text-gray-700" x-text="formatNum(j.total_comments)"></p>
+              </div>
+            </div>
+          </div>
+          <div x-show="j.platforms.length" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+            <template x-for="p in j.platforms" :key="p.platform">
+              <a :href="p.platform_url" target="_blank" rel="noopener"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs transition-colors">
+                <span x-text="({youtube:'▶️',tiktok:'🎵',instagram:'📷',facebook:'📘',threads:'🧵',x:'✖️'})[p.platform] || '🔗'"></span>
+                <span class="font-medium capitalize" x-text="p.platform"></span>
+                <span class="text-gray-400">·</span>
+                <span><span x-text="formatNum(p.views)"></span> 👁</span>
+                <span class="text-gray-400" x-show="p.likes">·</span>
+                <span x-show="p.likes"><span x-text="formatNum(p.likes)"></span> ❤️</span>
+                <span class="text-gray-400" x-show="p.comments">·</span>
+                <span x-show="p.comments"><span x-text="formatNum(p.comments)"></span> 💬</span>
+              </a>
+            </template>
+          </div>
+          <p x-show="!j.platforms.length" class="text-xs text-gray-400">（尚未抓到任何平台資料 — 可能 YT/FB ID 未綁或 token 過期）</p>
+        </div>
+      </template>
+    </div>
+
     <div x-show="page==='settings'" class="p-8 max-w-xl mx-auto space-y-6">
 
       <!-- Audio Assets Status -->
@@ -2407,6 +2484,49 @@ function app() {
       this.toast = msg
       clearTimeout(this._toastTimer)
       this._toastTimer = setTimeout(() => this.toast = '', 3000)
+    },
+
+    // ── Analytics page ──────────────────────────────────────────
+    analyticsJobs: [],
+    analyticsSummary: null,
+    analyticsLoading: false,
+    analyticsRefreshing: false,
+
+    async loadAnalytics() {
+      this.analyticsLoading = true
+      try {
+        const d = await this.api('GET', '/api/analytics/overview?limit=50')
+        this.analyticsJobs    = d.jobs || []
+        this.analyticsSummary = d.summary || null
+      } catch (e) {
+        this.showToast('分析讀取失敗：' + e.message)
+      } finally {
+        this.analyticsLoading = false
+      }
+    },
+
+    async refreshAnalytics() {
+      this.analyticsRefreshing = true
+      try {
+        await this.api('POST', '/api/analytics/refresh?limit=30')
+        this.showToast('🔄 背景抓取中，20-40 秒後重整')
+        // Poll back after 25s
+        setTimeout(async () => {
+          await this.loadAnalytics()
+          this.analyticsRefreshing = false
+          this.showToast('✅ 分析已更新')
+        }, 25000)
+      } catch (e) {
+        this.analyticsRefreshing = false
+        this.showToast('觸發失敗：' + e.message)
+      }
+    },
+
+    formatNum(n) {
+      n = Number(n) || 0
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+      if (n >= 1000)    return (n / 1000).toFixed(1) + 'K'
+      return String(n)
     },
 
     async api(method, path, body) {

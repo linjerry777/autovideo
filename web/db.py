@@ -70,6 +70,24 @@ def init_db():
                 created_at          TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS video_stats (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id              INTEGER NOT NULL,
+                platform            TEXT NOT NULL,
+                platform_video_id   TEXT,
+                platform_url        TEXT,
+                title               TEXT,
+                thumbnail_url       TEXT,
+                views               INTEGER DEFAULT 0,
+                likes               INTEGER DEFAULT 0,
+                comments            INTEGER DEFAULT 0,
+                shares              INTEGER DEFAULT 0,
+                duration_seconds    INTEGER,
+                first_seen_at       TEXT,
+                fetched_at          TEXT,
+                UNIQUE(job_id, platform)
+            );
+
             INSERT OR IGNORE INTO settings (key, value) VALUES
                 ('schedule_hour',    '8'),
                 ('schedule_minute',  '0'),
@@ -248,3 +266,61 @@ def get_all_settings() -> dict:
     with get_conn() as conn:
         rows = conn.execute("SELECT key, value FROM settings").fetchall()
         return {r[0]: r[1] for r in rows}
+
+
+# ── video_stats helpers ─────────────────────────────────────────────────────
+
+def upsert_video_stat(job_id: int, platform: str, **fields):
+    """Insert or update a single (job_id, platform) row in video_stats.
+    Any of: platform_video_id, platform_url, title, thumbnail_url,
+            views, likes, comments, shares, duration_seconds.
+    """
+    fields["fetched_at"] = _now()
+    with get_conn() as conn:
+        existing = conn.execute(
+            "SELECT id FROM video_stats WHERE job_id=? AND platform=?",
+            (job_id, platform),
+        ).fetchone()
+        if existing:
+            keys = list(fields.keys())
+            sets = ", ".join(f"{k}=?" for k in keys)
+            conn.execute(
+                f"UPDATE video_stats SET {sets} WHERE id=?",
+                [*fields.values(), existing[0]],
+            )
+        else:
+            fields["job_id"]        = job_id
+            fields["platform"]      = platform
+            fields["first_seen_at"] = _now()
+            cols = ", ".join(fields.keys())
+            qs   = ", ".join("?" * len(fields))
+            conn.execute(
+                f"INSERT INTO video_stats ({cols}) VALUES ({qs})",
+                list(fields.values()),
+            )
+
+
+def list_video_stats(limit: int = 100) -> list[dict]:
+    """Return recent video_stats joined with jobs info for analytics page."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT vs.*, j.date AS job_date, j.topic AS job_topic,
+                   j.status AS job_status, j.finished_at AS job_finished_at
+            FROM video_stats vs
+            JOIN jobs j ON j.id = vs.job_id
+            ORDER BY vs.fetched_at DESC
+            LIMIT ?
+            """, (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_job_stats(job_id: int) -> list[dict]:
+    """Return all video_stats rows for a single job, one per platform."""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM video_stats WHERE job_id=? ORDER BY platform",
+            (job_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]

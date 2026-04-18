@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from web.db import init_db, get_setting
 from web import job_runner, scheduler_service
-from web.routes import jobs, events, media, settings, news, accounts, trending
+from web.routes import jobs, events, media, settings, news, accounts, trending, analytics
 
 
 @asynccontextmanager
@@ -60,6 +60,7 @@ app.include_router(settings.router)
 app.include_router(news.router)
 app.include_router(accounts.router)
 app.include_router(trending.router)
+app.include_router(analytics.router)
 
 
 @app.get("/")
