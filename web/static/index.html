@@ -840,19 +840,26 @@
 
         <!-- Done: Video + Upload -->
         <div x-show="currentJob?.status==='done'" class="space-y-4">
-          <div class="glass rounded-2xl overflow-hidden">
+          <div class="glass rounded-2xl overflow-hidden" x-data="{ thumbOk: true }">
             <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-              <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
+              <div class="flex items-center gap-2">
+                <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
+                <span class="text-[10px] text-gray-400">(YouTube 會用這張；TikTok/IG/FB 自動從影片抽)</span>
+              </div>
               <a :href="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                  download="thumbnail.png"
                  class="text-xs text-green-600 hover:text-green-700 border border-green-200 rounded-lg px-3 py-1">
                 下載
               </a>
             </div>
-            <img :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+            <img x-show="thumbOk"
+                 :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                  class="w-full max-h-80 object-contain bg-black"
-                 @error="$event.target.style.display='none'"
+                 @error="thumbOk = false"
                  alt="thumbnail">
+            <div x-show="!thumbOk" class="p-8 text-center text-sm text-gray-500 bg-gray-50">
+              ⚠️ 縮圖載入失敗（後端可能未啟動或檔案不存在）— 點上方「下載」可直接取原檔
+            </div>
           </div>
           <div class="glass rounded-2xl overflow-hidden">
             <template x-if="currentJob?.status==='done'">
@@ -1335,19 +1342,26 @@
 
       <!-- Done -->
       <div x-show="currentJob?.status==='done'" class="space-y-4">
-        <div class="glass rounded-2xl overflow-hidden">
+        <div class="glass rounded-2xl overflow-hidden" x-data="{ thumbOk: true }">
           <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-            <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
+            <div class="flex items-center gap-2">
+              <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
+              <span class="text-[10px] text-gray-400">(YouTube 會用這張；TikTok/IG/FB 自動從影片抽)</span>
+            </div>
             <a :href="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                download="thumbnail.png"
                class="text-xs text-green-600 hover:text-green-700 border border-green-200 rounded-lg px-3 py-1">
               下載
             </a>
           </div>
-          <img :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+          <img x-show="thumbOk"
+               :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                class="w-full max-h-80 object-contain bg-black"
-               @error="$event.target.style.display='none'"
+               @error="thumbOk = false"
                alt="thumbnail">
+          <div x-show="!thumbOk" class="p-8 text-center text-sm text-gray-500 bg-gray-50">
+            ⚠️ 縮圖載入失敗（後端可能未啟動或檔案不存在）— 點上方「下載」可直接取原檔
+          </div>
         </div>
         <div class="glass rounded-2xl overflow-hidden">
           <template x-if="currentJob?.status==='done'">

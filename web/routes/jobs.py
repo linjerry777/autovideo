@@ -300,6 +300,25 @@ def upload_screenshot(job_id: int, n: int, body: UploadScreenshotRequest):
 PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x", "pinterest", "reddit"]
 
 
+_HASHTAGS_BY_STRATEGY = {
+    "tech":          "#AI快訊 #人工智慧 #科技新聞 #AINews #TechNews",
+    "entertainment": "#娛樂 #明星 #藝人 #熱門話題 #八卦",
+    "finance":       "#股市 #投資 #財經 #台股 #理財",
+    "pet":           "#萌寵 #貓狗 #寵物 #可愛動物 #療癒",
+    "generic":       "#每日新聞 #熱門 #話題",
+}
+
+_YOUTUBE_TAGS_BY_STRATEGY = {
+    "tech":          "AI,人工智慧,科技新聞,AINews,TechNews",
+    "entertainment": "娛樂,明星,藝人,熱門,八卦,entertainment",
+    "finance":       "股市,投資,財經,台股,理財,finance",
+    "pet":           "萌寵,貓狗,寵物,可愛,療癒,pet",
+    "generic":       "每日新聞,熱門,話題",
+}
+
+FACEBOOK_PAGE_ID_DEFAULT = "1100141579843223"   # 雙層甜甜圈 — hard-coded per user request
+
+
 def _seed_platform_meta(news: dict) -> dict:
     """Build default per-platform meta from news.json items (option B: shared baseline)."""
     items = news.get("items", [])
@@ -314,14 +333,18 @@ def _seed_platform_meta(news: dict) -> dict:
 
     main_title = " | ".join(t for t in titles if t)[:100]
     long_desc  = "\n\n".join(f"【{h}】{s}" for h, s in zip(hooks, scripts) if s)
-    hashtags   = "#AI快訊 #人工智慧 #科技新聞"
+
+    # Hashtag set follows the content strategy (tech/entertainment/finance/pet/generic)
+    strategy = (news.get("strategy") or "tech").lower()
+    hashtags    = _HASHTAGS_BY_STRATEGY.get(strategy,    _HASHTAGS_BY_STRATEGY["tech"])
+    yt_tags_csv = _YOUTUBE_TAGS_BY_STRATEGY.get(strategy, _YOUTUBE_TAGS_BY_STRATEGY["tech"])
 
     return {
         "youtube": {
             "video_version":         "long",
             "title":                 main_title,
             "description":           f"{long_desc}\n\n{hashtags}",
-            "tags":                  "AI,人工智慧,科技新聞,AINews,TechNews",
+            "tags":                  yt_tags_csv,
             "use_auto_thumbnail":    True,
             "categoryId":            "22",
             "defaultLanguage":       "zh-Hant",
@@ -360,7 +383,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "description":           f"{long_desc}\n\n{hashtags}",
             "facebook_media_type":   "REELS",
             "video_state":           "PUBLISHED",
-            "facebook_page_id":      "",
+            "facebook_page_id":      FACEBOOK_PAGE_ID_DEFAULT,
         },
         "threads": {
             "video_version":         "short",

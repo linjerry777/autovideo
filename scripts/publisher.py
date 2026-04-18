@@ -56,15 +56,24 @@ API_KEY   = os.getenv("UPLOAD_POST_KEY", "")
 PROFILE   = os.getenv("UPLOAD_POST_PROFILE", "default")   # 在 .env 設定你的 profile 名稱
 
 
-def build_metadata(items: list) -> dict:
-    """從新聞 items 組合標題、說明、hashtag"""
+_HASHTAGS_BY_STRATEGY = {
+    "tech":          "#AI快訊 #人工智慧 #科技新聞 #AINews #TechNews",
+    "entertainment": "#娛樂 #明星 #藝人 #熱門話題 #八卦",
+    "finance":       "#股市 #投資 #財經 #台股 #理財",
+    "pet":           "#萌寵 #貓狗 #寵物 #可愛動物 #療癒",
+    "generic":       "#每日新聞 #熱門 #話題",
+}
+
+
+def build_metadata(items: list, strategy: str = "tech") -> dict:
+    """從新聞 items 組合標題、說明、hashtag (hashtag 跟著 strategy 走)"""
     titles   = [it["title"] for it in items]
-    hooks    = [it.get("hook", "") for it in items]
     title    = " | ".join(titles)
     desc     = "\n\n".join(
         f"【{it['hook']}】\n{it['summary']}" for it in items
     )
-    hashtags = "#AI快訊 #人工智慧 #科技新聞 #AINews #TechNews"
+    hashtags = _HASHTAGS_BY_STRATEGY.get((strategy or "tech").lower(),
+                                        _HASHTAGS_BY_STRATEGY["tech"])
     return dict(title=title, description=f"{desc}\n\n{hashtags}")
 
 
@@ -99,7 +108,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         if schedule.get("timezone"):
             schedule_kwargs["timezone"] = schedule["timezone"]
     items = data["items"]
-    meta  = build_metadata(items)
+    meta  = build_metadata(items, strategy=data.get("strategy") or "tech")
 
     print(f"📤 準備上傳：{output_mp4.name}")
     print(f"   平台：{', '.join(platforms)}")
