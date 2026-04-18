@@ -77,14 +77,33 @@ def build_metadata(items: list, strategy: str = "tech") -> dict:
     return dict(title=title, description=f"{desc}\n\n{hashtags}")
 
 
+SUPPORTED_PLATFORMS = {"youtube", "instagram", "tiktok", "facebook", "threads", "x"}
+
+
 def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     """job_key is either a date "2026-03-22" or "2026-03-22/job_5" """
+    # Silently drop removed/unsupported platforms (reddit/pinterest/linkedin left over
+    # from old job DB rows). No crash; just warn.
+    dropped = [p for p in platforms if p not in SUPPORTED_PLATFORMS]
+    if dropped:
+        print(f"⚠️  忽略不支援的平台：{dropped}（reddit/pinterest/linkedin 已於 2026-04 移除）", file=sys.stderr)
+    platforms = [p for p in platforms if p in SUPPORTED_PLATFORMS]
+    if not platforms:
+        print("❌ 過濾後沒有任何可上傳的平台，中止", file=sys.stderr)
+        sys.exit(1)
+
     pipe_dir   = BASE_DIR / "pipeline" / job_key
     output_mp4 = pipe_dir / "output.mp4"
     news_file  = pipe_dir / "news.json"
 
-    if not output_mp4.exists():
-        print(f"❌ 找不到影片：{output_mp4}")
+    # Accept legacy output.mp4 OR dual-version short/long outputs — any one is enough
+    has_video = (
+        output_mp4.exists()
+        or (pipe_dir / "short" / "output.mp4").exists()
+        or (pipe_dir / "long"  / "output.mp4").exists()
+    )
+    if not has_video:
+        print(f"❌ 找不到影片：{output_mp4}（short/long/output.mp4 也都沒有）")
         sys.exit(1)
     if not news_file.exists():
         print(f"❌ 找不到新聞：{news_file}")
@@ -292,10 +311,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("job_key", nargs="?", default=date.today().isoformat(),
                         help="job key，例如 2026-03-20 或 2026-03-20/job_5")
+    # NOTE: no `choices=` — we accept whatever the job DB has, then filter unsupported
+    # platforms silently (reddit/pinterest/linkedin were removed in Apr 2026 but old DB
+    # rows still carry them). Crashing on extra platforms broke job #85 upload step.
     parser.add_argument("--platforms", nargs="+",
                         default=["youtube", "instagram"],
-                        choices=["youtube","instagram","tiktok","facebook",
-                                 "threads","x"],
                         help="目標平台（預設：youtube instagram）")
     parser.add_argument("--dry-run", action="store_true",
                         help="只顯示預覽，不實際上傳")
