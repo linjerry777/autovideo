@@ -105,7 +105,10 @@ def job_screenshot(job_id: int, filename: str):
     f = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "screenshots" / filename
     if not f.exists():
         raise HTTPException(404, "Screenshot not found")
-    return FileResponse(str(f), media_type="image/png")
+    # no-cache: user can overwrite via /upload (edited PNG replaces same filename on disk).
+    # Without this header Chrome serves stale bytes even after the file changed.
+    return FileResponse(str(f), media_type="image/png",
+                        headers={"Cache-Control": "no-cache, no-store, must-revalidate"})
 
 
 @router.get("/jobs/{job_id}/broll/{filename}")

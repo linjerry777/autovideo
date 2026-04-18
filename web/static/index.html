@@ -3050,16 +3050,17 @@ function app() {
         const res = await this.api('POST',
           `/api/jobs/${this.currentJob.id}/screenshots/${this.editorShotIndex}/upload`,
           { data_url: dataUrl })
-        // Refresh screenshot URL (bust cache via timestamp)
+        // Refresh screenshot URL — use splice() so Alpine reliably picks up array index change
         const idx = this.screenshots.findIndex(s => s.index === this.editorShotIndex)
         if (idx !== -1 && res.url) {
-          this.screenshots[idx] = {
+          const updated = {
             ...this.screenshots[idx],
             url: res.url + '?t=' + Date.now(),
-            edited: res.edited === true ? true : this.screenshots[idx].edited,
+            edited: true,
           }
+          this.screenshots.splice(idx, 1, updated)
         }
-        this.showToast('已儲存編輯後圖片')
+        this.showToast('✓ 已儲存編輯後圖片（預覽已更新）')
         this.closeEditor()
       } catch (e) { this.showToast('儲存失敗：' + e.message) }
     },
