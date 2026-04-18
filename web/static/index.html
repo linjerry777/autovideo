@@ -6,13 +6,14 @@
 <title>AutoVideo — AI 短影音自動化</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
-<!-- tui-image-editor (MS-Paint-style screenshot editing) -->
-<link rel="stylesheet" href="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.min.css">
-<link rel="stylesheet" href="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.min.css">
-<script src="https://uicdn.toast.com/tui.code-snippet/v1.5.2/tui-code-snippet.min.js"></script>
+<!-- tui-image-editor (MS-Paint-style screenshot editing). Versions pinned because /latest/ path
+     occasionally serves stale or broken builds that load but apply no CSS (editor renders naked). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tui-color-picker@2.2.8/dist/tui-color-picker.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tui-image-editor@3.15.3/dist/tui-image-editor.min.css">
+<script src="https://cdn.jsdelivr.net/npm/tui-code-snippet@1.5.2/dist/tui-code-snippet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/4.2.0/fabric.min.js"></script>
-<script src="https://uicdn.toast.com/tui-color-picker/latest/tui-color-picker.min.js"></script>
-<script src="https://uicdn.toast.com/tui-image-editor/latest/tui-image-editor.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tui-color-picker@2.2.8/dist/tui-color-picker.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tui-image-editor@3.15.3/dist/tui-image-editor.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -3002,6 +3003,10 @@ function app() {
       const shot = this.screenshots.find(s => s.index === shotIndex)
       if (!shot || !shot.url) {
         this.showToast('此項沒有可編輯的圖片')
+        return
+      }
+      if (typeof tui === 'undefined' || !tui.ImageEditor) {
+        this.showToast('⚠️ 圖片編輯器未載入 — 請 Ctrl+F5 強制重新整理（清瀏覽器快取）')
         return
       }
       this.editorShotIndex = shotIndex
