@@ -18,16 +18,14 @@ interface Props {
  * Placement sits *above* the subtitle bar (~1660+) and *below* the info card
  * (~720..1460), using the otherwise-empty gap at y ~1480-1620.
  */
-const BAR_Y       = 1540;
-const BAR_HEIGHT  = 6;
-const BAR_MARGIN  = 80;        // horizontal padding from frame edge
+// Canvas is 1080×1920. Mascot slides along the very bottom edge, no visible track.
+const FRAME_H     = 1920;
+const BAR_MARGIN  = 60;                          // horizontal padding so mascot never clips
 const CANVAS_W    = 1080;
 const BAR_WIDTH   = CANVAS_W - BAR_MARGIN * 2;
-const MASCOT_W    = 90;
-const MASCOT_H    = 105;       // matches ~0.85 aspect of 848×993 source
-
-const ACCENT      = "#ff6bcb";  // fallback; ideally read from palette but NewsVideo doesn't expose per-item palette up here
-const TRACK_BG    = "rgba(255,255,255,0.22)";
+const MASCOT_W    = 110;                         // slightly bigger since it's now the sole character anchor
+const MASCOT_H    = 129;                         // ~0.85 aspect of 848×993 source
+const MASCOT_BOTTOM_PAD = 8;                     // distance from mascot feet to absolute bottom
 
 export const MascotOverlay: React.FC<Props> = ({ src }) => {
   const frame = useCurrentFrame();
@@ -40,66 +38,35 @@ export const MascotOverlay: React.FC<Props> = ({ src }) => {
   // Where the mascot's horizontal centre sits
   const mascotCenterX = BAR_MARGIN + BAR_WIDTH * progress;
   const mascotLeft    = mascotCenterX - MASCOT_W / 2;
-  // Mascot sits on top of the bar — its feet line up with the bar
-  const mascotTop     = BAR_Y - MASCOT_H + 8;
+  // Mascot's feet sit at the very bottom edge of the video
+  const mascotTop     = FRAME_H - MASCOT_H - MASCOT_BOTTOM_PAD;
 
-  // Life micro-motion while walking
+  // Life micro-motion while walking (subtle — no visible track means the
+  // wobble is the only cue that something is "moving forward")
   const t           = frame / fps;
-  const bob         = Math.sin(t * Math.PI * 1.6) * 3;         // ±3px vertical wobble (~0.8 Hz)
+  const bob         = Math.sin(t * Math.PI * 1.6) * 3;         // ±3px vertical wobble
   const rotate      = Math.sin(t * Math.PI * 1.1) * 2;         // ±2° tilt
   const entryFade   = interpolate(frame, [0, 14], [0, 1], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
   });
 
   return (
-    <>
-      {/* Background track */}
-      <div
-        style={{
-          position: "absolute",
-          left:  BAR_MARGIN,
-          top:   BAR_Y,
-          width: BAR_WIDTH,
-          height: BAR_HEIGHT,
-          borderRadius: 999,
-          background: TRACK_BG,
-          zIndex: 17,
-          opacity: entryFade,
-        }}
-      />
-      {/* Filled portion behind the mascot */}
-      <div
-        style={{
-          position: "absolute",
-          left:  BAR_MARGIN,
-          top:   BAR_Y,
-          width: Math.max(0, mascotCenterX - BAR_MARGIN),
-          height: BAR_HEIGHT,
-          borderRadius: 999,
-          background: `linear-gradient(90deg, ${ACCENT} 0%, #ffffff 100%)`,
-          boxShadow: `0 0 18px ${ACCENT}`,
-          zIndex: 17,
-          opacity: entryFade,
-        }}
-      />
-      {/* Mascot sliding along the bar */}
-      <div
-        style={{
-          position: "absolute",
-          left:  mascotLeft,
-          top:   mascotTop + bob,
-          width: MASCOT_W,
-          height: MASCOT_H,
-          zIndex: 19,
-          pointerEvents: "none",
-          opacity: entryFade,
-          transform: `rotate(${rotate}deg)`,
-          transformOrigin: "bottom center",
-          filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.55))",
-        }}
-      >
-        <Img src={src} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-      </div>
-    </>
+    <div
+      style={{
+        position: "absolute",
+        left:  mascotLeft,
+        top:   mascotTop + bob,
+        width: MASCOT_W,
+        height: MASCOT_H,
+        zIndex: 19,
+        pointerEvents: "none",
+        opacity: entryFade,
+        transform: `rotate(${rotate}deg)`,
+        transformOrigin: "bottom center",
+        filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.55))",
+      }}
+    >
+      <Img src={src} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+    </div>
   );
 };
