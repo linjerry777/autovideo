@@ -1449,6 +1449,32 @@
         </h1>
       </div>
 
+      <!-- Account routing banner — which Upload-Post profile + social handles -->
+      <div x-show="uploadProfile" class="glass rounded-2xl p-4 bg-gradient-to-r from-amber-50 to-orange-50 border-orange-200/50">
+        <div class="flex items-start gap-3">
+          <span class="text-xl">📦</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-xs text-gray-500">上傳會發到 Upload-Post profile</p>
+            <p class="text-sm font-bold text-gray-900">
+              <code class="text-orange-700 bg-orange-100 px-2 py-0.5 rounded" x-text="uploadProfile?.profile || ''"></code>
+              <span class="text-xs text-gray-400 ml-2" x-show="uploadProfile?.strategy">（策略 <span x-text="uploadProfile.strategy"></span>）</span>
+              <span class="text-xs text-red-600 ml-2" x-show="uploadProfile && !uploadProfile.profile_found">⚠️ 這個 profile 在 Upload-Post 找不到，上傳會失敗</span>
+            </p>
+            <div class="flex flex-wrap gap-1.5 mt-2" x-show="uploadProfile?.accounts?.length">
+              <template x-for="acc in (uploadProfile?.accounts || [])" :key="acc.platform">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-gray-200 text-[11px]">
+                  <span x-text="({youtube:'▶️',tiktok:'🎵',instagram:'📷',facebook:'📘',threads:'🧵',x:'✖️'})[acc.platform] || '🔗'"></span>
+                  <span class="font-medium capitalize" x-text="acc.platform"></span>
+                  <span class="text-gray-400" x-show="acc.handle">·</span>
+                  <span class="text-gray-600" x-text="acc.handle"></span>
+                </span>
+              </template>
+            </div>
+            <p x-show="!uploadProfile?.accounts?.length" class="text-xs text-red-600 mt-1">⚠️ 這 profile 還沒綁定任何社群帳號，Upload-Post 會 reject</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Loading state -->
       <div x-show="platformMetaLoading" class="glass rounded-2xl p-12 text-center">
         <div class="w-10 h-10 rounded-full border-2 border-green-500 border-t-transparent animate-spin mx-auto mb-4"></div>
@@ -3319,11 +3345,23 @@ function app() {
       this.platformMeta._schedule.timezone       = this.scheduleTimezone
     },
 
+    uploadProfile: null,
+
     openUploadPreview() {
       if (!this.currentJob) return
       this.uploadPreviewOrigin = this.page   // remember where we came from
       this.page = 'upload'
       this.loadPlatformMeta(this.currentJob.id)
+      this.loadUploadProfile(this.currentJob.id)
+    },
+
+    async loadUploadProfile(jobId) {
+      this.uploadProfile = null
+      try {
+        this.uploadProfile = await this.api('GET', `/api/accounts/resolve/${jobId}`)
+      } catch (e) {
+        this.uploadProfile = { profile: '(讀取失敗)', profile_found: false, accounts: [] }
+      }
     },
 
     platformIcon(p) {

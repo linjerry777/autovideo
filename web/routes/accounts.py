@@ -58,6 +58,77 @@ def list_accounts():
         raise HTTPException(502, f"Upload-Post API 錯誤: {e}")
 
 
+# ── Resolve which profile + accounts a given job will publish to ──────────────
+
+@router.get("/accounts/resolve/{job_id}")
+def resolve_for_job(job_id: int):
+    """For an upload preview: return the Upload-Post profile name that this job
+    will publish under + the list of social accounts already bound to it.
+
+    Routing logic mirrors publisher.py + job_runner.py:
+      1. Read news.json for this job to get `strategy`.
+      2. Look up setting `trending_profile_{strategy}` → Upload-Post profile name.
+      3. Fall back to setting `upload_post_profile` (global default).
+      4. Fetch /uploadposts/users and cherry-pick that one profile's social_accounts.
+    """
+    import json as _json
+    from pathlib import Path
+    from web.db import get_job, get_setting
+
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    # Read strategy from news.json if present
+    BASE_DIR  = Path(__file__).parent.parent.parent
+    news_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "news.json"
+    strategy  = ""
+    if news_file.exists():
+        try:
+            strategy = _json.loads(news_file.read_text(encoding="utf-8")).get("strategy", "") or ""
+        except Exception:
+            pass
+
+    # Resolve profile name via strategy → trending_profile_<strategy> setting
+    profile_name = ""
+    if strategy:
+        profile_name = get_setting(f"trending_profile_{strategy.lower()}", "")
+    if not profile_name:
+        profile_name = get_setting("upload_post_profile", "") or "default"
+
+    # Fetch accounts list + pick matching profile
+    try:
+        r = _req.get(f"{UP_BASE}/uploadposts/users", headers=_headers(), timeout=10)
+        r.raise_for_status()
+        raw = r.json()
+        users = raw.get("profiles") or raw.get("users") or raw.get("data") or raw if isinstance(raw, list) else []
+        if isinstance(raw, dict) and not users:
+            for k in ("profiles", "users", "data", "items", "results"):
+                if k in raw and isinstance(raw[k], list):
+                    users = raw[k]
+                    break
+    except Exception as e:
+        raise HTTPException(502, f"Upload-Post API 錯誤: {e}")
+
+    matched = next((u for u in users if u.get("username") == profile_name), None)
+    social  = matched.get("social_accounts") if matched else None
+
+    bound = []
+    if social and isinstance(social, dict):
+        for platform, info in social.items():
+            if isinstance(info, dict) and info:
+                handle = info.get("username") or info.get("name") or info.get("handle") or ""
+                bound.append({"platform": platform, "handle": handle})
+
+    return {
+        "job_id":       job_id,
+        "strategy":     strategy,
+        "profile":      profile_name,
+        "profile_found": matched is not None,
+        "accounts":     bound,
+    }
+
+
 # ── 建立 Profile ──────────────────────────────────────────────────────────────
 
 class CreateAccountBody(BaseModel):
