@@ -112,72 +112,30 @@ def _ffmpeg_path_arg(p: Path) -> str:
 
 def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
               hook_sfx: Path | None = None) -> float:
-    """Mix voice with optional BGM (sidechain-ducked) and optional Hook SFX (prepended).
+    """Mix voice with optional BGM (sidechain-ducked). hook_sfx kept in signature for
+    backward compat but now ignored — SFX layer was removed per user request (was serial
+    with intro.mp4, not overlapping, so add no value).
 
-    Output structure when both BGM and SFX present:
-      [silence 0.3s][hook_sfx][gap 0.2s][voice]
-        all of the above mixed with [bgm_looped at -18dB, ducked to -30dB when voice signal]
-
-    Returns the leading offset in seconds (silence + sfx duration + gap) so caller
-    can shift timing.json. Returns 0.0 when no SFX is added.
+    Returns 0.0 — there's no leading offset anymore, so timing.json needs no shifting.
     """
     voice_dur = get_duration(voice)
 
-    # Case 1: no BGM and no SFX → just copy voice through
-    if not bgm and not hook_sfx:
+    # No BGM → just copy voice through
+    if not bgm:
         if voice != out:
             import shutil
             shutil.copy(voice, out)
         return 0.0
 
-    # Build leading audio: silence + sfx + gap (only if sfx provided)
-    # SFX hard-capped to SFX_MAX_DUR_S so a full song dropped in sfx/hook/ can't inflate output
-    leading_offset = 0.0
-    sfx_dur        = 0.0
-    if hook_sfx:
-        raw_sfx_dur = get_duration(hook_sfx)
-        sfx_dur = min(raw_sfx_dur, SFX_MAX_DUR_S)
-        if raw_sfx_dur > SFX_MAX_DUR_S:
-            print(f"      ⚠️  SFX {hook_sfx.name} 太長 ({raw_sfx_dur:.1f}s)，截取前 {SFX_MAX_DUR_S}s")
-        leading_offset = LEADING_SILENCE_S + sfx_dur + SFX_BGM_GAP_S
+    total_dur = voice_dur
 
-    total_dur = leading_offset + voice_dur
-
-    # Build ffmpeg filter graph
-    cmd = [FFMPEG, "-y"]
-
-    # Voice always input 0
-    cmd += ["-i", _ffmpeg_path_arg(voice)]
+    # Build ffmpeg filter graph: voice as input 0, bgm looped as input 1
+    cmd = [FFMPEG, "-y", "-i", _ffmpeg_path_arg(voice),
+           "-stream_loop", "-1", "-i", _ffmpeg_path_arg(bgm)]
     voice_idx = 0
-
-    if hook_sfx:
-        cmd += ["-i", _ffmpeg_path_arg(hook_sfx)]
-        sfx_idx = 1
-        next_idx = 2
-    else:
-        sfx_idx = None
-        next_idx = 1
-
-    if bgm:
-        cmd += ["-stream_loop", "-1", "-i", _ffmpeg_path_arg(bgm)]
-        bgm_idx = next_idx
-    else:
-        bgm_idx = None
-
-    # Build filter
+    bgm_idx   = 1
+    voice_label = f"{voice_idx}:a"
     filter_parts: list[str] = []
-
-    if hook_sfx:
-        # Silence(0.3s) + sfx(trimmed + attenuated) + silence(0.2s) + voice → [vfull]
-        filter_parts.append(
-            f"[{sfx_idx}:a]atrim=0:{sfx_dur},asetpts=PTS-STARTPTS,volume={SFX_VOLUME_DB}dB[sfxtrim];"
-            f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={LEADING_SILENCE_S}[s1];"
-            f"anullsrc=channel_layout=stereo:sample_rate=44100:duration={SFX_BGM_GAP_S}[s2];"
-            f"[s1][sfxtrim][s2][{voice_idx}:a]concat=n=4:v=0:a=1[vfull]"
-        )
-        voice_label = "vfull"
-    else:
-        voice_label = f"{voice_idx}:a"
 
     if bgm:
         # BGM trimmed to total_dur, lowered to BGM_BASE_DB, sidechain-ducked by voice
@@ -206,8 +164,7 @@ def mix_audio(voice: Path, out: Path, bgm: Path | None = None,
         # Fallback: just copy voice
         import shutil
         shutil.copy(voice, out)
-        return 0.0
-    return leading_offset
+    return 0.0
 
 
 # ── 句子切分 ─────────────────────────────────────────────────────────
@@ -315,11 +272,10 @@ def main():
             for sp in sent_files:
                 sp.unlink(missing_ok=True)
 
-        # Step B: mix with BGM + SFX (or pass through if no assets)
+        # Step B: mix with BGM only (SFX layer removed — was serial with intro.mp4, no value)
         emotion = (item.get("emotion") or "").lower()
         bgm     = pick_bgm(emotion)
-        sfx     = pick_hook_sfx(emotion)
-        offset  = mix_audio(raw_voice, combined, bgm=bgm, hook_sfx=sfx)
+        offset  = mix_audio(raw_voice, combined, bgm=bgm)
 
         # Cleanup intermediate file
         raw_voice.unlink(missing_ok=True)
@@ -338,12 +294,10 @@ def main():
         )
 
         bgm_label = bgm.name if bgm else "(no BGM)"
-        sfx_label = sfx.name if sfx else "(no SFX)"
-        print(f"      ✅ {combined.name}（BGM={bgm_label}, SFX={sfx_label}, +{offset:.1f}s offset）")
+        print(f"      ✅ {combined.name}（BGM={bgm_label}）")
         audio_metadata.append({
             "index":    i,
             "bgm":      bgm.name if bgm else None,
-            "sfx":      sfx.name if sfx else None,
             "offset":   round(offset, 2),
             "duration": round(get_duration(combined), 2),
         })

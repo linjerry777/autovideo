@@ -373,10 +373,8 @@ def main():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     render(props, OUTPUT)
 
-    # Optional: prepend brand intro if assets/brand/intro.mp4 exists
-    intro_path = BASE_DIR / "assets" / "brand" / "intro.mp4"
-    if intro_path.exists():
-        concat_intro(OUTPUT, intro_path)
+    # intro.mp4 concat removed per user request — was serial with main content, no value.
+    # If you want to bring it back later, re-enable concat_intro() here.
 
     print(f"\nDone: {OUTPUT}", file=sys.stdout)
 
