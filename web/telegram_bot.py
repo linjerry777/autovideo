@@ -114,9 +114,21 @@ class TelegramBot:
     # ── Job event hook (called by job_runner._broadcast) ─────────────────────
 
     def on_event(self, job_id: int, data: dict):
-        if not self._job_chat or job_id != self._active_job_id:
+        # Pick recipient:
+        #   - Bot-triggered job → the chat that ran /run (1:1 feedback)
+        #   - Anything else (UI click, scheduler cron) → broadcast to all allowed_chat_ids
+        #     so the user gets pings even for jobs they started at the computer and then
+        #     walked away from.
+        if self._job_chat and job_id == self._active_job_id:
+            targets = [self._job_chat]
+        elif self.allowed_chat_ids:
+            targets = sorted(self.allowed_chat_ids)
+        else:
             return
-        chat = self._job_chat
+        for chat in targets:
+            self._dispatch_event(chat, job_id, data)
+
+    def _dispatch_event(self, chat: str, job_id: int, data: dict):
 
         STEP_LABELS = {
             "step_news":       "📰 新聞收集",
@@ -238,8 +250,13 @@ class TelegramBot:
     def _cmd_help(self, chat: str):
         _send(self.token, chat,
               "🎬 <b>AutoVideo Bot</b>\n\n"
-              "/run — 觸發影片生成（預設主題）\n"
-              "/run AI科技 — 指定主題\n"
+              "<b>新聞模式</b>\n"
+              "/run — 觸發新聞影片（預設主題）\n"
+              "/run AI科技 — 指定主題\n\n"
+              "<b>趨勢模式</b>（YouTube TW 熱門第 1 則）\n"
+              "/trending — 預設娛樂策略\n"
+              "/trending tech — 指定策略 (tech|entertainment|finance|pet)\n\n"
+              "<b>管理</b>\n"
               "/status — 查看目前狀態\n"
               "/cancel — 取消執行中的 job\n"
               "/jobs — 最近 5 筆記錄\n"
@@ -270,6 +287,71 @@ class TelegramBot:
         else:
             _send(self.token, chat, "❌ 啟動失敗（鎖定中）")
             self._job_chat      = None
+            self._active_job_id = None
+
+    def _cmd_trending(self, chat: str, strategy: str | None):
+        """Fetch top YouTube TW trending item → enrich → trigger job with strategy."""
+        from web import job_runner
+        from web.db import create_job, get_setting
+        from web.routes.news import _fetch_youtube_trending
+        from web.claude_client import enrich_trending_items
+        from datetime import date
+
+        if job_runner.is_running():
+            _send(self.token, chat, "⚠️ 已有 job 在執行，請先等待或 /cancel")
+            return
+
+        strategy = (strategy or "entertainment").lower()
+        if strategy not in ("tech", "entertainment", "finance", "pet"):
+            _send(self.token, chat, f"❌ 策略必須是 tech/entertainment/finance/pet 之一（你給的：{strategy}）")
+            return
+
+        _send(self.token, chat, f"📡 抓 YouTube TW 熱門 #1…")
+        try:
+            raw_items = _fetch_youtube_trending(region="TW", limit=5)
+        except Exception as e:
+            _send(self.token, chat, f"❌ 抓熱門失敗：{e}")
+            return
+        if not raw_items:
+            _send(self.token, chat, "❌ 沒抓到熱門影片（API key 可能沒設）")
+            return
+
+        first = raw_items[0]
+        _send(self.token, chat, f"🎯 選到：{first['title'][:60]}\n🤖 Claude 生腳本中…")
+        try:
+            items = enrich_trending_items([first])
+        except Exception as e:
+            _send(self.token, chat, f"❌ Claude 生腳本失敗：{e}")
+            return
+        if not items:
+            _send(self.token, chat, "❌ Claude 回傳空結果")
+            return
+
+        today     = date.today().isoformat()
+        platforms = get_setting("platforms", "youtube,instagram").split(",")
+        dry_run   = get_setting("dry_run", "false").lower() == "true"
+
+        job_id = create_job(today, triggered_by="telegram", topic=first["title"][:40])
+        self._job_chat      = chat
+        self._active_job_id = job_id
+
+        ok = job_runner.trigger_job(
+            job_id, today,
+            topic=None,
+            platforms=platforms,
+            dry_run=dry_run,
+            pre_news=items,         # pre-enriched, skips Claude re-run in pipeline
+            strategy=strategy,
+        )
+        if ok:
+            _send(self.token, chat,
+                  f"🚀 Job #{job_id} 啟動\n"
+                  f"策略：{strategy}\n"
+                  f"標題：{first['title'][:60]}\n"
+                  f"進度 / 審核暫停點都會自動推播…")
+        else:
+            _send(self.token, chat, "❌ 啟動失敗")
+            self._job_chat = None
             self._active_job_id = None
 
     def _cmd_status(self, chat: str):
@@ -377,6 +459,8 @@ class TelegramBot:
             self._cmd_help(chat)
         elif cmd == "/run":
             self._cmd_run(chat, arg or None)
+        elif cmd == "/trending":
+            self._cmd_trending(chat, arg or None)
         elif cmd == "/status":
             self._cmd_status(chat)
         elif cmd == "/cancel":
