@@ -66,7 +66,41 @@ def verify_manifest():
     print(f"✅ Playwright scraper 完成，{len(data)} 篇新聞")
 
 
+def override_youtube_thumbnails():
+    """Post-process: for any item whose URL is YouTube, replace the page screenshot
+    with the clean YT thumbnail (maxresdefault.jpg). Mirrors screenshot_collector's
+    shortcut so the playwright_stealth background_mode also gets clean YT visuals.
+    """
+    news_file = PIPE_DIR / "news.json"
+    if not news_file.exists():
+        return
+    try:
+        import sys as _sys
+        _script_dir = str(Path(__file__).resolve().parent)
+        if _script_dir not in _sys.path:
+            _sys.path.insert(0, _script_dir)
+        from screenshot_collector import _youtube_thumbnail
+    except ImportError as e:
+        print(f"  [override] import failed: {e}", file=sys.stderr)
+        return
+
+    data  = json.loads(news_file.read_text(encoding="utf-8"))
+    items = data.get("items", [])
+    shots_dir = PIPE_DIR / "screenshots"
+    overridden = 0
+    for i, it in enumerate(items, 1):
+        url = it.get("source_url") or it.get("url") or ""
+        shot_path = shots_dir / f"news_{i:02d}.png"
+        ok, src = _youtube_thumbnail(url, shot_path)
+        if ok:
+            print(f"  [{i}] 🔄 覆蓋為乾淨 YT thumbnail ({src})")
+            overridden += 1
+    if overridden:
+        print(f"✅ {overridden} 張 YT 頁截圖已換成 thumbnail")
+
+
 if __name__ == "__main__":
     ensure_deps()
     run_scraper()
     verify_manifest()
+    override_youtube_thumbnails()
