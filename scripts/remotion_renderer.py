@@ -240,7 +240,11 @@ def render(props: dict, output: Path):
             f"--props={props_file.replace(chr(92), '/')}",
             "--overwrite",
             "--codec", "h264",
-            "--crf", "18",
+            # Quality knobs (tradeoff: ~3x file size + ~2x render time vs previous defaults):
+            "--crf", "15",              # was 18; 15 ≈ visually-lossless for short-form
+            "--jpeg-quality", "95",     # was 80 default; bumps Remotion's internal frame JPEG from 'noticeable artefacts' to 'clean'
+            "--x264-preset", "slow",    # was medium; better compression efficiency at same CRF
+            "--pixel-format", "yuv420p",  # keep 8-bit 4:2:0 for universal player compat
             "--concurrency", "4",
         ]
 
