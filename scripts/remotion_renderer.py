@@ -262,6 +262,94 @@ def render(props: dict, output: Path):
         raise RuntimeError(f"Remotion render failed (exit {result.returncode})")
 
 
+# ── Intro concat ───────────────────────────────────────────────────────────────
+def _ffmpeg_bin() -> str:
+    import shutil
+    return shutil.which("ffmpeg") or "ffmpeg"
+
+
+def concat_intro(main_path: Path, intro_path: Path) -> bool:
+    """Prepend assets/brand/intro.mp4 onto main rendered output.
+
+    Normalises intro to 1080×1920 (scale + letterbox pad) and 44.1kHz stereo audio
+    (silent track synthesised if intro has no audio). Overwrites main_path in place.
+
+    Returns True on success, False if ffmpeg missing / concat errored (caller keeps
+    main_path unchanged).
+    """
+    if not intro_path.exists():
+        return False
+    ffmpeg = _ffmpeg_bin()
+    tmp_out = main_path.with_suffix(".withintro.mp4")
+
+    # Detect audio presence on intro
+    try:
+        import shutil as _sh
+        ffprobe = _sh.which("ffprobe") or "ffprobe"
+        probe = subprocess.run(
+            [ffprobe, "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "stream=codec_name", "-of", "default=noprint_wrappers=1:nokey=1",
+             str(intro_path)],
+            capture_output=True, text=True, timeout=10,
+        )
+        intro_has_audio = bool(probe.stdout.strip())
+    except Exception:
+        intro_has_audio = True   # assume yes; safer default
+
+    # Build filter: always normalise to 1080x1920. If intro lacks audio, inject silence.
+    if intro_has_audio:
+        filter_complex = (
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[iv];"
+            "[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[ia];"
+            "[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[mv];"
+            "[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[ma];"
+            "[iv][ia][mv][ma]concat=n=2:v=1:a=1[v][a]"
+        )
+        cmd = [
+            ffmpeg, "-y",
+            "-i", str(intro_path).replace("\\", "/"),
+            "-i", str(main_path).replace("\\", "/"),
+            "-filter_complex", filter_complex,
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
+            str(tmp_out).replace("\\", "/"),
+        ]
+    else:
+        # intro silent → add anullsrc for its audio track
+        filter_complex = (
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[iv];"
+            "anullsrc=channel_layout=stereo:sample_rate=44100[ia];"
+            "[1:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1,fps=30[mv];"
+            "[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[ma];"
+            "[iv][ia][mv][ma]concat=n=2:v=1:a=1[v][a]"
+        )
+        cmd = [
+            ffmpeg, "-y",
+            "-i", str(intro_path).replace("\\", "/"),
+            "-i", str(main_path).replace("\\", "/"),
+            "-filter_complex", filter_complex,
+            "-map", "[v]", "-map", "[a]",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
+            str(tmp_out).replace("\\", "/"),
+        ]
+
+    print(f"  prepending intro: {intro_path.name} → {main_path.name}", file=sys.stderr)
+    r = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    if r.returncode != 0:
+        print(f"  ⚠️  intro concat failed, keeping main video as-is:\n{r.stderr[-400:]}", file=sys.stderr)
+        tmp_out.unlink(missing_ok=True)
+        return False
+
+    tmp_out.replace(main_path)
+    return True
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     if not NEWS_FILE.exists():
@@ -284,6 +372,11 @@ def main():
 
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     render(props, OUTPUT)
+
+    # Optional: prepend brand intro if assets/brand/intro.mp4 exists
+    intro_path = BASE_DIR / "assets" / "brand" / "intro.mp4"
+    if intro_path.exists():
+        concat_intro(OUTPUT, intro_path)
 
     print(f"\nDone: {OUTPUT}", file=sys.stdout)
 
