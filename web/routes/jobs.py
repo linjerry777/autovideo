@@ -316,7 +316,16 @@ _YOUTUBE_TAGS_BY_STRATEGY = {
     "generic":       "每日新聞,熱門,話題",
 }
 
-FACEBOOK_PAGE_ID_DEFAULT = "1100141579843223"   # 雙層甜甜圈 — hard-coded per user request
+# Strategy → FB Page ID mapping.
+# Tech goes to 雙層甜甜圈; everything else (news, entertainment, pet) defaults to Mascot page.
+_FB_PAGE_BY_STRATEGY = {
+    "tech":          "1100141579843223",   # 雙層甜甜圈
+    "entertainment": "61569203069316",     # 小狼狽 Mascot
+    "pet":           "61569203069316",     # same Mascot page for now (swap if 奶烙 gets own page)
+    "finance":       "1100141579843223",   # fallback to tech page (finance strategy dropped)
+    "generic":       "61569203069316",     # generic (news without specific strategy) → Mascot
+}
+FACEBOOK_PAGE_ID_DEFAULT = _FB_PAGE_BY_STRATEGY["generic"]
 
 
 def _seed_platform_meta(news: dict) -> dict:
@@ -338,6 +347,7 @@ def _seed_platform_meta(news: dict) -> dict:
     strategy = (news.get("strategy") or "tech").lower()
     hashtags    = _HASHTAGS_BY_STRATEGY.get(strategy,    _HASHTAGS_BY_STRATEGY["tech"])
     yt_tags_csv = _YOUTUBE_TAGS_BY_STRATEGY.get(strategy, _YOUTUBE_TAGS_BY_STRATEGY["tech"])
+    fb_page_id  = _FB_PAGE_BY_STRATEGY.get(strategy,     FACEBOOK_PAGE_ID_DEFAULT)
 
     return {
         "youtube": {
@@ -383,7 +393,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "description":           f"{long_desc}\n\n{hashtags}",
             "facebook_media_type":   "REELS",
             "video_state":           "PUBLISHED",
-            "facebook_page_id":      FACEBOOK_PAGE_ID_DEFAULT,
+            "facebook_page_id":      fb_page_id,
         },
         "threads": {
             "video_version":         "short",
