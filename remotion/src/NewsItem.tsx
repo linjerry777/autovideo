@@ -38,6 +38,7 @@ interface NewsItemProps {
   item: NewsItemType;
   index: number;
   totalFrames: number;
+  totalItems: number;
   layout_mode?: LayoutMode;
 }
 
@@ -67,6 +68,7 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
   item,
   index,
   totalFrames,
+  totalItems,
   layout_mode = "visual",
 }) => {
   // Inside <Sequence from=N>, useCurrentFrame() is already shifted to 0 at
@@ -190,7 +192,8 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
         {!item.scene_recipe && scene === "race" && <RaceScene />}
       </div>
 
-      {/* Item counter top-right */}
+      {/* Item counter top-right — hidden for single-item (trending) videos */}
+      {totalItems > 1 && (
       <div
         style={{
           position: "absolute",
@@ -212,9 +215,10 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
             letterSpacing: 2,
           }}
         >
-          {String(index + 1).padStart(2, "0")} / 03
+          {String(index + 1).padStart(2, "0")} / {String(totalItems).padStart(2, "0")}
         </div>
       </div>
+      )}
 
       {/* HOOK hero */}
       <div

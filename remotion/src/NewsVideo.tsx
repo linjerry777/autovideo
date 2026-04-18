@@ -42,6 +42,7 @@ export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visu
             item={item}
             index={idx}
             totalFrames={durationFrames}
+            totalItems={placed.length}
             layout_mode={layout_mode}
           />
         </Sequence>
