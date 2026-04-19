@@ -135,7 +135,35 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     print(f"   Profile：{PROFILE}")
 
     if dry_run:
-        print("\n[DRY RUN] 不實際上傳，以上為預覽")
+        # Still write schedule_log.json so the UI 📅 排程 page shows what WOULD
+        # be scheduled — just with status="dry_run" so user can tell apart from
+        # real uploads. Inline pmeta lookups since the downstream
+        # _platform_meta / auto_per_platform aren't defined yet at this point.
+        _schedule     = pmeta.get("_schedule", {}) if pmeta else {}
+        _auto_per     = _schedule.get("mode") == "auto_per_platform"
+        _tz           = _schedule.get("timezone") or "Asia/Taipei"
+        preview_entries = []
+        for p in platforms:
+            p_meta = pmeta.get(p, {}) if pmeta else {}
+            version_key = p_meta.get("video_version", "legacy")
+            slot = _next_golden_slot(p, _tz) if _auto_per else ""
+            preview_entries.append({
+                "platform":       p,
+                "scheduled_date": slot or "",
+                "timezone":       _tz,
+                "video_version":  version_key,
+                "profile":        PROFILE,
+                "status":         "dry_run",
+                "request_id":     "",
+            })
+        try:
+            (pipe_dir / "schedule_log.json").write_text(
+                json.dumps(preview_entries, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        except Exception as _e:
+            print(f"⚠️  schedule_log 寫入失敗：{_e}", file=sys.stderr)
+        print("\n[DRY RUN] 不實際上傳，以上為預覽（排程已寫入 schedule_log.json）")
         return
 
     client = UploadPostClient(API_KEY)

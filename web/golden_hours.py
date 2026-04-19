@@ -8,14 +8,15 @@ publisher.py + web routes import it.
 from datetime import datetime, timedelta
 
 # Hour:minute of the first golden-hour slot per platform, local time.
+# MUST stay in sync with scripts/publisher.py GOLDEN_HOUR_FIRST.
 # (Based on 2026 Buffer / Socialync aggregate data — weekday peak windows.)
 GOLDEN_HOUR_FIRST: dict[str, str] = {
-    "youtube":   "08:00",   # morning commute
-    "instagram": "13:00",   # midday scroll
-    "facebook":  "19:00",   # evening wind-down
-    "threads":   "21:30",   # late-night chatter
-    "x":         "09:00",   # news-cycle morning
-    "tiktok":    "19:30",   # prime-time entertainment
+    "youtube":   "14:00",
+    "tiktok":    "07:00",
+    "instagram": "13:00",
+    "facebook":  "13:00",
+    "threads":   "12:00",
+    "x":         "09:00",
 }
 
 
