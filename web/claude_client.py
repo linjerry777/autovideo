@@ -103,6 +103,7 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None,
   "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
+  "bullets": ["金句1（≤15字）", "金句2（≤15字）", "金句3（≤15字）"],
   "script_short": "短版旁白（30-40 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
   "script_long":  "長版旁白（60-80 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
   "script":       "= script_long (legacy field, backward compat)",
@@ -118,6 +119,11 @@ hook_variants 必須恰好 3 個不同風格：
 - 風格 A：懸念式（「破千萬的秘密」）
 - 風格 B：打臉式（「1188 萬人搞錯了」）
 - 風格 C：提問式（「為什麼全網都...？」）
+
+bullets 是 3 條**新聞卡片重點**（≤15字/條），會被放在 Remotion 影片裡當文字 overlay。
+- 每條要是獨立成立的短金句，不是半句話
+- 避免重複 hook/title 的內容；應該是「延伸 / 數據 / 結論」三個不同面向
+- 範例：["營收年增 300%", "三大車廠同步跟進", "2026 全面商用"]
 
 script_short 和 script_long 必須是**獨立重寫**的兩份腳本，不是 Long 的截斷版。
 Short 適合 TikTok/IG/FB/Threads（節奏快、1 句關鍵）；
@@ -191,6 +197,7 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
   "hook": "主要開場鉤子（5-8字，從 hook_variants 選最強的）",
   "hook_variants": ["懸念式", "打臉式", "提問式"],
   "title": "標題（15字以內，中文）",
+  "bullets": ["金句1（≤15字）", "金句2（≤15字）", "金句3（≤15字）"],
   "script_short": "短版旁白（40-50 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
   "script_long":  "長版旁白（100-130 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
   "script":       "= script_long (legacy field, backward compat)",
@@ -205,6 +212,11 @@ def enrich_trending_items(raw_items: list[dict]) -> list[dict]:
 }}
 
 hook_variants 必須恰好 3 個不同風格：懸念式 / 打臉式 / 提問式。
+
+bullets 是 3 條**趨勢卡片重點**（≤15字/條），會被放在 Remotion 影片裡當文字 overlay。
+- 每條要是獨立成立的短金句，不是半句話
+- 避免重複 hook/title 的內容；應該是「數據 / 現象 / 結論」三個不同面向
+- 範例：["單日破 200 萬觀看", "全平台瘋傳翻拍", "年輕族群 9 成認同"]
 
 stat_badge 必須是**短且視覺強**的 overlay 字串（<12 字），會被放大在影片中間。
 - 若提示的 stats 有 view_count，格式化為「X萬觀看」或「X百萬觀看」（中文讀數優先）

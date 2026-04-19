@@ -136,6 +136,7 @@ def select_news_with_claude(raw_items: list[dict]) -> list[dict]:
   "hook_variants": ["懸念式 hook", "打臉式 hook", "提問式 hook"],
   "title": "標題（15字以內，中文）",
   "summary": "摘要（40字以內，中文，口語化）",
+  "bullets": ["金句1（≤15字）", "金句2（≤15字）", "金句3（≤15字）"],
   "script_short": "短版旁白（30-40 字，獨立重寫 — 不是 long 的截斷版，一句話講完核心）",
   "script_long":  "長版旁白（60-80 字，獨立重寫 — 含鋪陳+結論，為長平台而寫）",
   "script":       "= script_long (legacy field, backward compat)",
@@ -151,6 +152,11 @@ hook_variants 必須生成恰好 3 個不同風格：
 - 風格 A：懸念式（「破千萬的秘密」「沒人告訴你的」）
 - 風格 B：打臉式（「1188 萬人搞錯了」「你以為 X 是 Y 其實...」）
 - 風格 C：提問式（「為什麼全網都...？」「這事怎麼發生的？」）
+
+bullets 是 3 條**新聞卡片重點**（≤15字/條），會被放在 Remotion 影片裡當文字 overlay。
+- 每條要是獨立成立的短金句，不是半句話
+- 避免重複 hook/title 的內容；應該是「延伸 / 數據 / 結論」三個不同面向
+- 範例：["營收年增 300%", "三大車廠同步跟進", "2026 全面商用"]
 
 新聞列表：
 {headlines}
