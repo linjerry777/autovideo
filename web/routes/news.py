@@ -536,12 +536,16 @@ CURATED_RSS = {
 
 # ── TikTok Creative Center hashtag trending (TW) ──────────────────────────────
 
-def _fetch_tiktok_tw(keyword: str = None, limit: int = 25) -> list[dict]:
-    """Scrape TikTok Creative Center popular hashtags for Taiwan.
+def _fetch_tiktok_tw(keyword: str = None, limit: int = 25, lang: str = "zh-TW") -> list[dict]:
+    """TikTok hashtag trending → real news articles about each hashtag.
 
-    Source: https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en?countryCode=TW
-    Returns __NEXT_DATA__-embedded items with hashtagName, rank, videoViews, publishCnt.
-    Treat each hashtag as a news-like item for Claude enrichment.
+    Hashtags alone have no visual / substance (user feedback: '只是tag 沒畫面怎搞').
+    We use the hashtag list as a *signal* — 'this is burning on TikTok right now' —
+    then for each top hashtag we google-search the term and return actual news articles
+    (which have title/URL/OG image → viable pipeline inputs).
+
+    Returns items tagged source_type=tiktok_tw, with the source label showing which
+    hashtag the article came from: 'TikTok 趨勢 #X · Google News'.
     """
     import requests, re
     try:
@@ -563,27 +567,36 @@ def _fetch_tiktok_tw(keyword: str = None, limit: int = 25) -> list[dict]:
                 for page in sd["pages"]:
                     rows.extend(page.get("list", []))
                 break
+        # Sort by rank, take top-5 hashtags (more → too slow from google sub-queries)
+        hashtags = sorted(
+            (h for h in rows if h.get("hashtagName")),
+            key=lambda h: h.get("rank", 999),
+        )[:5]
+
         items = []
-        for h in rows[:limit]:
-            tag = h.get("hashtagName", "")
-            if not tag or (keyword and keyword.lower() not in tag.lower()):
-                continue
+        for h in hashtags:
+            tag   = h["hashtagName"]
             views = int(h.get("videoViews", 0))
-            posts = int(h.get("publishCnt", 0))
             rank  = h.get("rank", "?")
-            items.append({
-                "title":         f"#{tag}",
-                "summary":       f"TikTok TW 熱門 #{rank}｜{views:,} 播放、{posts:,} 則貼文",
-                "url":           f"https://www.tiktok.com/tag/{tag}",
-                "source":        f"TikTok Trending · TW (#{rank})",
-                "source_type":   "tiktok_tw",
-                "view_count":    views,
-                "publish_count": posts,
-                "rank":          rank,
-            })
-        if len(items) < 3 and keyword:
-            return _fetch_tiktok_tw(None, limit)
-        return items
+            if keyword and keyword.lower() not in tag.lower():
+                continue
+            # Fetch real articles about this hashtag via Google News
+            try:
+                articles = _fetch_google(tag, lang=lang, limit=3)
+            except Exception:
+                articles = []
+            for a in articles[:3]:
+                items.append({
+                    **a,
+                    "source":      f"TikTok 趨勢 #{tag} · {a.get('source','Google')}",
+                    "source_type": "tiktok_tw",
+                    "tiktok_hashtag":      tag,
+                    "tiktok_rank":         rank,
+                    "tiktok_video_views":  views,
+                })
+            if len(items) >= limit:
+                break
+        return items[:limit]
     except Exception as e:
         log.warning(f"TikTok CC trending 失敗: {e}")
         return []
@@ -639,7 +652,7 @@ def _fetch_all(keyword: str, lang: str, sources: list[str], limit_per: int = 20)
     add("youtube_tw",        lambda: _fetch_youtube_trending(keyword, "TW", limit_per))
     add("youtube_us",        lambda: _fetch_youtube_trending(keyword, "US", limit_per))
     add("dcard",             lambda: _fetch_dcard(keyword, limit_per))
-    add("tiktok_tw",         lambda: _fetch_tiktok_tw(keyword, limit_per))
+    add("tiktok_tw",         lambda: _fetch_tiktok_tw(keyword, limit_per, lang=lang))
     add("google_trends_tw",  lambda: _fetch_google_trends_tw(keyword, limit_per))
     for sid, rss_url in CURATED_RSS.items():
         add(sid, lambda u=rss_url, s=sid: _fetch_rss_source(s, u, keyword, limit_per))
