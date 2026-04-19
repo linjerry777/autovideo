@@ -440,7 +440,7 @@
           <!-- 中文熱門 group -->
           <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">中文熱門</p>
           <div class="flex flex-wrap gap-2 mb-3">
-            <template x-for="[id, icon, label] in [['zhihu','💬','知乎'],['dcard','🃏','Dcard'],['ithome','🏠','ITHome'],['google_trends_tw','📈','Google Trends TW']]" :key="id">
+            <template x-for="[id, icon, label] in [['zhihu','💬','知乎'],['dcard','🃏','Dcard'],['ithome','🏠','ITHome']]" :key="id">
               <button type="button" @click="toggleSource(id)"
                 :class="selectedSources.has(id) ? 'bg-purple-50 border-purple-300 text-purple-700 ring-1 ring-purple-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
                 class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
@@ -452,7 +452,7 @@
           <!-- 英文趨勢 group -->
           <p class="text-[11px] text-gray-400 uppercase tracking-wide mb-1">英文趨勢（不需關鍵字）</p>
           <div class="flex flex-wrap gap-2 mb-2">
-            <template x-for="[id, icon, label] in [['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US'],['tiktok_tw','🎵','TikTok TW #'],['hackernews','🦊','Hacker News']]" :key="id">
+            <template x-for="[id, icon, label] in [['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US'],['hackernews','🦊','Hacker News']]" :key="id">
               <button type="button" @click="toggleSource(id)"
                 :class="selectedSources.has(id) ? 'bg-orange-50 border-orange-300 text-orange-700 ring-1 ring-orange-200' : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'"
                 class="border rounded-lg px-3 py-1.5 text-sm font-medium transition-all flex items-center gap-1">
@@ -462,7 +462,7 @@
             </template>
           </div>
           <p class="text-xs text-amber-500 mt-1" x-show="(selectedSources.has('youtube_tw') || selectedSources.has('youtube_us')) && !youtubeKeySet">⚠️ YouTube 需設定 YOUTUBE_API_KEY</p>
-          <p class="text-xs text-gray-400" x-show="selectedSources.has('last30days') || selectedSources.has('zhihu') || selectedSources.has('tiktok_tw') || selectedSources.has('google_trends_tw')">含社群/趨勢來源，搜尋約 +15-30 秒</p>
+          <p class="text-xs text-gray-400" x-show="selectedSources.has('last30days') || selectedSources.has('zhihu')">含社群/趨勢來源，搜尋約 +15-30 秒</p>
         </div>
         <button @click="fetchNews()"
           :disabled="newLangs.size === 0"
@@ -970,7 +970,6 @@
             <div class="flex flex-wrap gap-2">
               <template x-for="[id, icon, label] in [
                 ['youtube_tw','▶️','YouTube TW'],['youtube_us','▶️','YouTube US'],
-                ['tiktok_tw','🎵','TikTok #'],['google_trends_tw','📈','Google Trends TW'],
                 ['zhihu','💬','知乎'],['dcard','🃏','Dcard']
               ]" :key="id">
                 <button type="button" @click="trendingToggleSource(id)"
@@ -2427,12 +2426,12 @@ function app() {
     trendingItems: [],          // 從 trending sources 抓到的原始項目
     trendingEnriched: [],       // Claude 分析後的結果（含 format/category/script）
     trendingSelectedIds: new Set(),
-    trendingSelectedSources: new Set(['youtube_tw', 'tiktok_tw', 'google_trends_tw']),
+    trendingSelectedSources: new Set(['youtube_tw']),
     newTopic: '',
     newLangs: new Set(['zh-TW']),   // multi-lang selection for initial fetch
     appendLangs: new Set(),          // multi-lang selection for append
     appending: false,
-    selectedSources: new Set(['google','bing','google_trends_tw','zhihu']),  // per-source toggle
+    selectedSources: new Set(['google','bing','zhihu']),  // per-source toggle
     strategy: 'tech',   // tech | entertainment | finance | pet
     newsItems: [],      // currently displayed items (may be filtered)
     newsPool: [],       // all fetched items (for replacement)
@@ -2599,7 +2598,7 @@ function app() {
       this.selectedIds = new Set()
       this.appendLangs = new Set()
       this.appending = false
-      this.selectedSources = new Set(['google','bing','google_trends_tw','zhihu'])
+      this.selectedSources = new Set(['google','bing','zhihu'])
       this.currentJob = null
       this.sseLog = []
       this.screenshots = []
@@ -2642,7 +2641,7 @@ function app() {
     },
 
     groupedNews() {
-      const ORDER = ['google','bing','google_trends_tw','zhihu','dcard','hackernews','youtube_tw','youtube_us','tiktok_tw','youtube','tiktok','instagram']
+      const ORDER = ['google','bing','zhihu','dcard','hackernews','youtube_tw','youtube_us','youtube','tiktok','instagram']
       const groups = {}
       for (const item of this.newsItems) {
         const k = item.source_type || 'other'
@@ -2692,7 +2691,7 @@ function app() {
     },
 
     groupedTrending() {
-      const ORDER = ['youtube_tw','youtube_us','tiktok_tw','google_trends_tw','dcard','zhihu']
+      const ORDER = ['youtube_tw','youtube_us','dcard','zhihu']
       const groups = {}
       const seenKeys = {}            // per-source dedup so Alpine x-for :key is unique
       for (const item of this.trendingItems) {
@@ -2815,9 +2814,9 @@ function app() {
     setSourcePreset(preset) {
       const presets = {
         news:  ['google', 'bing', 'hackernews'],
-        zh:    ['zhihu', 'dcard', 'google_trends_tw'],
-        en:    ['youtube_tw', 'youtube_us', 'tiktok_tw'],
-        all:   ['google', 'bing', 'google_trends_tw', 'zhihu', 'dcard', 'youtube_tw', 'youtube_us', 'tiktok_tw', 'hackernews'],
+        zh:    ['zhihu', 'dcard'],
+        en:    ['youtube_tw', 'youtube_us'],
+        all:   ['google', 'bing', 'zhihu', 'dcard', 'youtube_tw', 'youtube_us', 'hackernews'],
       }
       this.selectedSources = new Set(presets[preset] || presets.news)
     },
@@ -2901,7 +2900,7 @@ function app() {
       if (this.newLangs.size === 0) return
       this.newStep = 'fetching'
       try {
-        const TRENDING = new Set(['youtube_tw','youtube_us','tiktok_tw','google_trends_tw','dcard','zhihu'])
+        const TRENDING = new Set(['youtube_tw','youtube_us','dcard','zhihu'])
         const allTrending = [...this.selectedSources].every(s => TRENDING.has(s))
         const kw = (!allTrending && (this.newTopic || 'AI 人工智慧 科技')) || (this.newTopic || '')
         const langs = [...this.newLangs]
