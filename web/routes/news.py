@@ -87,12 +87,10 @@ _SOCIAL_LABELS = {
 ALL_SOURCES = {
     "google":           {"label": "Google News",          "icon": "🔍", "default": True,  "group": "news"},
     "bing":             {"label": "Bing News",            "icon": "🔎", "default": True,  "group": "news"},
-    "google_trends_tw": {"label": "Google Trends TW",     "icon": "📈", "default": True,  "group": "news"},
     "zhihu":            {"label": "知乎熱搜",              "icon": "💬", "default": True,  "group": "zh"},
     "dcard":            {"label": "Dcard 熱門",            "icon": "🃏", "default": False, "group": "zh"},
-    "youtube_tw":       {"label": "YouTube 熱門 TW",       "icon": "▶️", "default": False, "group": "en"},
+    "youtube_tw":       {"label": "YouTube 熱門 TW",       "icon": "▶️", "default": True,  "group": "en"},
     "youtube_us":       {"label": "YouTube Trending US",   "icon": "▶️", "default": False, "group": "en"},
-    "tiktok_tw":        {"label": "TikTok 熱門 Hashtag TW", "icon": "🎵", "default": False, "group": "en"},
     "hackernews":       {"label": "Hacker News",           "icon": "🦊", "default": False, "group": "en"},
     "last30days":       {"label": "Social (Reddit·HN)",    "icon": "🌐", "default": False, "group": "en"},
     "ithome":           {"label": "IT之家",                "icon": "🏠", "default": False, "group": "zh"},

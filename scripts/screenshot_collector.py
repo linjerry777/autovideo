@@ -150,34 +150,89 @@ def main():
                     print(f"  [{i}] ✅ {og_source} ({size_kb}KB)")
                     continue
 
-            # ── 方法 1：Playwright 截圖（OG 失敗 fallback）────────────
+            # ── 方法 1：Playwright 智能截圖（OG 失敗 fallback）────────────
+            # 重點: 不截整個 viewport（會包含 nav / cookie / 側欄）；改成定位
+            # 文章主體 <article>/<main>/role=main 區塊，element.screenshot 只截那塊。
+            # 失敗才退回 viewport 截圖。
             if url:
-                print(f"  [{i}] 截圖：{url[:80]}...")
+                print(f"  [{i}] 智能截圖：{url[:80]}...")
                 try:
                     page.goto(url, wait_until="domcontentloaded", timeout=30000)
-                    page.wait_for_timeout(3000)   # 等 JS 渲染
-                    # 嘗試關掉 cookie/訂閱彈窗
-                    for sel in ["button[id*='cookie']", "button[class*='close']",
-                                "button[aria-label*='Close']", "button[aria-label*='close']",
-                                "[class*='modal'] button", "[id*='popup'] button"]:
+                    page.wait_for_timeout(2500)   # 等 JS 渲染 + 圖片載入
+                    # 1. 關閉常見的 cookie / newsletter / paywall / modal 彈窗
+                    DISMISS_SELECTORS = [
+                        "button[id*='cookie'][id*='accept' i]",
+                        "button[class*='cookie'][class*='accept' i]",
+                        "button[aria-label*='Accept' i]",
+                        "button[aria-label*='同意' i]",
+                        "button[aria-label*='Close' i]",
+                        "button[aria-label*='close' i]",
+                        "button[aria-label*='關閉' i]",
+                        "button[class*='close'][class*='modal' i]",
+                        "button[class*='dismiss' i]",
+                        "[class*='cookie-banner' i] button",
+                        "[id*='popup' i] button[class*='close' i]",
+                    ]
+                    for sel in DISMISS_SELECTORS:
                         try:
-                            btn = page.query_selector(sel)
-                            if btn and btn.is_visible():
-                                btn.click()
-                                page.wait_for_timeout(500)
-                                break
+                            for btn in page.query_selector_all(sel)[:3]:
+                                if btn.is_visible():
+                                    btn.click(timeout=1000)
+                                    page.wait_for_timeout(200)
                         except Exception:
                             pass
-                    page.evaluate("window.scrollTo(0, 0)")
-                    page.screenshot(path=str(shot_path), full_page=False)
-
-                    # 檢查截圖大小
-                    size = shot_path.stat().st_size
-                    if size < 25_000:
-                        print(f"    ⚠️  截圖疑似空白（{size//1024}KB），嘗試備案...")
-                        shot_path.unlink(missing_ok=True)
-                    else:
-                        print(f"  [{i}] ✅ 截圖成功 ({size//1024}KB)")
+                    # 2. 強制移除黏性 header / footer / banner（CSS 注入）
+                    page.add_style_tag(content="""
+                        [class*='cookie-banner' i], [id*='cookie-banner' i],
+                        [class*='newsletter' i][class*='popup' i],
+                        [class*='paywall' i], [class*='modal-overlay' i],
+                        [class*='sticky' i][class*='header' i],
+                        [style*='position: fixed' i][style*='bottom' i] { display: none !important; }
+                    """)
+                    # 3. 定位文章主體 element 並截圖
+                    ARTICLE_SELECTORS = [
+                        "article",
+                        "[role='main']",
+                        "main article",
+                        "main",
+                        "[itemprop='articleBody']",
+                        ".article-body",
+                        ".article-content",
+                        ".post-content",
+                        ".entry-content",
+                        "#article-body",
+                        "#content",
+                    ]
+                    captured = False
+                    for sel in ARTICLE_SELECTORS:
+                        try:
+                            el = page.query_selector(sel)
+                            if not el:
+                                continue
+                            box = el.bounding_box()
+                            if not box or box["height"] < 300 or box["width"] < 300:
+                                continue
+                            # Scroll element into view so images lazy-load
+                            el.scroll_into_view_if_needed(timeout=3000)
+                            page.wait_for_timeout(700)
+                            el.screenshot(path=str(shot_path))
+                            captured = True
+                            print(f"  [{i}] ✅ element:{sel} 截圖成功 ({shot_path.stat().st_size//1024}KB)")
+                            break
+                        except Exception:
+                            continue
+                    # 4. fallback: viewport 截圖
+                    if not captured:
+                        page.evaluate("window.scrollTo(0, 0)")
+                        page.screenshot(path=str(shot_path), full_page=False)
+                        size = shot_path.stat().st_size
+                        if size < 25_000:
+                            print(f"    ⚠️  截圖疑似空白（{size//1024}KB），嘗試備案...")
+                            shot_path.unlink(missing_ok=True)
+                        else:
+                            print(f"  [{i}] ✅ viewport 截圖成功 ({size//1024}KB)")
+                            captured = True
+                    if captured:
                         continue
                 except Exception as e:
                     print(f"  [{i}] ⚠️ 截圖失敗：{e}")
