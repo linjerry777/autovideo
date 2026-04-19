@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from web.db import init_db, get_setting
 from web import job_runner, scheduler_service
-from web.routes import jobs, events, media, settings, news, accounts, trending, analytics
+from web.routes import jobs, events, media, settings, news, accounts, trending, analytics, schedule
 
 
 @asynccontextmanager
@@ -61,6 +61,7 @@ app.include_router(news.router)
 app.include_router(accounts.router)
 app.include_router(trending.router)
 app.include_router(analytics.router)
+app.include_router(schedule.router)
 
 
 @app.get("/")
@@ -72,3 +73,10 @@ def root():
 _static_dir = Path(__file__).parent / "static"
 _static_dir.mkdir(exist_ok=True)
 app.mount("/ui", StaticFiles(directory=str(_static_dir), html=True), name="ui")
+
+# Serve pipeline assets (thumbnails, screenshots) to the UI — read-only
+_pipeline_dir = Path(__file__).parent.parent / "pipeline"
+if _pipeline_dir.exists():
+    app.mount("/pipeline_asset",
+              StaticFiles(directory=str(_pipeline_dir)),
+              name="pipeline_asset")

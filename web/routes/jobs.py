@@ -82,9 +82,40 @@ def trigger(req: TriggerRequest):
     return {"job_id": job_id, "date": run_date, "status": "queued"}
 
 
+_STRATEGY_LABEL = {
+    "tech":          "科技",
+    "entertainment": "娛樂",
+    "finance":       "財經",
+    "pet":           "寵物",
+    "generic":       "新聞",
+}
+
+def _enrich_display(job: dict) -> dict:
+    """Compute display_topic = {strategy label} · {first news title}. Falls
+    back to raw topic / triggered_by so UI always has something meaningful."""
+    pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job['id']}"
+    news_file = pipe_dir / "news.json"
+    strategy  = ""
+    first_title = ""
+    if news_file.exists():
+        try:
+            nd = _json.loads(news_file.read_text(encoding="utf-8"))
+            strategy = (nd.get("strategy") or "").lower()
+            items    = nd.get("items") or []
+            if items:
+                first_title = items[0].get("title") or items[0].get("hook") or ""
+        except Exception:
+            pass
+    label = _STRATEGY_LABEL.get(strategy, "")
+    parts = [p for p in (label, first_title) if p]
+    display = " · ".join(parts) if parts else (job.get("topic") or "")
+    job["display_topic"] = display
+    return job
+
+
 @router.get("/jobs")
 def jobs_list(limit: int = 30, status: str = None):
-    return list_jobs(limit=limit, status=status)
+    return [_enrich_display(j) for j in list_jobs(limit=limit, status=status)]
 
 
 @router.get("/jobs/running")
@@ -96,6 +127,8 @@ def running_job():
 @router.get("/jobs/{job_id}")
 def job_detail(job_id: int):
     job = get_job(job_id)
+    if job:
+        _enrich_display(job)
     if not job:
         raise HTTPException(404, "Job not found")
     return job

@@ -100,6 +100,14 @@
         <span class="font-medium" :class="page==='accounts' ? 'text-green-700' : ''">帳號</span>
       </button>
 
+      <button @click="page='schedule'; loadSchedule()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='schedule' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='schedule'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <svg class="w-[15px] h-[15px] flex-shrink-0" :class="page==='schedule' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        <span class="font-medium" :class="page==='schedule' ? 'text-green-700' : ''">排程</span>
+      </button>
+
       <button @click="page='analytics'; loadAnalytics()"
         class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
         :class="page==='analytics' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
@@ -278,7 +286,7 @@
                   <td class="px-5 py-3.5 text-xs text-gray-400 font-mono" x-text="'#'+j.id"></td>
                   <td class="px-5 py-3.5 text-sm text-gray-600 font-mono tabular-nums" x-text="j.date"></td>
                   <td class="px-5 py-3.5">
-                    <span class="text-sm text-gray-500 truncate max-w-[160px] block" x-text="j.topic || 'AI 科技快訊'"></span>
+                    <span class="text-sm text-gray-500 truncate max-w-[260px] block" x-text="j.display_topic || j.topic || 'AI 科技快訊'"></span>
                   </td>
                   <td class="px-5 py-3.5">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
@@ -2127,6 +2135,102 @@
       </div>
     </div>
 
+    <!-- ═══════ SCHEDULE PAGE ═══════ -->
+    <div x-show="page==='schedule'" class="p-8 max-w-6xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900">📅 發布排程</h1>
+          <p class="text-sm text-gray-500 mt-1">未來 7 天各平台 × 帳號的影片上傳時段（已發布 + 預測中）</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <select x-model="scheduleDays" @change="loadSchedule()"
+            class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm bg-white">
+            <option value="1">今日</option>
+            <option value="3">未來 3 天</option>
+            <option value="7">未來 7 天</option>
+          </select>
+          <button @click="loadSchedule()"
+            class="text-xs text-green-600 hover:text-green-700 font-medium">重新整理</button>
+        </div>
+      </div>
+
+      <div x-show="!scheduleLoading && (!scheduleEntries || scheduleEntries.length===0)"
+        class="text-center py-20 text-gray-400 text-sm">
+        還沒有排程中的上傳。跑一次 autopilot 就會出現在這裡。
+      </div>
+
+      <div x-show="scheduleLoading" class="text-center py-20 text-gray-400 text-sm">
+        載入中⋯
+      </div>
+
+      <!-- Grouped by day -->
+      <template x-for="day in scheduleByDay" :key="day.date">
+        <div class="glass rounded-2xl overflow-hidden">
+          <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-semibold text-gray-700" x-text="day.label"></span>
+              <span class="text-xs text-gray-400" x-text="day.date"></span>
+            </div>
+            <span class="text-xs text-gray-500" x-text="day.entries.length + ' 支上傳'"></span>
+          </div>
+          <div class="divide-y divide-gray-100">
+            <template x-for="e in day.entries" :key="e.job_id + '-' + e.platform + '-' + e.when">
+              <div class="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition">
+                <!-- Time -->
+                <div class="w-20 flex-shrink-0">
+                  <div class="text-lg font-mono font-semibold text-gray-800 tabular-nums" x-text="e.time"></div>
+                  <div class="text-[10px] text-gray-400" x-text="e.relative"></div>
+                </div>
+                <!-- Thumbnail -->
+                <div class="w-16 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 ring-1 ring-gray-200">
+                  <template x-if="e.thumbnail">
+                    <img :src="e.thumbnail" class="w-full h-full object-cover">
+                  </template>
+                  <template x-if="!e.thumbnail">
+                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-xl">🎬</div>
+                  </template>
+                </div>
+                <!-- Meta -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                      :class="({
+                        tiktok:'bg-black text-white',
+                        youtube:'bg-red-500 text-white',
+                        instagram:'bg-gradient-to-br from-pink-500 to-orange-400 text-white',
+                        facebook:'bg-blue-600 text-white',
+                        threads:'bg-gray-900 text-white',
+                        x:'bg-black text-white',
+                      })[e.platform]"
+                      x-text="({tiktok:'TikTok',youtube:'YouTube',instagram:'IG',facebook:'FB',threads:'Threads',x:'X'})[e.platform] || e.platform"></span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-gray-100 text-gray-600"
+                      x-show="e.account" x-text="'@' + e.account"></span>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-purple-100 text-purple-700"
+                      x-show="e.strategy_label" x-text="e.strategy_label"></span>
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]"
+                      :class="{
+                        'bg-emerald-100 text-emerald-700': e.status==='uploaded',
+                        'bg-amber-100 text-amber-700':    e.status==='pending',
+                        'bg-blue-100 text-blue-700':      e.status==='predicted',
+                        'bg-red-100 text-red-700':        e.status==='failed',
+                      }" x-text="({uploaded:'已排程',pending:'排程中',predicted:'預測',failed:'失敗'})[e.status] || e.status"></span>
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500"
+                      x-show="e.video_version" x-text="e.video_version==='long'?'長版':'短版'"></span>
+                  </div>
+                  <div class="text-sm text-gray-700 mt-1 truncate" x-text="e.title || '(未命名)'"></div>
+                </div>
+                <!-- Job link -->
+                <button @click="openJob(e.job_id)"
+                  class="text-xs text-green-600 hover:text-green-700 font-medium flex-shrink-0">
+                  #<span x-text="e.job_id"></span> →
+                </button>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
     <!-- ── Settings ───────────────────────────────────────────────────── -->
     <!-- ═══════ ANALYTICS PAGE ═══════ -->
     <div x-show="page==='analytics'" class="p-8 max-w-6xl mx-auto space-y-6">
@@ -2468,6 +2572,12 @@ function app() {
     stats: {},
     jobs: [],
 
+    // schedule preview
+    scheduleDays: 7,
+    scheduleEntries: [],
+    scheduleLoading: false,
+    scheduleByDay: [],
+
     // generate flow
     newStep: 'config',
     videoMode: 'news',          // 'news' | 'trending'
@@ -2589,6 +2699,49 @@ function app() {
       } finally {
         this.analyticsLoading = false
       }
+    },
+
+    async loadSchedule() {
+      this.scheduleLoading = true
+      try {
+        const d = await this.api('GET', `/api/schedule/upcoming?days=${this.scheduleDays}`)
+        this.scheduleEntries = d.entries || []
+        this.scheduleByDay   = this._groupScheduleByDay(this.scheduleEntries)
+      } catch (e) {
+        this.showToast('排程讀取失敗：' + e.message)
+      } finally {
+        this.scheduleLoading = false
+      }
+    },
+    _groupScheduleByDay(entries) {
+      const byDate = {}
+      const today = new Date(); today.setHours(0,0,0,0)
+      const fmtDay = (d) => {
+        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0')
+        return `${y}-${m}-${dd}`
+      }
+      const weekdays = ['日','一','二','三','四','五','六']
+      for (const e of entries) {
+        const dt = new Date(e.when)
+        const dkey = fmtDay(dt)
+        if (!byDate[dkey]) {
+          const diff = Math.floor((dt - today) / 86400000)
+          let lbl = `週${weekdays[dt.getDay()]}`
+          if (diff === 0)      lbl = '今天 · ' + lbl
+          else if (diff === 1) lbl = '明天 · ' + lbl
+          else if (diff === 2) lbl = '後天 · ' + lbl
+          byDate[dkey] = { date: dkey, label: lbl, entries: [] }
+        }
+        const hh = String(dt.getHours()).padStart(2,'0')
+        const mm = String(dt.getMinutes()).padStart(2,'0')
+        const diffMs = dt - new Date()
+        const rel = diffMs < 0 ? '已過' :
+                    diffMs < 3600000 ? `${Math.round(diffMs/60000)} 分後` :
+                    diffMs < 86400000 ? `${Math.round(diffMs/3600000)} 小時後` :
+                    `${Math.round(diffMs/86400000)} 天後`
+        byDate[dkey].entries.push({ ...e, time: `${hh}:${mm}`, relative: rel })
+      }
+      return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date))
     },
 
     async refreshAnalytics() {

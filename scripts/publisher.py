@@ -280,6 +280,22 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         else:
             upload_plan.append((version_key, video_path, group, {}))
 
+    # Write schedule_log.json so the UI's 📅 排程 page can show what's queued.
+    # Writes per-platform scheduled_date + account + video_version. Appended
+    # with request_id + status after each upload below.
+    schedule_entries: list[dict] = []
+    for label, _vp, group, extra in upload_plan:
+        for p in group:
+            schedule_entries.append({
+                "platform":       p,
+                "scheduled_date": extra.get("scheduled_date") or "",
+                "timezone":       tz,
+                "video_version":  label.split(":")[0] if ":" in label else "legacy",
+                "profile":        PROFILE,
+                "status":         "pending",
+                "request_id":     "",
+            })
+
     responses = []
     for label, video_path, group, extra in upload_plan:
         merged_kwargs = {**kwargs, **extra}
@@ -292,6 +308,20 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
             **merged_kwargs,
         )
         responses.append((label, resp))
+        # Backfill status + request_id into schedule_entries for the UI
+        for ent in schedule_entries:
+            if ent["platform"] in group and ent.get("status") == "pending":
+                ent["status"]     = "uploaded" if resp.get("success") else "failed"
+                ent["request_id"] = resp.get("request_id", "")
+
+    # Persist schedule log (even on failure — tells UI what was attempted)
+    try:
+        (pipe_dir / "schedule_log.json").write_text(
+            json.dumps(schedule_entries, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as _e:
+        print(f"⚠️  schedule_log 寫入失敗：{_e}", file=sys.stderr)
 
     # Summarize
     all_ok = all(r.get("success") for _, r in responses) if responses else False
