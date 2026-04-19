@@ -189,11 +189,16 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
             "audio":        audio_url,
             "timing":       timing,
             "duration":     duration,
+            # Article-card fields — populated by scripts/article_extractor.py
+            "bullets":        item.get("bullets") or [],
+            "hero_image_b64": item.get("hero_image_b64") or "",
+            "byline":         item.get("byline") or "",
+            "pub_date":       item.get("pub_date") or "",
         })
 
-    # layout_mode: default "visual" (image full-bleed); accept "text" for legacy look
+    # layout_mode: default "visual"; accept text + 3 article-card variants
     layout_mode = (raw.get("layout_mode") or "visual").lower()
-    if layout_mode not in ("visual", "text"):
+    if layout_mode not in ("visual", "text", "article_magazine", "article_breaking", "article_flashcard"):
         layout_mode = "visual"
 
     # Optional brand mascot (persistent bottom-right overlay across all items)

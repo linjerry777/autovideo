@@ -14,6 +14,13 @@ import { FireScene } from "./scenes/FireScene";
 import { RaceScene } from "./scenes/RaceScene";
 import { SceneInterpreter } from "./scenes/SceneInterpreter";
 import { BackgroundLayer } from "./BackgroundLayer";
+import { ArticleLayer, ArticleVariant } from "./ArticleLayer";
+
+const ARTICLE_LAYOUT_TO_VARIANT: Record<string, ArticleVariant> = {
+  article_magazine:  "magazine",
+  article_breaking:  "breaking",
+  article_flashcard: "flashcard",
+};
 
 const PRESET_SCENES = new Set(["fire", "race", "money", "robot", "warning", "trophy", "default"]);
 
@@ -125,7 +132,10 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
 
   const audioSrc = pathToUrl(item.audio);
   const screenshotSrc = pathToUrl(item.screenshot);
+  const heroSrc = pathToUrl(item.hero_image_b64 || "");
   const scene = resolveScene(item);
+  const articleVariant: ArticleVariant | undefined =
+    layout_mode && ARTICLE_LAYOUT_TO_VARIANT[layout_mode];
 
   // Scene fades in softer when screenshot coexists (atmosphere), bolder otherwise
   const maxSceneOpacity = screenshotSrc ? 0.55 : 0.9;
@@ -133,6 +143,30 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
+  // ── Article-card layouts short-circuit the normal hook/card/orbs tree ──
+  if (articleVariant) {
+    return (
+      <AbsoluteFill style={{ opacity: fadeOpacity, backgroundColor: "#0a0a0a" }}>
+        {audioSrc && <Audio src={audioSrc} startFrom={0} />}
+        <ArticleLayer
+          variant={articleVariant}
+          hook={item.hook || ""}
+          title={item.title || ""}
+          bullets={item.bullets || []}
+          heroImage={heroSrc}
+          fallbackImage={screenshotSrc}
+          source={item.source || ""}
+          byline={item.byline}
+          pubDate={item.pub_date}
+          accent={palette.accent}
+          glow={palette.glow}
+          totalFrames={totalFrames}
+        />
+        <Subtitle timing={item.timing} script={item.script} />
+      </AbsoluteFill>
+    );
+  }
 
   return (
     <AbsoluteFill style={{ opacity: fadeOpacity, backgroundColor: palette.bg1 }}>
