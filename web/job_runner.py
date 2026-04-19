@@ -277,7 +277,8 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
                   platforms: list[str], skip_upload: bool, dry_run: bool,
                   pre_news: list[dict] | None = None,
                   account_profile: str | None = None,
-                  strategy: str | None = None):
+                  strategy: str | None = None,
+                  autopilot: bool = False):
     global _running_job_id
 
     # 每個 job 有自己的子目錄，避免同天不同主題互相覆蓋
@@ -352,13 +353,17 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         su("news", "done")
         _check_cancel(job_id)
 
-        # ── 暫停：等用戶確認/調整腳本 ────────────────────────────
-        ev_script = threading.Event()
-        _pause_events[f"{job_id}_script"] = ev_script
-        su("screenshot", "script_review")
-        ev_script.wait()
-        del _pause_events[f"{job_id}_script"]
-        _check_cancel(job_id)
+        # ── 暫停：等用戶確認/調整腳本 (autopilot 跳過) ────────────
+        if not autopilot:
+            ev_script = threading.Event()
+            _pause_events[f"{job_id}_script"] = ev_script
+            su("screenshot", "script_review")
+            ev_script.wait()
+            del _pause_events[f"{job_id}_script"]
+            _check_cancel(job_id)
+        else:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("\n[autopilot] 略過腳本 review pause\n")
 
         # ── Step 2: 背景素材（截圖 or B-roll）──────────────────────
         bg_mode = get_setting("background_mode", "screenshot")
@@ -399,13 +404,17 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         su("screenshot", "done")
         _check_cancel(job_id)
 
-        # ── 暫停：等用戶確認截圖 ──────────────────────────────────
-        ev = threading.Event()
-        _pause_events[job_id] = ev
-        su("audio", "review")
-        ev.wait()
-        del _pause_events[job_id]
-        _check_cancel(job_id)
+        # ── 暫停：等用戶確認截圖 (autopilot 跳過) ─────────────────
+        if not autopilot:
+            ev = threading.Event()
+            _pause_events[job_id] = ev
+            su("audio", "review")
+            ev.wait()
+            del _pause_events[job_id]
+            _check_cancel(job_id)
+        else:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("\n[autopilot] 略過截圖 review pause\n")
 
         # ── Step 3: 語音生成 (dual-version or legacy) ───────────────
         versions = _detect_versions(job_key)
@@ -452,9 +461,24 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"\n[WARN] thumbnail render exception: {_e}\n")
 
-        # ── Step 5: 上傳 (需用戶手動觸發) ─────────────────────────
+        # ── Step 5: 上傳 ──────────────────────────────────────────
         output_mp4 = pipe_dir / "output.mp4"
-        su("upload", "pending")
+
+        if autopilot and not skip_upload:
+            # Autopilot 直接發布，不等 UI 點擊
+            update_job(job_id, step_upload="uploading")
+            plat_args = ["--platforms"] + platforms
+            if dry_run:
+                plat_args += ["--dry-run"]
+            if account_profile:
+                plat_args += ["--profile", account_profile]
+            ok_pub, out_pub = _call_script("publisher.py", job_key, plat_args, log_path)
+            update_job(job_id, step_upload="done" if ok_pub else "failed")
+            if not ok_pub:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n[autopilot] publisher 失敗:\n{out_pub[-500:]}\n")
+        else:
+            su("upload", "pending")
 
         # ── 完成 ────────────────────────────────────────────────────
         update_job(job_id, status="done", finished_at=_now(),
@@ -485,7 +509,8 @@ def trigger_job(job_id: int, date: str, topic: str | None = None,
                 dry_run: bool = False,
                 pre_news: list[dict] | None = None,
                 account_profile: str | None = None,
-                strategy: str | None = None) -> bool:
+                strategy: str | None = None,
+                autopilot: bool = False) -> bool:
     """Returns True always — job runs immediately or is enqueued for sequential execution."""
     global _running_job_id
     if platforms is None:
@@ -497,13 +522,14 @@ def trigger_job(job_id: int, date: str, topic: str | None = None,
             "dry_run": dry_run, "pre_news": pre_news,
             "account_profile": account_profile,
             "strategy": strategy,
+            "autopilot": autopilot,
         })
         return True
     _running_job_id = job_id
     t = threading.Thread(
         target=_run_pipeline,
         args=(job_id, date, topic, platforms, skip_upload, dry_run,
-              pre_news, account_profile, strategy),
+              pre_news, account_profile, strategy, autopilot),
         daemon=True,
     )
     t.start()

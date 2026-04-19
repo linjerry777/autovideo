@@ -51,6 +51,7 @@ class TriggerRequest(BaseModel):
     selected_cache_ids: list[int] | None  = None   # 對應快取 ID
     account_profile:    str | None        = None   # 覆蓋預設 Upload-Post profile
     strategy:           str | None        = None   # tech|entertainment|finance|pet
+    autopilot:          bool              = False  # 略過 review pause + 自動發布
 
 
 @router.post("/jobs/trigger")
@@ -76,6 +77,7 @@ def trigger(req: TriggerRequest):
         pre_news        = req.selected_news,
         account_profile = req.account_profile,
         strategy        = req.strategy,
+        autopilot       = req.autopilot,
     )
     return {"job_id": job_id, "date": run_date, "status": "queued"}
 
