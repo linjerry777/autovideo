@@ -599,7 +599,8 @@ def _fetch_google_trends_tw(keyword: str = None, limit: int = 25) -> list[dict]:
     """
     import feedparser
     try:
-        feed = feedparser.parse("https://trends.google.com/trends/trendingsearches/daily/rss?geo=TW")
+        # Note: Google deprecated /trendingsearches/daily/rss in 2025 → empty feed; new path is /trending/rss
+        feed = feedparser.parse("https://trends.google.com/trending/rss?geo=TW")
         items = []
         for e in feed.entries[:limit]:
             title = e.get("title", "").strip()
