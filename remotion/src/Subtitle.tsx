@@ -3,41 +3,81 @@ import {
   useCurrentFrame,
   useVideoConfig,
   interpolate,
+  spring,
 } from "remotion";
 import { TimingEntry } from "./types";
 
 interface SubtitleProps {
   timing: TimingEntry[] | null;
   script: string;
+  /** Accent color used for power-word emphasis. Defaults to punchy yellow. */
+  accent?: string;
+}
+
+// Power-word regex — numbers, percentages, Chinese emphasis words.
+// Matches are rendered in accent color with a glow, mimicking Submagic's
+// per-word highlight style. Designed for 60%+ muted viewers who read captions.
+const POWER_REGEX =
+  /(\d+[.,]?\d*[%％萬億千百倍]?|破|爆|首|最|第一|竟然|居然|直接|全網|瞬間|秒殺|顛覆|崩壞|封神|全平台|狂漲|暴漲|暴跌|翻倍|上線|震撼|驚|真的|絕對|完全|史上|一次|瞬間|正式)/g;
+
+function renderColoredText(text: string, accent: string) {
+  const nodes: React.ReactNode[] = [];
+  const re = new RegExp(POWER_REGEX.source, "g");
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) {
+      nodes.push(
+        <span key={`t${lastIdx}`}>{text.slice(lastIdx, m.index)}</span>,
+      );
+    }
+    nodes.push(
+      <span
+        key={`e${m.index}`}
+        style={{
+          color: accent,
+          textShadow: `0 0 14px ${accent}aa, 0 3px 8px rgba(0,0,0,0.95)`,
+          fontWeight: 900,
+        }}
+      >
+        {m[0]}
+      </span>,
+    );
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) {
+    nodes.push(<span key={`t${lastIdx}`}>{text.slice(lastIdx)}</span>);
+  }
+  return nodes.length > 0 ? nodes : [<span key="all">{text}</span>];
 }
 
 /**
- * Renders animated subtitles synced to timing JSON.
- * Falls back to splitting script into 4 equal chunks if timing is absent.
+ * Animated subtitles synced to timing JSON. Falls back to equal-split chunks
+ * if timing is absent.
  *
- * Runs inside <Sequence from=N>, so useCurrentFrame() is already 0-based
- * relative to the sequence start.
+ * Submagic-style: each chunk enters with a scale-in spring bounce, power words
+ * highlighted in accent color with glow, larger/bolder text than the old plain
+ * white subtitle.
  */
-export const Subtitle: React.FC<SubtitleProps> = ({ timing, script }) => {
+export const Subtitle: React.FC<SubtitleProps> = ({
+  timing,
+  script,
+  accent = "#ffd740",
+}) => {
   const localFrame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const localSeconds = localFrame / fps;
 
-  // Build subtitle chunks from timing or equal split
   let chunks: Array<{ text: string; start: number; end: number }>;
 
   if (timing && timing.length > 0) {
     chunks = timing;
   } else {
-    // Split script into ~4 sentences
     const sentences = script
       .split(/(?<=[！？。，、；])/g)
       .map((s) => s.trim())
       .filter(Boolean);
     const parts = sentences.length > 0 ? sentences : [script];
-    // Estimate we won't know duration here, use a placeholder approach
-    // The parent passes a generous duration via its own durationInFrames
-    // Just give each chunk 1/parts fraction of 999s (clamped by parent)
     const chunkDur = 999 / parts.length;
     chunks = parts.map((text, i) => ({
       text,
@@ -46,29 +86,34 @@ export const Subtitle: React.FC<SubtitleProps> = ({ timing, script }) => {
     }));
   }
 
-  // Find active chunk
   const active = chunks.find(
-    (c) => localSeconds >= c.start && localSeconds < c.end
+    (c) => localSeconds >= c.start && localSeconds < c.end,
   );
-
   if (!active) return null;
 
+  const chunkStartFrame = active.start * fps;
+  const framesIntoChunk = localFrame - chunkStartFrame;
   const chunkDuration = active.end - active.start;
   const progressInChunk = localSeconds - active.start;
 
-  // Fade in first 0.2s, fade out last 0.15s
-  const fadeInEnd = Math.min(0.2, chunkDuration * 0.2);
-  const fadeOutStart = Math.max(0, chunkDuration - 0.15);
+  // Scale spring: 0.85 → 1.0 over 10 frames at chunk start
+  const scaleSpring = spring({
+    fps,
+    frame: framesIntoChunk,
+    config: { damping: 14, stiffness: 180, mass: 0.6 },
+    durationInFrames: 12,
+  });
+  const scale = interpolate(scaleSpring, [0, 1], [0.85, 1]);
 
+  // Fade in 0.12s, fade out last 0.12s
   const opacity = interpolate(
     progressInChunk,
-    [0, fadeInEnd, fadeOutStart, chunkDuration],
+    [0, 0.12, Math.max(0, chunkDuration - 0.12), chunkDuration],
     [0, 1, 1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
 
-  // Wrap text at ~13 CJK chars
-  const wrapped = wrapText(active.text, 13);
+  const wrapped = wrapText(active.text, 12);
 
   return (
     <div
@@ -82,16 +127,20 @@ export const Subtitle: React.FC<SubtitleProps> = ({ timing, script }) => {
         alignItems: "center",
         opacity,
         zIndex: 20,
-        padding: "0 60px",
+        padding: "0 40px",
+        transform: `scale(${scale})`,
+        transformOrigin: "center bottom",
       }}
     >
       <div
         style={{
-          backgroundColor: "rgba(0,0,0,0.7)",
-          borderRadius: 12,
-          padding: "10px 22px",
+          backgroundColor: "rgba(0,0,0,0.82)",
+          borderRadius: 16,
+          padding: "14px 28px",
           textAlign: "center",
-          maxWidth: "92%",
+          maxWidth: "94%",
+          border: `2px solid ${accent}55`,
+          boxShadow: `0 12px 32px rgba(0,0,0,0.7), 0 0 28px ${accent}30`,
         }}
       >
         {wrapped.map((line, idx) => (
@@ -100,16 +149,17 @@ export const Subtitle: React.FC<SubtitleProps> = ({ timing, script }) => {
             style={{
               fontFamily:
                 '"Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif',
-              fontSize: 52,
-              fontWeight: "bold",
+              fontSize: 60,
+              fontWeight: 900,
               color: "#FFFFFF",
-              lineHeight: 1.3,
-              textShadow: "2px 2px 6px rgba(0,0,0,0.9)",
+              lineHeight: 1.25,
+              textShadow:
+                "0 3px 10px rgba(0,0,0,0.95), 0 0 18px rgba(0,0,0,0.8)",
               letterSpacing: 2,
               display: "block",
             }}
           >
-            {line}
+            {renderColoredText(line, accent)}
           </div>
         ))}
       </div>

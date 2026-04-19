@@ -46,10 +46,16 @@ const MagazineLayout: React.FC<ArticleLayerProps> = ({
   const { fps } = useVideoConfig();
   const imgSrc = heroImage || fallbackImage || "";
 
-  // Hero Ken-Burns zoom
-  const heroScale = interpolate(frame, [0, totalFrames], [1.0, 1.06], {
+  // Rapid punch-in: 1.22 → 1.02 over first 18 frames (0.6s), then slow drift
+  // Silent-muted viewers get motion in the first half-second — 2026 data shows
+  // this beats static by 2.5× on 3s-retention.
+  const punchIn = interpolate(frame, [0, 18], [1.22, 1.02], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
   });
+  const drift = interpolate(frame, [18, totalFrames], [0, 0.04], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+  const heroScale = punchIn + drift;
 
   // Title fade-in
   const titleOp = interpolate(frame, [6, 22], [0, 1], {
@@ -215,13 +221,15 @@ const BreakingLayout: React.FC<ArticleLayerProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
-      {/* Full-bleed image dimmed */}
+      {/* Full-bleed image dimmed with rapid punch-in (1.25 → 1.03 over 18f) */}
       {imgSrc ? (
         <Img
           src={imgSrc}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             filter: "brightness(0.45) contrast(1.1)",
+            transform: `scale(${interpolate(frame, [0, 18, totalFrames], [1.25, 1.03, 1.06], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })})`,
+            transformOrigin: "center center",
           }}
         />
       ) : (
@@ -400,14 +408,14 @@ const FlashcardLayout: React.FC<ArticleLayerProps> = ({
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#0a0a0a" }}>
-      {/* Full-bleed dimmed hero as atmosphere */}
+      {/* Full-bleed dimmed hero with rapid zoom-in (1.3 → 1.08 over 18f) */}
       {imgSrc ? (
         <Img
           src={imgSrc}
           style={{
             width: "100%", height: "100%", objectFit: "cover",
             filter: "brightness(0.3) blur(6px)",
-            transform: `scale(${1.05 + (frame / totalFrames) * 0.04})`,
+            transform: `scale(${interpolate(frame, [0, 18, totalFrames], [1.3, 1.08, 1.12], { extrapolateLeft: "clamp", extrapolateRight: "clamp" })})`,
           }}
         />
       ) : (
