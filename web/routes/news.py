@@ -82,19 +82,20 @@ _SOCIAL_LABELS = {
 }
 
 # 所有支援的來源定義
+# 移除 reddit / bilibili / ptt（用戶反饋「用不到」「感覺有點鳥」）
+# 新增 tiktok_tw（TikTok CC hashtag trending）+ google_trends_tw（官方 Trends RSS）
 ALL_SOURCES = {
-    "google":       {"label": "Google News",        "icon": "🔍", "default": True,  "group": "news"},
-    "bing":         {"label": "Bing News",          "icon": "🔎", "default": True,  "group": "news"},
-    "bilibili":     {"label": "Bilibili 熱榜",      "icon": "📺", "default": True,  "group": "zh"},
-    "zhihu":        {"label": "知乎熱搜",            "icon": "💬", "default": True,  "group": "zh"},
-    "ptt":          {"label": "PTT 八卦/熱門",       "icon": "🏛️", "default": False, "group": "zh"},
-    "dcard":        {"label": "Dcard 熱門",          "icon": "🃏", "default": False, "group": "zh"},
-    "reddit":       {"label": "Reddit 熱門",         "icon": "🤖", "default": False, "group": "en"},
-    "youtube_tw":   {"label": "YouTube 熱門 TW",     "icon": "▶️", "default": False, "group": "en"},
-    "youtube_us":   {"label": "YouTube Trending US", "icon": "▶️", "default": False, "group": "en"},
-    "hackernews":   {"label": "Hacker News",         "icon": "🦊", "default": False, "group": "en"},
-    "last30days":   {"label": "Social (Reddit·HN)",  "icon": "🌐", "default": False, "group": "en"},
-    "ithome":       {"label": "IT之家",             "icon": "🏠", "default": False, "group": "zh"},
+    "google":           {"label": "Google News",          "icon": "🔍", "default": True,  "group": "news"},
+    "bing":             {"label": "Bing News",            "icon": "🔎", "default": True,  "group": "news"},
+    "google_trends_tw": {"label": "Google Trends TW",     "icon": "📈", "default": True,  "group": "news"},
+    "zhihu":            {"label": "知乎熱搜",              "icon": "💬", "default": True,  "group": "zh"},
+    "dcard":            {"label": "Dcard 熱門",            "icon": "🃏", "default": False, "group": "zh"},
+    "youtube_tw":       {"label": "YouTube 熱門 TW",       "icon": "▶️", "default": False, "group": "en"},
+    "youtube_us":       {"label": "YouTube Trending US",   "icon": "▶️", "default": False, "group": "en"},
+    "tiktok_tw":        {"label": "TikTok 熱門 Hashtag TW", "icon": "🎵", "default": False, "group": "en"},
+    "hackernews":       {"label": "Hacker News",           "icon": "🦊", "default": False, "group": "en"},
+    "last30days":       {"label": "Social (Reddit·HN)",    "icon": "🌐", "default": False, "group": "en"},
+    "ithome":           {"label": "IT之家",                "icon": "🏠", "default": False, "group": "zh"},
 }
 
 DEFAULT_SOURCES = [k for k, v in ALL_SOURCES.items() if v["default"]]
@@ -533,6 +534,92 @@ CURATED_RSS = {
     "ithome": "https://www.ithome.com/rss/",
 }
 
+# ── TikTok Creative Center hashtag trending (TW) ──────────────────────────────
+
+def _fetch_tiktok_tw(keyword: str = None, limit: int = 25) -> list[dict]:
+    """Scrape TikTok Creative Center popular hashtags for Taiwan.
+
+    Source: https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en?countryCode=TW
+    Returns __NEXT_DATA__-embedded items with hashtagName, rank, videoViews, publishCnt.
+    Treat each hashtag as a news-like item for Claude enrichment.
+    """
+    import requests, re
+    try:
+        html = requests.get(
+            "https://ads.tiktok.com/business/creativecenter/inspiration/popular/hashtag/pc/en?countryCode=TW",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"},
+            timeout=15,
+        ).text
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.+?)</script>', html, re.S)
+        if not m:
+            return []
+        import json as _j
+        data = _j.loads(m.group(1))
+        state = data["props"]["pageProps"].get("dehydratedState", {})
+        rows = []
+        for q in state.get("queries", []):
+            sd = q.get("state", {}).get("data")
+            if isinstance(sd, dict) and "pages" in sd:
+                for page in sd["pages"]:
+                    rows.extend(page.get("list", []))
+                break
+        items = []
+        for h in rows[:limit]:
+            tag = h.get("hashtagName", "")
+            if not tag or (keyword and keyword.lower() not in tag.lower()):
+                continue
+            views = int(h.get("videoViews", 0))
+            posts = int(h.get("publishCnt", 0))
+            rank  = h.get("rank", "?")
+            items.append({
+                "title":         f"#{tag}",
+                "summary":       f"TikTok TW 熱門 #{rank}｜{views:,} 播放、{posts:,} 則貼文",
+                "url":           f"https://www.tiktok.com/tag/{tag}",
+                "source":        f"TikTok Trending · TW (#{rank})",
+                "source_type":   "tiktok_tw",
+                "view_count":    views,
+                "publish_count": posts,
+                "rank":          rank,
+            })
+        if len(items) < 3 and keyword:
+            return _fetch_tiktok_tw(None, limit)
+        return items
+    except Exception as e:
+        log.warning(f"TikTok CC trending 失敗: {e}")
+        return []
+
+
+# ── Google Trends TW (daily RSS) ──────────────────────────────────────────────
+
+def _fetch_google_trends_tw(keyword: str = None, limit: int = 25) -> list[dict]:
+    """Google's official daily-trends RSS for Taiwan.
+
+    Feed: https://trends.google.com/trends/trendingsearches/daily/rss?geo=TW
+    Each <item> has a trend query + approx_traffic + related news links.
+    """
+    import feedparser
+    try:
+        feed = feedparser.parse("https://trends.google.com/trends/trendingsearches/daily/rss?geo=TW")
+        items = []
+        for e in feed.entries[:limit]:
+            title = e.get("title", "").strip()
+            if not title or (keyword and keyword.lower() not in title.lower()):
+                continue
+            traffic = getattr(e, "ht_approx_traffic", "") or ""
+            summary = f"Google Trends TW｜{title}" + (f"（約 {traffic} 搜尋）" if traffic else "")
+            items.append({
+                "title":       title,
+                "summary":     summary,
+                "url":         e.get("link") or f"https://www.google.com/search?q={title}",
+                "source":      "Google Trends · TW",
+                "source_type": "google_trends_tw",
+            })
+        return items
+    except Exception as e:
+        log.warning(f"Google Trends TW 失敗: {e}")
+        return []
+
+
 # ── 主要聚合函數 ───────────────────────────────────────────────────────────────
 
 def _fetch_all(keyword: str, lang: str, sources: list[str], limit_per: int = 20) -> list[dict]:
@@ -543,17 +630,16 @@ def _fetch_all(keyword: str, lang: str, sources: list[str], limit_per: int = 20)
         if name in sources:
             tasks[name] = fn
 
-    add("google",      lambda: _fetch_google(keyword, lang, limit_per))
-    add("bing",        lambda: _fetch_bing(keyword, lang, limit_per))
-    add("bilibili",    lambda: _fetch_bilibili(keyword, limit_per))
-    add("zhihu",       lambda: _fetch_zhihu(keyword, limit_per))
-    add("hackernews",  lambda: _fetch_hackernews(keyword, limit_per))
-    add("last30days",  lambda: _fetch_last30days(keyword, limit_per))
-    add("reddit",      lambda: _fetch_reddit_trending(keyword, limit_per))
-    add("youtube_tw",  lambda: _fetch_youtube_trending(keyword, "TW", limit_per))
-    add("youtube_us",  lambda: _fetch_youtube_trending(keyword, "US", limit_per))
-    add("ptt",         lambda: _fetch_ptt(keyword, limit_per))
-    add("dcard",       lambda: _fetch_dcard(keyword, limit_per))
+    add("google",            lambda: _fetch_google(keyword, lang, limit_per))
+    add("bing",              lambda: _fetch_bing(keyword, lang, limit_per))
+    add("zhihu",             lambda: _fetch_zhihu(keyword, limit_per))
+    add("hackernews",        lambda: _fetch_hackernews(keyword, limit_per))
+    add("last30days",        lambda: _fetch_last30days(keyword, limit_per))
+    add("youtube_tw",        lambda: _fetch_youtube_trending(keyword, "TW", limit_per))
+    add("youtube_us",        lambda: _fetch_youtube_trending(keyword, "US", limit_per))
+    add("dcard",             lambda: _fetch_dcard(keyword, limit_per))
+    add("tiktok_tw",         lambda: _fetch_tiktok_tw(keyword, limit_per))
+    add("google_trends_tw",  lambda: _fetch_google_trends_tw(keyword, limit_per))
     for sid, rss_url in CURATED_RSS.items():
         add(sid, lambda u=rss_url, s=sid: _fetch_rss_source(s, u, keyword, limit_per))
 
