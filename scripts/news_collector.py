@@ -82,6 +82,31 @@ def _freshness_level(hours: float | None) -> str:
     return "old"
 
 
+def _load_used_urls() -> set[str]:
+    """Scan pipeline/*/job_*/news.json for URLs already turned into videos.
+
+    Returns a set of source_url strings that should be skipped on auto-selection.
+    """
+    used: set[str] = set()
+    pipeline_root = BASE_DIR / "pipeline"
+    if not pipeline_root.exists():
+        return used
+    for job_dir in pipeline_root.glob("*/job_*"):
+        news_file = job_dir / "news.json"
+        if not news_file.exists():
+            continue
+        try:
+            data = json.loads(news_file.read_text(encoding="utf-8"))
+            for item in data.get("items", []):
+                for key in ("source_url", "url", "resolved_url"):
+                    u = item.get(key)
+                    if u:
+                        used.add(u)
+        except Exception:
+            continue
+    return used
+
+
 def fetch_rss_items(keyword: str = DEFAULT_KEYWORD, limit: int = 30) -> list[dict]:
     print(f"  Google News 搜尋：{keyword}")
     for days in [3, 7, 30]:
@@ -215,6 +240,18 @@ def main():
     raw_items = fetch_rss_items(keyword)
     if not raw_items:
         print("❌ RSS 抓取全部失敗", file=sys.stderr)
+        sys.exit(1)
+
+    # Exclude URLs already made into videos in earlier jobs
+    used = _load_used_urls()
+    if used:
+        before = len(raw_items)
+        raw_items = [it for it in raw_items if it.get("url") not in used]
+        skipped = before - len(raw_items)
+        if skipped:
+            print(f"  ⏭️  跳過 {skipped} 則曾經做過的新聞，剩 {len(raw_items)} 則候選")
+    if not raw_items:
+        print("❌ 過濾後沒有新鮮新聞可選（全部都已做過）", file=sys.stderr)
         sys.exit(1)
 
     print("🤖 Groq 整理 3 則精選新聞...")

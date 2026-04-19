@@ -13,15 +13,13 @@ PYTHON   = sys.executable
 
 
 def _default_layout_for_strategy(strategy: str | None) -> str:
-    """Pick a default layout_mode based on content strategy.
+    """Default layout for all strategies → article_rotate.
 
-    entertainment / generic → article_rotate (magazine/breaking/flashcard cycle)
-    everything else          → visual (image full-bleed + hook/card)
+    User preference: every strategy (news + trending, tech / entertainment /
+    finance / pet / generic) uses the 3-variant rotation. Individual jobs
+    can still override via news.json's `layout_mode` field.
     """
-    s = (strategy or "").lower()
-    if s in ("entertainment", "generic"):
-        return "article_rotate"
-    return "visual"
+    return "article_rotate"
 
 
 def _detect_versions(job_key: str) -> list[str | None]:

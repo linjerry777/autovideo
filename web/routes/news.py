@@ -696,6 +696,7 @@ def fetch_news(
     sources: str = Query(None),  # 逗號分隔，e.g. "google,bilibili,zhihu"
     force: bool = Query(False),  # True = skip cache
     exclude_urls: str = Query(""),
+    filter_made_before: bool = Query(False),  # True = hide already-made URLs entirely
 ):
     if lang not in LANG_CONFIG:
         lang = "zh-TW"
@@ -763,6 +764,8 @@ def fetch_news(
         if u in exclude_set:
             continue
         past = used_map.get(u, [])
+        if filter_made_before and past:
+            continue   # autopilot mode: skip anything already videoed
         it["made_before"]        = bool(past)
         it["past_jobs"]          = past[-3:]    # last 3 job ids
         # Preserve existing screenshot_blocked (may be True from DB); OR with live check
