@@ -205,11 +205,18 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
     mascot_path = BASE_DIR / "assets" / "brand" / "mascot.png"
     mascot_url  = file_to_data_url(mascot_path, "image/png") if mascot_path.exists() else ""
 
+    # Deterministic rotation offset from job_key — ensures single-item jobs
+    # (e.g. trending) don't all start on "magazine". Stable per job so re-renders
+    # don't shuffle.
+    import hashlib as _hashlib
+    rotation_offset = int(_hashlib.md5(TODAY.encode("utf-8")).hexdigest(), 16) % 3
+
     return {
-        "date":        TODAY,
-        "items":       items_out,
-        "layout_mode": layout_mode,
-        "mascot":      mascot_url,
+        "date":            TODAY,
+        "items":           items_out,
+        "layout_mode":     layout_mode,
+        "mascot":          mascot_url,
+        "rotation_offset": rotation_offset,
     }
 
 

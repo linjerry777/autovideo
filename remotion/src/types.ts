@@ -82,4 +82,6 @@ export interface NewsVideoProps extends Record<string, unknown> {
   layout_mode?: LayoutMode;
   /** Optional data-URL of assets/brand/mascot.png; renders as bottom-right presenter when set. */
   mascot?: string;
+  /** Offset added to per-item variant rotation so single-item jobs don't all look the same. */
+  rotation_offset?: number;
 }

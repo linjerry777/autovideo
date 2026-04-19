@@ -499,7 +499,15 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             if account_profile:
                 plat_args += ["--profile", account_profile]
             ok_pub, out_pub = _call_script("publisher.py", job_key, plat_args, log_path)
-            update_job(job_id, step_upload="done" if ok_pub else "failed")
+            # Distinguish dry-run preview from real upload in the UI so users
+            # don't think an un-published job was pushed to the platforms.
+            if not ok_pub:
+                final_state = "failed"
+            elif dry_run:
+                final_state = "dry_run"
+            else:
+                final_state = "done"
+            update_job(job_id, step_upload=final_state)
             if not ok_pub:
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[autopilot] publisher 失敗:\n{out_pub[-500:]}\n")

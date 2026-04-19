@@ -13,7 +13,7 @@ const FPS = 30;
  * A 0.3s crossfade is applied by having each Sequence start 9 frames
  * before the previous one ends (handled via opacity in NewsItemComponent).
  */
-export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visual", mascot = "" }) => {
+export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visual", mascot = "", rotation_offset = 0 }) => {
   // Build per-item frame ranges
   const FADE_FRAMES = 9; // 0.3s @ 30fps
 
@@ -41,7 +41,7 @@ export const NewsVideo: React.FC<NewsVideoProps> = ({ items, layout_mode = "visu
         >
           <NewsItemComponent
             item={item}
-            index={idx}
+            index={idx + rotation_offset}
             totalFrames={durationFrames}
             totalItems={placed.length}
             layout_mode={layout_mode}

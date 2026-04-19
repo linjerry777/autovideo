@@ -43,6 +43,16 @@ class SettingsUpdate(BaseModel):
     trending_profile_entertainment: str | None = None
     trending_profile_finance:       str | None = None
     trending_profile_pet:           str | None = None
+    # Autopilot (daily auto-run at schedule_hour:schedule_minute)
+    autopilot_enabled:              str | None = None
+    autopilot_dry_run:              str | None = None
+    autopilot_news_enabled:         str | None = None
+    autopilot_trending_enabled:     str | None = None
+    autopilot_news_strategy:        str | None = None
+    autopilot_news_profile:         str | None = None
+    autopilot_trending_strategy:    str | None = None
+    autopilot_trending_profile:     str | None = None
+    autopilot_platforms:            str | None = None
 
 
 @router.get("/settings")
@@ -68,6 +78,13 @@ def update_settings(body: SettingsUpdate):
         )
 
     return get_all_settings()
+
+
+@router.post("/autopilot/run")
+def autopilot_run_now():
+    """Manually trigger the autopilot daily_job — useful for testing."""
+    scheduler_service.run_now()
+    return {"ok": True}
 
 
 @router.get("/llm/models")

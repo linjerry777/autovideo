@@ -98,7 +98,16 @@ def init_db():
                 ('ai_video_mode',         ''),
                 ('telegram_bot_token',    ''),
                 ('telegram_chat_ids',     ''),
-                ('video_renderer',        'ffmpeg');
+                ('video_renderer',        'ffmpeg'),
+                ('autopilot_enabled',          'false'),
+                ('autopilot_dry_run',          'true'),
+                ('autopilot_news_enabled',     'true'),
+                ('autopilot_trending_enabled', 'true'),
+                ('autopilot_news_strategy',    'generic'),
+                ('autopilot_news_profile',     'pet'),
+                ('autopilot_trending_strategy','entertainment'),
+                ('autopilot_trending_profile', 'pet'),
+                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,tiktok');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}

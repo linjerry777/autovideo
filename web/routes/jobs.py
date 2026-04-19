@@ -464,15 +464,21 @@ def put_platform_meta(job_id: int, body: PlatformMetaUpdate):
     return {"ok": True}
 
 
+_LAYOUT_MODES = {
+    "visual", "text",
+    "article_rotate", "article_magazine", "article_breaking", "article_flashcard",
+}
+
+
 class LayoutModeUpdate(BaseModel):
-    layout_mode: str   # "visual" | "text"
+    layout_mode: str   # see _LAYOUT_MODES
 
 
 @router.patch("/jobs/{job_id}/layout_mode")
 def patch_layout_mode(job_id: int, body: LayoutModeUpdate):
-    """Update layout_mode in news.json (atomic write). Values: visual | text."""
-    if body.layout_mode not in ("visual", "text"):
-        raise HTTPException(400, "layout_mode must be 'visual' or 'text'")
+    """Update layout_mode in news.json (atomic write)."""
+    if body.layout_mode not in _LAYOUT_MODES:
+        raise HTTPException(400, f"layout_mode must be one of: {sorted(_LAYOUT_MODES)}")
 
     job = get_job(job_id)
     if not job:

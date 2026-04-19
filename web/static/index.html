@@ -1227,6 +1227,17 @@
               </div>
             </div>
           </label>
+          <label class="cursor-pointer group"
+            :class="layoutMode === 'article_rotate' ? 'ring-2 ring-green-500 rounded-xl' : ''">
+            <input type="radio" x-model="layoutMode" value="article_rotate" @change="saveLayoutMode()" class="sr-only">
+            <div class="flex items-center gap-3 border border-gray-200 rounded-xl p-2 group-hover:border-gray-300">
+              <div class="w-14 h-24 rounded-md bg-gradient-to-br from-red-500 via-amber-400 to-emerald-500 flex items-center justify-center text-xl">📰</div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-700">📰 文章循環 <span class="text-[10px] text-emerald-600 font-semibold">預設</span></p>
+                <p class="text-[10px] text-gray-400 leading-tight">雜誌 / 突發 / 金句三種版型<br>每則自動輪換</p>
+              </div>
+            </div>
+          </label>
         </div>
         <template x-for="(item, i) in scriptItems" :key="i">
           <div class="glass rounded-2xl p-5 space-y-3">
@@ -2263,6 +2274,44 @@
         <div class="space-y-3">
           <label class="flex items-center gap-3 cursor-pointer group">
             <div class="relative">
+              <input type="checkbox" :checked="settings.autopilot_enabled==='true'"
+                @change="settings.autopilot_enabled = $event.target.checked ? 'true' : 'false'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-purple-600 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm font-medium text-gray-700">🤖 Autopilot（排程時間自動跑 + 自動發布）</p>
+              <p class="text-[11px] text-gray-400">啟用後，每日排程會自動跑「新聞 + 趨勢」各 1 支影片，跳過所有 review pause</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group ml-12"
+            x-show="settings.autopilot_enabled === 'true'">
+            <div class="relative">
+              <input type="checkbox" :checked="settings.autopilot_dry_run==='true'"
+                @change="settings.autopilot_dry_run = $event.target.checked ? 'true' : 'false'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-amber-500 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm text-gray-700">Dry-run 預覽（不實際推到社群平台）</p>
+              <p class="text-[11px] text-gray-400">預設開啟 — 確認過整個流程沒問題再關掉</p>
+            </div>
+          </label>
+          <div x-show="settings.autopilot_enabled === 'true'" class="ml-12">
+            <button @click="runAutopilotNow()"
+              class="text-xs px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium transition">
+              ⚡ 立刻跑一次 autopilot（測試）
+            </button>
+          </div>
+        </div>
+
+        <div class="h-px bg-gray-100"></div>
+
+        <div class="space-y-3">
+          <label class="flex items-center gap-3 cursor-pointer group">
+            <div class="relative">
               <input type="checkbox" :checked="settings.dry_run==='true'"
                 @change="settings.dry_run = $event.target.checked ? 'true' : 'false'"
                 class="sr-only peer">
@@ -3274,7 +3323,14 @@ function app() {
       try {
         await this.api('PATCH', `/api/jobs/${this.currentJob.id}/layout_mode`,
                        { layout_mode: this.layoutMode })
-        const label = this.layoutMode === 'visual' ? '視覺優先' : '文字優先'
+        const label = ({
+          visual:             '視覺優先',
+          text:               '文字優先',
+          article_rotate:     '📰 文章循環',
+          article_magazine:   '📖 雜誌',
+          article_breaking:   '⚡ 突發',
+          article_flashcard:  '💡 金句',
+        })[this.layoutMode] || this.layoutMode
         this.showToast(`版面 → ${label}`)
       } catch (e) { this.showToast('切換失敗：' + e.message) }
     },
@@ -3550,6 +3606,14 @@ function app() {
         this.settingsSaved = true
         setTimeout(() => this.settingsSaved = false, 2000)
       } catch (e) { this.showToast('儲存失敗：' + e.message) }
+    },
+
+    async runAutopilotNow() {
+      if (!confirm('確定要立刻跑 autopilot？會產生 1 支新聞 + 1 支趨勢影片。')) return
+      try {
+        await this.api('POST', '/api/autopilot/run', {})
+        this.showToast('🤖 autopilot 已觸發，到 Jobs 頁看進度')
+      } catch (e) { this.showToast('觸發失敗：' + e.message) }
     },
   }
 }
