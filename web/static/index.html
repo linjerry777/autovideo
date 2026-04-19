@@ -1015,7 +1015,7 @@
                   x-text="group.label"></span>
                 <span class="text-xs text-gray-400" x-text="`${group.items.length} 則`"></span>
               </div>
-              <div class="divide-y divide-gray-50 max-h-72 overflow-y-auto">
+              <div class="divide-y divide-gray-50 max-h-[30rem] overflow-y-auto">
                 <template x-for="item in group.items" :key="item.url || item.title">
                   <label class="flex items-start gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
                     :class="trendingSelectedIds.has(item.url || item.title) ? 'bg-orange-50' : ''">
