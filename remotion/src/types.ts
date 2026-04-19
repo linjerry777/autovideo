@@ -72,7 +72,8 @@ export type LayoutMode =
   | "text"
   | "article_magazine"
   | "article_breaking"
-  | "article_flashcard";
+  | "article_flashcard"
+  | "article_rotate";  // per-item rotation: magazine → breaking → flashcard
 
 export interface NewsVideoProps extends Record<string, unknown> {
   date: string;

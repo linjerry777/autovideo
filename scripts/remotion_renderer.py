@@ -198,7 +198,7 @@ def build_props(pipe_dir: Path, news_file: Path) -> dict:
 
     # layout_mode: default "visual"; accept text + 3 article-card variants
     layout_mode = (raw.get("layout_mode") or "visual").lower()
-    if layout_mode not in ("visual", "text", "article_magazine", "article_breaking", "article_flashcard"):
+    if layout_mode not in ("visual", "text", "article_magazine", "article_breaking", "article_flashcard", "article_rotate"):
         layout_mode = "visual"
 
     # Optional brand mascot (persistent bottom-right overlay across all items)

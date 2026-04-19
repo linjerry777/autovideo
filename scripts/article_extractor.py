@@ -35,7 +35,45 @@ MAX_BODY  = 3000       # truncate body so Claude prompt stays bounded
 
 
 def _http_get(url: str, timeout: int = 15) -> requests.Response:
-    return requests.get(url, headers={"User-Agent": UA, "Accept": "text/html"}, timeout=timeout)
+    # Spoof a full browser — some sites (CommonWealth, paywalled feeds) 403 on
+    # minimal requests headers alone.
+    headers = {
+        "User-Agent":      UA,
+        "Accept":          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Referer":         "https://www.google.com/",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest":  "document",
+        "Sec-Fetch-Mode":  "navigate",
+        "Sec-Fetch-Site":  "cross-site",
+    }
+    return requests.get(url, headers=headers, timeout=timeout)
+
+
+def _resolve_google_news(url: str) -> str:
+    """Google News uses JS redirect — requests.get can't follow it.
+    Use Playwright to land on the real article URL. No-op for non-GN URLs."""
+    if "news.google.com" not in (url or ""):
+        return url
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx     = browser.new_context(user_agent=UA)
+            page    = ctx.new_page()
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=20000)
+                # Give JS redirect a moment to fire
+                page.wait_for_url(lambda u: "news.google.com" not in u, timeout=12000)
+                real = page.url
+            except Exception:
+                real = page.url
+            browser.close()
+            return real if real and "news.google.com" not in real else url
+    except Exception as e:
+        print(f"  [_resolve_google_news] {e}", file=sys.stderr)
+        return url
 
 
 def _parse_int(val, default=0):
@@ -141,7 +179,12 @@ def download_as_data_url(url: str, max_dim: int = 1600) -> str | None:
         r = requests.get(url, headers={"User-Agent": UA, "Referer": url}, timeout=20)
         r.raise_for_status()
         img = Image.open(io.BytesIO(r.content))
-        if img.mode not in ("RGB", "RGBA"):
+        # Flatten transparency → white background so we can save as JPEG
+        if img.mode == "RGBA":
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[3])
+            img = bg
+        elif img.mode != "RGB":
             img = img.convert("RGB")
         if max(img.size) > max_dim:
             img.thumbnail((max_dim, max_dim), Image.LANCZOS)
@@ -156,16 +199,17 @@ def download_as_data_url(url: str, max_dim: int = 1600) -> str | None:
 
 def extract_article(url: str) -> dict:
     """Main entry — returns the dict to merge into a news.json item."""
+    resolved = _resolve_google_news(url)
     try:
-        r = _http_get(url)
+        r = _http_get(resolved)
         r.raise_for_status()
         soup = BeautifulSoup(r.text, "html.parser")
     except Exception as e:
-        print(f"  [extract] fetch failed {url}: {e}", file=sys.stderr)
+        print(f"  [extract] fetch failed {resolved}: {e}", file=sys.stderr)
         return {}
 
-    hero_url = extract_hero(soup, url)
-    all_imgs = extract_all_images(soup, url)
+    hero_url = extract_hero(soup, resolved)
+    all_imgs = extract_all_images(soup, resolved)
     body     = extract_body(soup)
     byline   = extract_byline(soup)
     pub_date = extract_pub_date(soup)
@@ -179,6 +223,7 @@ def extract_article(url: str) -> dict:
         "body_text":      body,
         "byline":         byline,
         "pub_date":       pub_date,
+        "resolved_url":   resolved if resolved != url else "",
     }
 
 

@@ -22,6 +22,9 @@ const ARTICLE_LAYOUT_TO_VARIANT: Record<string, ArticleVariant> = {
   article_flashcard: "flashcard",
 };
 
+// Rotation order used when layout_mode === "article_rotate"
+const ROTATION: ArticleVariant[] = ["magazine", "breaking", "flashcard"];
+
 const PRESET_SCENES = new Set(["fire", "race", "money", "robot", "warning", "trophy", "default"]);
 
 /**
@@ -135,7 +138,9 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
   const heroSrc = pathToUrl(item.hero_image_b64 || "");
   const scene = resolveScene(item);
   const articleVariant: ArticleVariant | undefined =
-    layout_mode && ARTICLE_LAYOUT_TO_VARIANT[layout_mode];
+    layout_mode === "article_rotate"
+      ? ROTATION[index % ROTATION.length]
+      : (layout_mode && ARTICLE_LAYOUT_TO_VARIANT[layout_mode]);
 
   // Scene fades in softer when screenshot coexists (atmosphere), bolder otherwise
   const maxSceneOpacity = screenshotSrc ? 0.55 : 0.9;
