@@ -51,7 +51,7 @@ def call_llm(prompt: str) -> str:
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 2048,
         },
-        timeout=60,
+        timeout=180,
     )
     r.raise_for_status()
     return r.json()["choices"][0]["message"]["content"].strip()
