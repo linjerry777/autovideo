@@ -142,7 +142,8 @@ def _pick_trending_items(n: int = 3) -> list[dict]:
 
 
 def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
-    items = _pick_trending_items(n=3)
+    # Per user preference: 娛樂 autopilot 一次只做 1 則（合輯要手動在 UI 選擇）
+    items = _pick_trending_items(n=1)
     if not items:
         log.info("[autopilot] all YT TW trends already made — skipping trending job")
         return
@@ -150,12 +151,12 @@ def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) ->
     profile  = get_setting("autopilot_trending_profile",  "pet")           or "pet"
     job_id   = create_job(date=today, triggered_by="autopilot_trending",
                           platforms=",".join(platforms))
-    log.info("[autopilot] trending job %s items=%d top=%s strategy=%s profile=%s dry_run=%s",
-             job_id, len(items), items[0]["title"][:50], strategy, profile, dry_run)
+    log.info("[autopilot] trending job %s single item=%s strategy=%s profile=%s dry_run=%s",
+             job_id, items[0]["title"][:50], strategy, profile, dry_run)
     job_runner.trigger_job(
         job_id=job_id, date=today, topic=None,
         platforms=platforms, dry_run=dry_run,
-        pre_news=items,               # 3 raw items → compilation video
+        pre_news=items,
         account_profile=profile,
         strategy=strategy,
         autopilot=True,
