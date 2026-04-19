@@ -371,7 +371,7 @@ def _seed_platform_meta(news: dict) -> dict:
             "license":               "youtube",
         },
         "tiktok": {
-            "video_version":         "short",
+            "video_version":         "long",   # >60s qualifies for Creator Rewards ($0.50-1/1K views)
             "title":                 f"{main_title}\n\n{hashtags}",
             "privacy_level":         "PUBLIC_TO_EVERYONE",
             "is_aigc":               True,
@@ -413,7 +413,11 @@ def _seed_platform_meta(news: dict) -> dict:
             "x_long_text_as_post":   False,
         },
         "_schedule": {
-            "mode":                  "now",
+            # auto_per_platform → publisher computes each platform's next golden
+            # slot (TikTok 19-23, IG 13-19, YT 07-09 / 20-22 etc) and Upload-Post
+            # handles the actual queue. Avoids the "凌晨同時爆 6 平台" signal
+            # that flags AI channels for YT review.
+            "mode":                  "auto_per_platform",
             "scheduled_date":        "",
             "timezone":              "Asia/Taipei",
         },

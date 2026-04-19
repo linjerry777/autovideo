@@ -49,46 +49,44 @@ def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> Non
     )
 
 
-def _pick_trending_item() -> dict | None:
-    """Return a raw YT TW trend dict (shape enrich_news_items can consume),
-    skipping URLs already made into videos."""
+def _pick_trending_items(n: int = 3) -> list[dict]:
+    """Return top N raw YT TW trends (enrich_news_items-compatible shape),
+    skipping URLs already made into videos. 3 items gives us a ~60-80s long
+    version that qualifies for TikTok Creator Rewards (>60s threshold)."""
     try:
         from web.routes.news import _fetch_all, _load_used_urls
     except Exception as e:
         log.warning("[autopilot] trending fetch import failed: %s", e)
-        return None
+        return []
     raw = _fetch_all(keyword="", lang="zh-TW", selected_sources=["youtube_tw"])
     if not raw:
-        return None
+        return []
     used = _load_used_urls()
-    fresh = [it for it in raw if it.get("url") not in used]
-    if not fresh:
-        log.info("[autopilot] all YT TW trends already made — skipping trending job")
-        return None
-    top = fresh[0]
-    return {
-        "title":       top.get("title", ""),
-        "summary":     top.get("summary", "") or top.get("title", ""),
-        "url":         top.get("url", ""),
-        "source":      top.get("source", "YouTube TW"),
-        "source_type": top.get("source_type", "youtube"),
-    }
+    fresh = [it for it in raw if it.get("url") not in used][:n]
+    return [{
+        "title":       it.get("title", ""),
+        "summary":     it.get("summary", "") or it.get("title", ""),
+        "url":         it.get("url", ""),
+        "source":      it.get("source", "YouTube TW"),
+        "source_type": it.get("source_type", "youtube"),
+    } for it in fresh]
 
 
 def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
-    item = _pick_trending_item()
-    if not item:
+    items = _pick_trending_items(n=3)
+    if not items:
+        log.info("[autopilot] all YT TW trends already made — skipping trending job")
         return
     strategy = get_setting("autopilot_trending_strategy", "entertainment") or "entertainment"
     profile  = get_setting("autopilot_trending_profile",  "pet")           or "pet"
     job_id   = create_job(date=today, triggered_by="autopilot_trending",
                           platforms=",".join(platforms))
-    log.info("[autopilot] trending job %s title=%s strategy=%s profile=%s dry_run=%s",
-             job_id, item["title"][:60], strategy, profile, dry_run)
+    log.info("[autopilot] trending job %s items=%d top=%s strategy=%s profile=%s dry_run=%s",
+             job_id, len(items), items[0]["title"][:50], strategy, profile, dry_run)
     job_runner.trigger_job(
         job_id=job_id, date=today, topic=None,
         platforms=platforms, dry_run=dry_run,
-        pre_news=[item],              # single raw item → enrich_news_items
+        pre_news=items,               # 3 raw items → compilation video
         account_profile=profile,
         strategy=strategy,
         autopilot=True,
