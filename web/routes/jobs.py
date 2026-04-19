@@ -118,6 +118,53 @@ def jobs_list(limit: int = 30, status: str = None):
     return [_enrich_display(j) for j in list_jobs(limit=limit, status=status)]
 
 
+class CompileRequest(BaseModel):
+    src_job_ids: list[int]              # [92, 94] — order preserved in output
+    version:     str | None = "long"    # "short" | "long" (default long → >60s)
+
+
+@router.post("/compile")
+def compile_videos_api(req: CompileRequest):
+    """Concatenate 2+ finished jobs into a 合輯 video. Returns the new
+    compile job's directory so the UI can open it for upload preview."""
+    import subprocess, sys
+    from datetime import date as _date
+
+    if len(req.src_job_ids) < 2:
+        raise HTTPException(400, "需要至少 2 個 src_job_ids")
+    if req.version not in ("short", "long"):
+        raise HTTPException(400, "version 必須是 short 或 long")
+
+    src_keys: list[str] = []
+    for jid in req.src_job_ids:
+        j = get_job(jid)
+        if not j:
+            raise HTTPException(404, f"job {jid} 不存在")
+        src_keys.append(f"{j['date']}/job_{jid}")
+
+    target_date = _date.today().isoformat()
+    script = BASE_DIR / "scripts" / "compile_videos.py"
+
+    proc = subprocess.run(
+        [sys.executable, str(script), target_date, *src_keys, "--version", req.version],
+        capture_output=True, text=True, cwd=str(BASE_DIR),
+    )
+    if proc.returncode != 0:
+        raise HTTPException(500, f"compile failed: {proc.stderr[-500:]}")
+
+    # Parse the output.mp4 path from the last line of stdout
+    import re as _re
+    m = _re.search(r"compile done.*?(pipeline[\\/][^\s(]+output\.mp4)", proc.stdout)
+    out_path = m.group(1) if m else ""
+
+    return {
+        "ok":         True,
+        "output":     out_path,
+        "src_keys":   src_keys,
+        "stdout_tail": proc.stdout.splitlines()[-6:],
+    }
+
+
 @router.get("/jobs/running")
 def running_job():
     return {"running": job_runner.is_running(),

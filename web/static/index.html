@@ -262,7 +262,16 @@
       <div>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">最近記錄</h2>
-          <button @click="loadDashboard()" class="text-xs text-green-600 hover:text-green-700 transition-colors font-medium">重新整理</button>
+          <div class="flex items-center gap-3">
+            <button x-show="compileSelection.length >= 2"
+              @click="runCompile()"
+              :disabled="compileBusy"
+              class="text-xs px-3 py-1.5 rounded-lg bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium disabled:opacity-50 transition">
+              <span x-show="!compileBusy">🎬 合輯所選 <span x-text="'(' + compileSelection.length + ')'"></span></span>
+              <span x-show="compileBusy">合輯中⋯</span>
+            </button>
+            <button @click="loadDashboard()" class="text-xs text-green-600 hover:text-green-700 transition-colors font-medium">重新整理</button>
+          </div>
         </div>
         <div class="glass rounded-2xl overflow-hidden">
           <div x-show="jobs.length === 0" class="py-16 text-center">
@@ -272,6 +281,7 @@
           <table x-show="jobs.length > 0" class="w-full text-sm">
             <thead>
               <tr class="border-b border-gray-200">
+                <th class="px-3 py-3.5 text-[11px] text-gray-400 font-semibold" title="合輯勾選"></th>
                 <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">#</th>
                 <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">日期</th>
                 <th class="text-left px-5 py-3.5 text-[11px] text-gray-400 font-semibold uppercase tracking-wide">主題</th>
@@ -283,6 +293,11 @@
             <tbody class="divide-y divide-gray-100">
               <template x-for="j in jobs" :key="j.id">
                 <tr @click="openJob(j.id)" class="hover:bg-gray-50 transition-colors cursor-pointer group">
+                  <td class="px-3 py-3.5 text-center" @click.stop>
+                    <input type="checkbox" :value="j.id" x-model.number="compileSelection"
+                      :disabled="j.status !== 'done'"
+                      class="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 disabled:opacity-30">
+                  </td>
                   <td class="px-5 py-3.5 text-xs text-gray-400 font-mono" x-text="'#'+j.id"></td>
                   <td class="px-5 py-3.5 text-sm text-gray-600 font-mono tabular-nums" x-text="j.date"></td>
                   <td class="px-5 py-3.5">
@@ -2578,6 +2593,10 @@ function app() {
     scheduleLoading: false,
     scheduleByDay: [],
 
+    // compile (合輯)
+    compileSelection: [],
+    compileBusy: false,
+
     // generate flow
     newStep: 'config',
     videoMode: 'news',          // 'news' | 'trending'
@@ -3759,6 +3778,28 @@ function app() {
         this.settingsSaved = true
         setTimeout(() => this.settingsSaved = false, 2000)
       } catch (e) { this.showToast('儲存失敗：' + e.message) }
+    },
+
+    async runCompile() {
+      if (this.compileSelection.length < 2) {
+        this.showToast('至少選 2 支 job 才能合輯')
+        return
+      }
+      if (!confirm(`確定要合輯這 ${this.compileSelection.length} 支影片嗎？會產生一支新的長影片（長版）。`)) return
+      this.compileBusy = true
+      try {
+        const r = await this.api('POST', '/api/compile', {
+          src_job_ids: [...this.compileSelection],
+          version: 'long',
+        })
+        this.showToast(`🎬 合輯完成：${r.output}`)
+        this.compileSelection = []
+        await this.loadDashboard()
+      } catch (e) {
+        this.showToast('合輯失敗：' + e.message)
+      } finally {
+        this.compileBusy = false
+      }
     },
 
     async runAutopilotNow() {
