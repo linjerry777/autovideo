@@ -12,6 +12,18 @@ SCRIPTS  = BASE_DIR / "scripts"
 PYTHON   = sys.executable
 
 
+def _default_layout_for_strategy(strategy: str | None) -> str:
+    """Pick a default layout_mode based on content strategy.
+
+    entertainment / generic → article_rotate (magazine/breaking/flashcard cycle)
+    everything else          → visual (image full-bleed + hook/card)
+    """
+    s = (strategy or "").lower()
+    if s in ("entertainment", "generic"):
+        return "article_rotate"
+    return "visual"
+
+
 def _detect_versions(job_key: str) -> list[str | None]:
     """Return list of versions to render.
 
@@ -292,11 +304,15 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             # 用戶已選好原始新聞，Claude 只針對這幾筆生成腳本
             from web.claude_client import enrich_news_items, _last_usage
             enriched = enrich_news_items(pre_news, topic, strategy)
+            # Default layout_mode by strategy: entertainment/generic → rotate
+            # through 3 article-card variants; tech/finance/pet keep "visual".
+            default_layout = _default_layout_for_strategy(strategy)
             news_file.write_text(
                 _json.dumps(
                     {"date": job_key,
                      "account_profile": account_profile or "",
                      "strategy": strategy or "",
+                     "layout_mode": default_layout,
                      "items": enriched},
                     ensure_ascii=False, indent=2
                 ),
@@ -320,6 +336,20 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             if not ok:
                 su("news", "failed")
                 raise RuntimeError(f"news_collector 失敗:\n{out[-500:]}")
+            # Seed layout_mode based on strategy — news_collector.py writes
+            # a minimal news.json so we patch it in place.
+            try:
+                if news_file.exists():
+                    data = _json.loads(news_file.read_text(encoding="utf-8"))
+                    if not data.get("layout_mode"):
+                        data["layout_mode"] = _default_layout_for_strategy(strategy)
+                        news_file.write_text(
+                            _json.dumps(data, ensure_ascii=False, indent=2),
+                            encoding="utf-8",
+                        )
+            except Exception as _e:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n[WARN] layout_mode seed failed: {_e}\n")
 
         su("news", "done")
         _check_cancel(job_id)
@@ -354,6 +384,20 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         if not ok:
             su("screenshot", "failed")
             raise RuntimeError(f"背景素材抓取失敗:\n{out[-500:]}")
+
+        # ── Step 2.5: 文章資料擷取 (hero image + body) ─────────────
+        # Best-effort: populates news.json items with hero_image_b64 / body_text
+        # / byline for article_rotate / article_* layout modes. Failure is
+        # non-fatal — ArticleLayer falls back to the existing screenshot.
+        try:
+            ok_ae, _out_ae = _call_script("article_extractor.py", job_key, [], log_path)
+            if not ok_ae:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write("\n[WARN] article_extractor failed (non-fatal)\n")
+        except Exception as _e:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[WARN] article_extractor exception: {_e}\n")
+
         su("screenshot", "done")
         _check_cancel(job_id)
 
