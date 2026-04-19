@@ -707,10 +707,10 @@ def fetch_news(
     if not selected_sources:
         selected_sources = DEFAULT_SOURCES
 
-    # Trending-only sources (reddit/youtube/ptt) don't need a keyword —
-    # use empty string so fetchers return full hot feed without filtering.
-    TRENDING_SOURCES = {"reddit", "youtube_tw", "youtube_us", "ptt", "dcard",
-                        "bilibili", "zhihu"}
+    # Trending-only sources don't need a keyword — use empty string so fetchers
+    # return full hot feed without keyword-filtering. Keep in sync with ALL_SOURCES.
+    TRENDING_SOURCES = {"youtube_tw", "youtube_us", "tiktok_tw", "google_trends_tw",
+                        "dcard", "zhihu", "hackernews", "last30days", "ithome"}
     all_trending = all(s in TRENDING_SOURCES for s in selected_sources)
     keyword = topic or ("" if all_trending else DEFAULT_KEYWORD)
 

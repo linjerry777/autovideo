@@ -2683,8 +2683,13 @@ function app() {
     groupedTrending() {
       const ORDER = ['youtube_tw','youtube_us','tiktok_tw','google_trends_tw','dcard','zhihu']
       const groups = {}
+      const seenKeys = {}            // per-source dedup so Alpine x-for :key is unique
       for (const item of this.trendingItems) {
         const k = item.source_type || 'other'
+        const rowKey = item.url || item.title
+        seenKeys[k] = seenKeys[k] || new Set()
+        if (seenKeys[k].has(rowKey)) continue    // skip dup — e.g. YT fetched twice when lang=zh+en both on
+        seenKeys[k].add(rowKey)
         ;(groups[k] = groups[k] || []).push(item)
       }
       const keys = ORDER.filter(k => groups[k]).concat(Object.keys(groups).filter(k => !ORDER.includes(k)))
