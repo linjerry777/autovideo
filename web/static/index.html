@@ -1026,6 +1026,17 @@
                     <div class="flex-1 min-w-0">
                       <p class="text-sm font-medium text-gray-800 line-clamp-2" x-text="item.title"></p>
                       <p class="text-xs text-gray-400 mt-0.5 truncate" x-text="item.summary"></p>
+                      <div class="flex flex-wrap gap-1 mt-1" x-show="item.made_before || item.screenshot_blocked">
+                        <span x-show="item.made_before"
+                          class="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200"
+                          :title="'已做過，job #' + (item.past_jobs || []).join(', #')">
+                          ⚠️ 已做過 <span x-text="'#' + ((item.past_jobs || []).join(', #'))"></span>
+                        </span>
+                        <span x-show="item.screenshot_blocked"
+                          class="text-[10px] px-1.5 py-0.5 rounded bg-orange-50 text-orange-600 border border-orange-200">
+                          🚫 曾封鎖
+                        </span>
+                      </div>
                     </div>
                   </label>
                 </template>
