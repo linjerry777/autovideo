@@ -462,7 +462,15 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
                 f.write(f"\n[WARN] thumbnail render exception: {_e}\n")
 
         # ── Step 5: 上傳 ──────────────────────────────────────────
-        output_mp4 = pipe_dir / "output.mp4"
+        # Resolve output_mp4 — dual-version jobs write to short/output.mp4
+        # (or long/output.mp4); legacy jobs write to pipe_dir/output.mp4.
+        # UI reads this path to render the video preview.
+        candidates = [
+            pipe_dir / "output.mp4",
+            pipe_dir / "short" / "output.mp4",
+            pipe_dir / "long"  / "output.mp4",
+        ]
+        output_mp4 = next((p for p in candidates if p.exists()), candidates[0])
 
         if autopilot and not skip_upload:
             # Autopilot 直接發布，不等 UI 點擊
