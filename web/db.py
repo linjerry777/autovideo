@@ -107,7 +107,9 @@ def init_db():
                 ('autopilot_news_profile',     'pet'),
                 ('autopilot_trending_strategy','entertainment'),
                 ('autopilot_trending_profile', 'pet'),
-                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,tiktok');
+                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,tiktok'),
+                ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days,youtube_us'),
+                ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,科技');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}

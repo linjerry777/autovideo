@@ -32,17 +32,86 @@ def _bool_setting(key: str, default: bool) -> bool:
     return str(get_setting(key, str(default).lower())).lower() == "true"
 
 
+def _pick_news_items(n: int = 3) -> list[dict]:
+    """Multi-source news fetch + AI keyword filter + dedup.
+
+    Pulls from the sources listed in `autopilot_news_sources` setting (default
+    google/bing/hackernews/ithome/last30days/youtube_us — everything except
+    youtube_tw which is reserved for trending autopilot, plus dcard/x which
+    the user flagged as useless for this use case).
+
+    Keeps only items whose title/summary contains at least one AI-related
+    keyword, and excludes URLs already used in past jobs. Returns `n` items
+    in the same shape enrich_news_items expects.
+    """
+    try:
+        from web.routes.news import _fetch_all, _load_used_urls
+    except Exception as e:
+        log.warning("[autopilot] news fetch import failed: %s", e)
+        return []
+
+    sources_csv = get_setting("autopilot_news_sources",
+                              "google,bing,hackernews,ithome,last30days,youtube_us")
+    sources = [s.strip() for s in sources_csv.split(",") if s.strip()]
+    keywords_csv = get_setting("autopilot_news_keywords",
+                               "AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,科技")
+    keywords = [k.strip().lower() for k in keywords_csv.split(",") if k.strip()]
+    # Send the broadest keyword to RSS-style sources so we get AI-flavored hits
+    kw = keywords[0] if keywords else "AI"
+
+    try:
+        raw = _fetch_all(keyword=kw, lang="zh-TW", sources=sources)
+    except Exception as e:
+        log.warning("[autopilot] _fetch_all failed: %s", e)
+        return []
+    if not raw:
+        return []
+
+    used = _load_used_urls()
+    matched = []
+    seen_urls = set()
+    for it in raw:
+        url = it.get("url", "")
+        if not url or url in used or url in seen_urls:
+            continue
+        haystack = f"{it.get('title','')} {it.get('summary','')}".lower()
+        if keywords and not any(k in haystack for k in keywords):
+            continue
+        seen_urls.add(url)
+        matched.append({
+            "title":       it.get("title", ""),
+            "summary":     it.get("summary", "") or it.get("title", ""),
+            "url":         url,
+            "source":      it.get("source", ""),
+            "source_type": it.get("source_type", "google"),
+        })
+        if len(matched) >= n:
+            break
+    return matched
+
+
 def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
     strategy = get_setting("autopilot_news_strategy", "generic") or "generic"
     profile  = get_setting("autopilot_news_profile",  "pet")     or "pet"
+    items    = _pick_news_items(n=3)
+
     job_id   = create_job(date=today, triggered_by="autopilot_news",
                           platforms=",".join(platforms))
-    log.info("[autopilot] news job %s strategy=%s profile=%s dry_run=%s",
-             job_id, strategy, profile, dry_run)
+
+    if items:
+        log.info("[autopilot] news job %s multi-source (%d items) strategy=%s profile=%s dry_run=%s",
+                 job_id, len(items), strategy, profile, dry_run)
+        pre_news = items
+    else:
+        # Fallback to legacy Google News RSS path if multi-source yielded nothing
+        log.info("[autopilot] news job %s multi-source empty — falling back to news_collector.py",
+                 job_id)
+        pre_news = None
+
     job_runner.trigger_job(
         job_id=job_id, date=today, topic=None,
         platforms=platforms, dry_run=dry_run,
-        pre_news=None,                # scheduled path → news_collector.py
+        pre_news=pre_news,
         account_profile=profile,
         strategy=strategy,
         autopilot=True,
@@ -58,7 +127,7 @@ def _pick_trending_items(n: int = 3) -> list[dict]:
     except Exception as e:
         log.warning("[autopilot] trending fetch import failed: %s", e)
         return []
-    raw = _fetch_all(keyword="", lang="zh-TW", selected_sources=["youtube_tw"])
+    raw = _fetch_all(keyword="", lang="zh-TW", sources=["youtube_tw"])
     if not raw:
         return []
     used = _load_used_urls()
