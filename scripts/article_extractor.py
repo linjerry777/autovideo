@@ -22,6 +22,10 @@ import requests
 from bs4 import BeautifulSoup
 from PIL import Image
 
+# Force UTF-8 stdout on Windows (cp950 chokes on emojis / CJK)
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+
 BASE_DIR  = Path(__file__).resolve().parent.parent
 UA        = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
              "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
