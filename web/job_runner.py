@@ -472,6 +472,24 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         ]
         output_mp4 = next((p for p in candidates if p.exists()), candidates[0])
 
+        # Seed platform_meta.json on disk if missing — publisher reads this to
+        # route per-platform video_version (short vs long) and FB page_id. UI
+        # normally seeds via GET /api/jobs/{id}/platform_meta, but autopilot
+        # bypasses the UI entirely.
+        meta_file = pipe_dir / "platform_meta.json"
+        if not meta_file.exists() and news_file.exists():
+            try:
+                from web.routes.jobs import _seed_platform_meta
+                news_data = _json.loads(news_file.read_text(encoding="utf-8"))
+                seed = _seed_platform_meta(news_data)
+                meta_file.write_text(
+                    _json.dumps(seed, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+            except Exception as _e:
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write(f"\n[WARN] platform_meta seed failed: {_e}\n")
+
         if autopilot and not skip_upload:
             # Autopilot 直接發布，不等 UI 點擊
             update_job(job_id, step_upload="uploading")
