@@ -86,6 +86,9 @@ def schedule_upcoming(days: int = Query(7, ge=1, le=30)):
             except Exception:
                 log = []
             for ent in log:
+                # Skip cancelled — user explicitly killed these on Upload-Post
+                if ent.get("status") == "cancelled":
+                    continue
                 when = ent.get("scheduled_date") or ""
                 if not when:
                     continue
