@@ -119,7 +119,10 @@ export const Subtitle: React.FC<SubtitleProps> = ({
     <div
       style={{
         position: "absolute",
-        bottom: 60,
+        // 280px from bottom keeps subtitle clear of TikTok/IG/YT-Shorts UI
+        // overlay zone (like buttons + comments take ~250-350px on mobile).
+        // Wife flagged previous 60px as "too low" — covered on phones.
+        bottom: 280,
         left: 0,
         right: 0,
         display: "flex",
