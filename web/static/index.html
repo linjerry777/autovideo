@@ -2150,98 +2150,175 @@
       </div>
     </div>
 
-    <!-- ═══════ SCHEDULE PAGE ═══════ -->
-    <div x-show="page==='schedule'" class="p-8 max-w-6xl mx-auto space-y-6">
+    <!-- ═══════ SCHEDULE PAGE (v2 redesign) ═══════ -->
+    <div x-show="page==='schedule'" class="p-8 max-w-7xl mx-auto space-y-6">
+      <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-semibold text-gray-900">📅 發布排程</h1>
-          <p class="text-sm text-gray-500 mt-1">未來 7 天各平台 × 帳號的影片上傳時段（已發布 + 預測中）</p>
+          <h1 class="text-2xl font-semibold text-gray-900">發布排程</h1>
+          <p class="text-sm text-gray-500 mt-1">未來 7 天各平台上傳時段 · 點擊任一項目展開 v2 文案預覽</p>
         </div>
         <div class="flex items-center gap-2">
-          <select x-model="scheduleDays" @change="loadSchedule()"
-            class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm bg-white">
-            <option value="1">今日</option>
-            <option value="3">未來 3 天</option>
-            <option value="7">未來 7 天</option>
-          </select>
-          <button @click="loadSchedule()"
-            class="text-xs text-green-600 hover:text-green-700 font-medium">重新整理</button>
+          <button @click="loadSchedule()" class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer transition">
+            <svg class="inline w-3.5 h-3.5 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            重新整理
+          </button>
         </div>
       </div>
 
+      <!-- Empty / Loading -->
+      <div x-show="scheduleLoading" class="text-center py-20 text-gray-400 text-sm">載入中⋯</div>
       <div x-show="!scheduleLoading && (!scheduleEntries || scheduleEntries.length===0)"
-        class="text-center py-20 text-gray-400 text-sm">
-        還沒有排程中的上傳。跑一次 autopilot 就會出現在這裡。
+        class="glass rounded-2xl py-20 text-center">
+        <div class="text-gray-300 mb-2">
+          <svg class="w-12 h-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+        <p class="text-sm text-gray-500">還沒有排程中的上傳</p>
+        <p class="text-xs text-gray-400 mt-1">跑一次 autopilot 就會出現在這裡</p>
       </div>
 
-      <div x-show="scheduleLoading" class="text-center py-20 text-gray-400 text-sm">
-        載入中⋯
-      </div>
-
-      <!-- Grouped by day -->
-      <template x-for="day in scheduleByDay" :key="day.date">
-        <div class="glass rounded-2xl overflow-hidden">
-          <div class="px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <span class="text-sm font-semibold text-gray-700" x-text="day.label"></span>
-              <span class="text-xs text-gray-400" x-text="day.date"></span>
-            </div>
-            <span class="text-xs text-gray-500" x-text="day.entries.length + ' 支上傳'"></span>
-          </div>
-          <div class="divide-y divide-gray-100">
-            <template x-for="e in day.entries" :key="e.job_id + '-' + e.platform + '-' + e.when">
-              <div class="flex items-center gap-4 px-5 py-3 hover:bg-gray-50 transition">
-                <!-- Time -->
-                <div class="w-20 flex-shrink-0">
-                  <div class="text-lg font-mono font-semibold text-gray-800 tabular-nums" x-text="e.time"></div>
-                  <div class="text-[10px] text-gray-400" x-text="e.relative"></div>
-                </div>
-                <!-- Thumbnail -->
-                <div class="w-16 h-28 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 ring-1 ring-gray-200">
-                  <template x-if="e.thumbnail">
-                    <img :src="e.thumbnail" class="w-full h-full object-cover">
-                  </template>
-                  <template x-if="!e.thumbnail">
-                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-xl">🎬</div>
-                  </template>
-                </div>
-                <!-- Meta -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold"
-                      :class="({
-                        tiktok:'bg-black text-white',
-                        youtube:'bg-red-500 text-white',
-                        instagram:'bg-gradient-to-br from-pink-500 to-orange-400 text-white',
-                        facebook:'bg-blue-600 text-white',
-                        threads:'bg-gray-900 text-white',
-                        x:'bg-black text-white',
-                      })[e.platform]"
-                      x-text="({tiktok:'TikTok',youtube:'YouTube',instagram:'IG',facebook:'FB',threads:'Threads',x:'X'})[e.platform] || e.platform"></span>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-gray-100 text-gray-600"
-                      x-show="e.account" x-text="'@' + e.account"></span>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] bg-purple-100 text-purple-700"
-                      x-show="e.strategy_label" x-text="e.strategy_label"></span>
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]"
-                      :class="{
-                        'bg-emerald-100 text-emerald-700': e.status==='uploaded',
-                        'bg-amber-100 text-amber-700':    e.status==='pending',
-                        'bg-blue-100 text-blue-700':      e.status==='predicted',
-                        'bg-red-100 text-red-700':        e.status==='failed',
-                      }" x-text="({uploaded:'已排程',pending:'排程中',predicted:'預測',failed:'失敗'})[e.status] || e.status"></span>
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500"
-                      x-show="e.video_version" x-text="e.video_version==='long'?'長版':'短版'"></span>
-                  </div>
-                  <div class="text-sm text-gray-700 mt-1 truncate" x-text="e.title || '(未命名)'"></div>
-                </div>
-                <!-- Job link -->
-                <button @click="openJob(e.job_id)"
-                  class="text-xs text-green-600 hover:text-green-700 font-medium flex-shrink-0">
-                  #<span x-text="e.job_id"></span> →
-                </button>
+      <!-- ── 7-Day Density Strip ── -->
+      <div x-show="!scheduleLoading && scheduleByDay.length > 0" class="glass rounded-2xl p-4">
+        <p class="text-[11px] text-gray-400 font-semibold uppercase tracking-wider mb-3">本週排程密度</p>
+        <div class="grid grid-cols-7 gap-2">
+          <template x-for="d in scheduleWeek7" :key="d.date">
+            <button @click="scheduleActiveDay = d.date"
+              class="cursor-pointer group rounded-xl px-2 py-2.5 text-center transition-all duration-200 border"
+              :class="scheduleActiveDay === d.date
+                ? 'bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white border-transparent shadow-lg'
+                : (d.count > 0 ? 'bg-white border-gray-200 hover:border-violet-300 hover:bg-violet-50' : 'bg-gray-50 border-gray-100 text-gray-400')">
+              <div class="text-[10px] font-medium opacity-70" x-text="d.shortLabel"></div>
+              <div class="text-base font-semibold tabular-nums mt-0.5" x-text="d.dayNum"></div>
+              <div class="mt-1.5 flex items-center justify-center gap-0.5" x-show="d.count > 0">
+                <template x-for="p in d.platformDots" :key="p">
+                  <span class="w-1.5 h-1.5 rounded-full"
+                    :class="scheduleActiveDay === d.date
+                      ? 'bg-white/80'
+                      : ({tiktok:'bg-black',youtube:'bg-red-500',instagram:'bg-pink-500',facebook:'bg-blue-600',threads:'bg-gray-900',x:'bg-black'})[p]"></span>
+                </template>
               </div>
-            </template>
+              <div class="text-[10px] mt-1 font-mono"
+                :class="scheduleActiveDay === d.date ? 'text-white/80' : 'text-gray-400'"
+                x-text="d.count + ' 支'"></div>
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <!-- ── Day Detail (selected day from strip) ── -->
+      <template x-for="day in scheduleByDay.filter(d => d.date === scheduleActiveDay)" :key="day.date">
+        <div class="space-y-3">
+          <div class="flex items-center justify-between px-1">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900" x-text="day.label"></h2>
+              <p class="text-xs text-gray-400 font-mono mt-0.5" x-text="day.date + ' · ' + day.entries.length + ' 支上傳'"></p>
+            </div>
+            <!-- Per-platform pill counts for this day -->
+            <div class="flex items-center gap-1.5">
+              <template x-for="pc in day.platformCounts" :key="pc.platform">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                  :class="({tiktok:'bg-black text-white',youtube:'bg-red-500 text-white',instagram:'bg-gradient-to-r from-pink-500 to-orange-400 text-white',facebook:'bg-blue-600 text-white',threads:'bg-gray-900 text-white',x:'bg-black text-white'})[pc.platform]">
+                  <span x-text="({tiktok:'TT',youtube:'YT',instagram:'IG',facebook:'FB',threads:'TH',x:'X'})[pc.platform]"></span>
+                  <span class="opacity-80" x-text="pc.count"></span>
+                </span>
+              </template>
+            </div>
           </div>
+
+          <!-- Per-platform grouped cards -->
+          <template x-for="grp in day.byPlatform" :key="grp.platform">
+            <div class="glass rounded-2xl overflow-hidden">
+              <!-- Platform header bar with brand color -->
+              <div class="px-4 py-2.5 flex items-center justify-between border-b border-gray-100"
+                :class="({tiktok:'bg-black/5',youtube:'bg-red-500/5',instagram:'bg-pink-500/5',facebook:'bg-blue-500/5',threads:'bg-gray-900/5',x:'bg-black/5'})[grp.platform]">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold"
+                    :class="({tiktok:'bg-black text-white',youtube:'bg-red-500 text-white',instagram:'bg-gradient-to-r from-pink-500 to-orange-400 text-white',facebook:'bg-blue-600 text-white',threads:'bg-gray-900 text-white',x:'bg-black text-white'})[grp.platform]"
+                    x-text="({tiktok:'TikTok',youtube:'YouTube',instagram:'Instagram',facebook:'Facebook',threads:'Threads',x:'X'})[grp.platform]"></span>
+                  <span class="text-xs text-gray-500" x-text="grp.entries.length + ' 支'"></span>
+                </div>
+              </div>
+              <div class="divide-y divide-gray-100">
+                <template x-for="e in grp.entries" :key="e.job_id + '-' + e.when">
+                  <div>
+                    <!-- Row -->
+                    <button @click="schedExpand[e.job_id+'-'+e.platform]=!schedExpand[e.job_id+'-'+e.platform]"
+                      class="w-full flex items-center gap-4 px-4 py-3 hover:bg-violet-50/40 transition cursor-pointer text-left">
+                      <!-- Time -->
+                      <div class="w-16 flex-shrink-0">
+                        <div class="text-lg font-mono font-semibold text-gray-900 tabular-nums" x-text="e.time"></div>
+                        <div class="text-[10px] text-gray-400" x-text="e.relative"></div>
+                      </div>
+                      <!-- Thumbnail -->
+                      <div class="w-12 h-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 ring-1 ring-gray-200">
+                        <template x-if="e.thumbnail">
+                          <img :src="e.thumbnail" class="w-full h-full object-cover" alt="">
+                        </template>
+                        <template x-if="!e.thumbnail">
+                          <div class="w-full h-full flex items-center justify-center text-gray-300">
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                          </div>
+                        </template>
+                      </div>
+                      <!-- Meta -->
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap mb-0.5">
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
+                            :class="{
+                              'bg-emerald-100 text-emerald-700': e.status==='uploaded',
+                              'bg-amber-100 text-amber-700':    e.status==='pending',
+                              'bg-violet-100 text-violet-700':  e.status==='dry_run',
+                              'bg-blue-100 text-blue-700':      e.status==='predicted',
+                              'bg-red-100 text-red-700':        e.status==='failed',
+                            }"
+                            x-text="({uploaded:'已排程',pending:'排程中',dry_run:'預覽',predicted:'預測',failed:'失敗'})[e.status] || e.status"></span>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500"
+                            x-show="e.video_version" x-text="e.video_version==='long'?'長版 60-80s':'短版 ~25s'"></span>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-purple-100 text-purple-700"
+                            x-show="e.strategy_label" x-text="e.strategy_label"></span>
+                          <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-500"
+                            x-show="e.account" x-text="'@' + e.account"></span>
+                        </div>
+                        <div class="text-sm text-gray-800 truncate" x-text="e.title || '(未命名)'"></div>
+                      </div>
+                      <!-- Expand chevron -->
+                      <svg class="w-4 h-4 text-gray-400 flex-shrink-0 transition-transform"
+                        :class="schedExpand[e.job_id+'-'+e.platform] ? 'rotate-180' : ''"
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </button>
+                    <!-- Expanded v2 metadata preview -->
+                    <div x-show="schedExpand[e.job_id+'-'+e.platform]" x-transition
+                      class="px-4 pb-4 pt-1 bg-gray-50/60 space-y-2 text-xs">
+                      <div x-show="e.platform_meta?.title">
+                        <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">標題 / 文案</p>
+                        <pre class="font-sans whitespace-pre-wrap text-gray-700 bg-white rounded-lg p-3 border border-gray-100" x-text="e.platform_meta?.title"></pre>
+                      </div>
+                      <div x-show="e.platform_meta?.description">
+                        <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">描述</p>
+                        <pre class="font-sans whitespace-pre-wrap text-gray-700 bg-white rounded-lg p-3 border border-gray-100 max-h-40 overflow-y-auto" x-text="e.platform_meta?.description"></pre>
+                      </div>
+                      <div x-show="e.platform_meta?.first_comment">
+                        <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Hashtag 留言</p>
+                        <pre class="font-sans whitespace-pre-wrap text-violet-700 bg-white rounded-lg p-3 border border-gray-100 max-h-32 overflow-y-auto" x-text="e.platform_meta?.first_comment"></pre>
+                      </div>
+                      <div x-show="e.platform_meta?.tags">
+                        <p class="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">YouTube Tags</p>
+                        <pre class="font-sans whitespace-pre-wrap text-gray-600 bg-white rounded-lg p-3 border border-gray-100" x-text="e.platform_meta?.tags"></pre>
+                      </div>
+                      <div class="flex items-center gap-3 pt-1">
+                        <button @click.stop="openJob(e.job_id)" class="text-xs text-violet-600 hover:text-violet-700 font-medium cursor-pointer">
+                          開啟 Job #<span x-text="e.job_id"></span> →
+                        </button>
+                        <span x-show="e.request_id" class="text-[10px] text-gray-400 font-mono" x-text="'req: ' + e.request_id?.slice(0,12)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
         </div>
       </template>
     </div>
@@ -2587,11 +2664,14 @@ function app() {
     stats: {},
     jobs: [],
 
-    // schedule preview
+    // schedule preview (v2)
     scheduleDays: 7,
     scheduleEntries: [],
     scheduleLoading: false,
     scheduleByDay: [],
+    scheduleWeek7: [],          // 7-day strip data
+    scheduleActiveDay: '',      // YYYY-MM-DD currently selected
+    schedExpand: {},            // {jobId-platform: bool}
 
     // compile (合輯)
     compileSelection: [],
@@ -2723,13 +2803,35 @@ function app() {
     async loadSchedule() {
       this.scheduleLoading = true
       try {
-        const d = await this.api('GET', `/api/schedule/upcoming?days=${this.scheduleDays}`)
+        // Always fetch 7 days for the week strip
+        const d = await this.api('GET', `/api/schedule/upcoming?days=7`)
         this.scheduleEntries = d.entries || []
+        // Hydrate each entry with the per-platform meta from its job
+        await this._hydrateScheduleMeta(this.scheduleEntries)
         this.scheduleByDay   = this._groupScheduleByDay(this.scheduleEntries)
+        this.scheduleWeek7   = this._buildWeek7(this.scheduleByDay)
+        // Default-select first day with content (or today)
+        if (!this.scheduleActiveDay || !this.scheduleByDay.find(d=>d.date===this.scheduleActiveDay)) {
+          this.scheduleActiveDay = this.scheduleByDay[0]?.date || ''
+        }
       } catch (e) {
         this.showToast('排程讀取失敗：' + e.message)
       } finally {
         this.scheduleLoading = false
+      }
+    },
+    async _hydrateScheduleMeta(entries) {
+      // Fetch each unique job's platform_meta once and attach the matching
+      // platform's slice to each entry. Lets the expand panel show v2 caption.
+      const uniqJobs = [...new Set(entries.map(e => e.job_id))]
+      const cache = {}
+      await Promise.all(uniqJobs.map(async jid => {
+        try {
+          cache[jid] = await this.api('GET', `/api/jobs/${jid}/platform_meta`)
+        } catch (e) { cache[jid] = {} }
+      }))
+      for (const e of entries) {
+        e.platform_meta = (cache[e.job_id] || {})[e.platform] || {}
       }
     },
     _groupScheduleByDay(entries) {
@@ -2740,6 +2842,7 @@ function app() {
         return `${y}-${m}-${dd}`
       }
       const weekdays = ['日','一','二','三','四','五','六']
+      const PLAT_ORDER = ['tiktok','youtube','instagram','facebook','threads','x']
       for (const e of entries) {
         const dt = new Date(e.when)
         const dkey = fmtDay(dt)
@@ -2760,7 +2863,47 @@ function app() {
                     `${Math.round(diffMs/86400000)} 天後`
         byDate[dkey].entries.push({ ...e, time: `${hh}:${mm}`, relative: rel })
       }
-      return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date))
+      // Add per-platform grouping + counts to each day
+      const days = Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date))
+      for (const day of days) {
+        const grpMap = {}
+        for (const e of day.entries) {
+          if (!grpMap[e.platform]) grpMap[e.platform] = { platform: e.platform, entries: [] }
+          grpMap[e.platform].entries.push(e)
+        }
+        for (const k in grpMap) {
+          grpMap[k].entries.sort((a,b)=>a.when.localeCompare(b.when))
+        }
+        day.byPlatform = PLAT_ORDER.filter(p=>grpMap[p]).map(p=>grpMap[p])
+        day.platformCounts = day.byPlatform.map(g => ({ platform: g.platform, count: g.entries.length }))
+      }
+      return days
+    },
+    _buildWeek7(scheduleByDay) {
+      // Build 7-day strip starting from today
+      const today = new Date(); today.setHours(0,0,0,0)
+      const weekdays = ['日','一','二','三','四','五','六']
+      const fmtDay = (d) => {
+        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), dd = String(d.getDate()).padStart(2,'0')
+        return `${y}-${m}-${dd}`
+      }
+      const byDateMap = Object.fromEntries(scheduleByDay.map(d=>[d.date, d]))
+      const out = []
+      for (let i = 0; i < 7; i++) {
+        const dt = new Date(today.getTime() + i*86400000)
+        const dkey = fmtDay(dt)
+        const day  = byDateMap[dkey]
+        const platforms = day ? [...new Set(day.entries.map(e=>e.platform))] : []
+        const shortLbl  = i===0 ? '今天' : (i===1 ? '明天' : `週${weekdays[dt.getDay()]}`)
+        out.push({
+          date:  dkey,
+          shortLabel: shortLbl,
+          dayNum: dt.getDate(),
+          count:  day ? day.entries.length : 0,
+          platformDots: platforms.slice(0, 6),
+        })
+      }
+      return out
     },
 
     async refreshAnalytics() {

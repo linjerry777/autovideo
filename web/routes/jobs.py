@@ -90,9 +90,17 @@ _STRATEGY_LABEL = {
     "generic":       "新聞",
 }
 
+_TRIGGERED_LABEL = {
+    "autopilot_news":     ("📰", "新聞"),
+    "autopilot_trending": ("🔥", "娛樂"),
+    "schedule":           ("⏰", "排程"),
+    "manual":             ("✋", "手動"),
+}
+
 def _enrich_display(job: dict) -> dict:
     """Compute display_topic = {strategy label} · {first news title}. Falls
-    back to raw topic / triggered_by so UI always has something meaningful."""
+    back to triggered_by + status hint so queued/in-flight jobs still show
+    meaningful labels (avoids the dreaded "AI 科技快訊" placeholder)."""
     pipe_dir  = BASE_DIR / "pipeline" / job["date"] / f"job_{job['id']}"
     news_file = pipe_dir / "news.json"
     strategy  = ""
@@ -108,7 +116,17 @@ def _enrich_display(job: dict) -> dict:
             pass
     label = _STRATEGY_LABEL.get(strategy, "")
     parts = [p for p in (label, first_title) if p]
-    display = " · ".join(parts) if parts else (job.get("topic") or "")
+    display = " · ".join(parts) if parts else ""
+    if not display:
+        # No news.json yet (queued/early-stage). Use triggered_by + status hint.
+        emoji, src_label = _TRIGGERED_LABEL.get(job.get("triggered_by") or "", ("⚙️", "自動"))
+        status_hint = {
+            "queued":  "排隊中",
+            "running": "選題中",
+            "failed":  "失敗",
+            "cancelled": "已取消",
+        }.get(job.get("status") or "", job.get("status") or "")
+        display = f"{emoji} {src_label} · {status_hint}" if status_hint else f"{emoji} {src_label}"
     job["display_topic"] = display
     return job
 

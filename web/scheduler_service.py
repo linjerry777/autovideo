@@ -51,11 +51,11 @@ def _pick_news_items(n: int = 3) -> list[dict]:
         return []
 
     sources_csv = get_setting("autopilot_news_sources",
-                              "google,bing,hackernews,ithome,last30days,youtube_us")
+                              "google,bing,hackernews,ithome,last30days")
     sources = [s.strip() for s in sources_csv.split(",") if s.strip()]
     keywords_csv = get_setting("autopilot_news_keywords",
-                               "AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,科技")
-    keywords = [k.strip().lower() for k in keywords_csv.split(",") if k.strip()]
+                               "AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft")
+    keywords = [k.strip() for k in keywords_csv.split(",") if k.strip()]
     # Send the broadest keyword to RSS-style sources so we get AI-flavored hits
     kw = keywords[0] if keywords else "AI"
 
@@ -67,6 +67,26 @@ def _pick_news_items(n: int = 3) -> list[dict]:
     if not raw:
         return []
 
+    # Word-boundary matcher so short keywords like "AI" don't false-match
+    # English noise words containing "ai" (TRAILER / SPAIN / RAIN / TAIL).
+    # Chinese keywords don't have word boundaries — for those plain `in` is fine.
+    import re as _re
+    en_keywords = [k for k in keywords if _re.fullmatch(r"[A-Za-z0-9]+", k)]
+    cn_keywords = [k for k in keywords if k not in en_keywords]
+    en_pattern  = _re.compile(
+        r"\b(" + "|".join(_re.escape(k) for k in en_keywords) + r")\b",
+        _re.IGNORECASE,
+    ) if en_keywords else None
+
+    def _matches(text: str) -> bool:
+        if not text:
+            return False
+        if any(k in text for k in cn_keywords):
+            return True
+        if en_pattern and en_pattern.search(text):
+            return True
+        return False
+
     used = _load_used_urls()
     matched = []
     seen_urls = set()
@@ -74,8 +94,8 @@ def _pick_news_items(n: int = 3) -> list[dict]:
         url = it.get("url", "")
         if not url or url in used or url in seen_urls:
             continue
-        haystack = f"{it.get('title','')} {it.get('summary','')}".lower()
-        if keywords and not any(k in haystack for k in keywords):
+        haystack = f"{it.get('title','')} {it.get('summary','')}"
+        if keywords and not _matches(haystack):
             continue
         seen_urls.add(url)
         matched.append({
