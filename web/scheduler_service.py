@@ -139,24 +139,52 @@ def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> Non
 
 
 def _pick_trending_items(n: int = 3) -> list[dict]:
-    """Return top N raw YT TW trends (enrich_news_items-compatible shape),
-    skipping URLs already made into videos. 3 items gives us a ~60-80s long
-    version that qualifies for TikTok Creator Rewards (>60s threshold)."""
+    """Pick top N raw trending items. Merges YT TW + YT US by default (user
+    preference 2026-04-19: '娛樂用yt tw or us 1則'). Interleaves the two
+    lists so a single pick still gets TW priority but US gets a shot when
+    TW's top is already used / gaming-niche.
+
+    Skipped: URLs already made into videos. Source list tunable via the
+    `autopilot_trending_sources` DB setting.
+    """
     try:
         from web.routes.news import _fetch_all, _load_used_urls
     except Exception as e:
         log.warning("[autopilot] trending fetch import failed: %s", e)
         return []
-    raw = _fetch_all(keyword="", lang="zh-TW", sources=["youtube_tw"])
-    if not raw:
-        return []
+
+    sources_csv = get_setting("autopilot_trending_sources", "youtube_tw,youtube_us")
+    sources = [s.strip() for s in sources_csv.split(",") if s.strip()] or ["youtube_tw"]
+
     used = _load_used_urls()
-    fresh = [it for it in raw if it.get("url") not in used][:n]
+    # Fetch each source separately so we can interleave
+    per_source: dict[str, list[dict]] = {}
+    for src in sources:
+        try:
+            raw = _fetch_all(keyword="", lang="zh-TW", sources=[src])
+            per_source[src] = [it for it in (raw or []) if it.get("url") not in used]
+        except Exception as e:
+            log.warning("[autopilot] trending fetch %s failed: %s", src, e)
+            per_source[src] = []
+
+    # Round-robin interleave (TW first if present, then US, etc.)
+    fresh: list[dict] = []
+    while len(fresh) < n:
+        progress = False
+        for src in sources:
+            if per_source.get(src):
+                fresh.append(per_source[src].pop(0))
+                progress = True
+                if len(fresh) >= n:
+                    break
+        if not progress:
+            break
+
     return [{
         "title":       it.get("title", ""),
         "summary":     it.get("summary", "") or it.get("title", ""),
         "url":         it.get("url", ""),
-        "source":      it.get("source", "YouTube TW"),
+        "source":      it.get("source", "YouTube"),
         "source_type": it.get("source_type", "youtube"),
     } for it in fresh]
 
