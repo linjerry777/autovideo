@@ -30,11 +30,130 @@ export interface ArticleLayerProps {
   totalFrames: number;
 }
 
+/**
+ * Pattern interrupt overlay — frames 0-9 (0.3s) show a jarring black + hook
+ * flash before the variant content. 2026 retention data: pattern interrupt
+ * in first 5 frames boosts 3s retention by +23% vs static openings.
+ */
+const PatternInterruptIntro: React.FC<{ hook: string; accent: string }> = ({ hook, accent }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  // Only render for first ~0.35s
+  if (frame >= 10) return null;
+
+  // 3-phase flash: black (0-2) → bright (3-4) → text slam in (5-9)
+  const bgOpacity = interpolate(frame, [0, 2, 4, 9, 10], [1, 1, 1, 0.6, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+  const bgColor = frame < 3 ? "#000000" : (frame < 5 ? "#ffffff" : "#000000");
+
+  const textSpring = spring({
+    fps, frame: Math.max(0, frame - 4),
+    config: { damping: 6, stiffness: 260, mass: 0.5 },
+    durationInFrames: 6,
+  });
+  const textScale = interpolate(textSpring, [0, 0.6, 1], [0.3, 1.4, 1.0]);
+  const textOp = interpolate(frame, [4, 5, 9, 10], [0, 1, 1, 0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        zIndex: 100,
+        backgroundColor: bgColor,
+        opacity: bgOpacity,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}
+    >
+      {frame >= 4 && (
+        <div
+          style={{
+            fontFamily: FONT_CJK,
+            fontSize: 180,
+            fontWeight: 900,
+            color: frame < 5 ? "#000" : accent,
+            textShadow: frame >= 5 ? `0 0 40px ${accent}aa, 0 6px 20px rgba(0,0,0,0.9)` : "none",
+            transform: `scale(${textScale})`,
+            opacity: textOp,
+            letterSpacing: 8,
+            textAlign: "center",
+            padding: "0 40px",
+            lineHeight: 1.05,
+          }}
+        >
+          {(hook || "").slice(0, 10)}
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};
+
+/**
+ * Loop-back outro — final 15 frames fade back to hook text, creating a
+ * pseudo-loop that makes viewers linger + algo reads as high completion.
+ */
+const LoopBackOutro: React.FC<{ hook: string; accent: string; totalFrames: number }> = ({
+  hook, accent, totalFrames,
+}) => {
+  const frame = useCurrentFrame();
+  const outroStart = totalFrames - 15;
+  if (frame < outroStart) return null;
+
+  const t = frame - outroStart;
+  const op = interpolate(t, [0, 6, 15], [0, 1, 1], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+  const scale = interpolate(t, [0, 10], [1.1, 1.0], {
+    extrapolateLeft: "clamp", extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        zIndex: 99,
+        backgroundColor: "rgba(0,0,0,0.88)",
+        opacity: op,
+        display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: FONT_CJK, fontSize: 40, fontWeight: 700,
+          color: "#ffffff99", letterSpacing: 4, marginBottom: 20,
+        }}
+      >
+        ↻ 再看一次
+      </div>
+      <div
+        style={{
+          fontFamily: FONT_CJK, fontSize: 140, fontWeight: 900,
+          color: accent, letterSpacing: 6, textAlign: "center",
+          padding: "0 40px", lineHeight: 1.1, transform: `scale(${scale})`,
+          textShadow: `0 0 36px ${accent}aa, 0 4px 16px rgba(0,0,0,0.9)`,
+        }}
+      >
+        {(hook || "").slice(0, 12)}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 export const ArticleLayer: React.FC<ArticleLayerProps> = (props) => {
   const { variant } = props;
-  if (variant === "magazine")  return <MagazineLayout  {...props} />;
-  if (variant === "breaking")  return <BreakingLayout  {...props} />;
-  return <FlashcardLayout {...props} />;
+  const variantEl =
+    variant === "magazine"  ? <MagazineLayout  {...props} /> :
+    variant === "breaking"  ? <BreakingLayout  {...props} /> :
+                              <FlashcardLayout {...props} />;
+  return (
+    <>
+      {variantEl}
+      <PatternInterruptIntro hook={props.hook} accent={props.accent} />
+      <LoopBackOutro hook={props.hook} accent={props.accent} totalFrames={props.totalFrames} />
+    </>
+  );
 };
 
 // ── Magazine: hero image top, title, 3 bullets stacked with numbered pills ──
@@ -154,14 +273,19 @@ const MagazineLayout: React.FC<ArticleLayerProps> = ({
         }}
       >
         {bullets.slice(0, 3).map((b, i) => {
+          const enterFrame = 22 + i * 10;
           const rowSpring = spring({
             fps,
-            frame: Math.max(0, frame - (22 + i * 10)),
+            frame: Math.max(0, frame - enterFrame),
             config: { damping: 14, stiffness: 130, mass: 0.8 },
             durationInFrames: 24,
           });
           const rowX = interpolate(rowSpring, [0, 1], [-60, 0]);
           const rowOp = interpolate(rowSpring, [0, 1], [0, 1]);
+          // v3 visual beat: number pill flashes white for ~5 frames on entry
+          // per 2026 data — visual change every 3-5s boosts watch time +18%.
+          const sinceEnter = frame - enterFrame;
+          const flash = sinceEnter >= 0 && sinceEnter < 5 ? (1 - sinceEnter / 5) : 0;
           return (
             <div
               key={i}
@@ -173,10 +297,12 @@ const MagazineLayout: React.FC<ArticleLayerProps> = ({
               <div
                 style={{
                   width: 78, height: 78, minWidth: 78,
-                  borderRadius: 20, backgroundColor: accent,
+                  borderRadius: 20,
+                  backgroundColor: flash > 0 ? `rgba(255,255,255,${0.3 + flash*0.7})` : accent,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontFamily: FONT_CJK, fontSize: 52, fontWeight: 900, color: "#000",
-                  boxShadow: `0 8px 22px ${glow}`,
+                  boxShadow: `0 8px 22px ${glow}, 0 0 ${flash*40}px rgba(255,255,255,${flash*0.8})`,
+                  transform: flash > 0 ? `scale(${1 + flash * 0.15})` : "none",
                 }}
               >
                 {i + 1}
