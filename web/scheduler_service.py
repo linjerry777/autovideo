@@ -139,13 +139,12 @@ def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> Non
 
 
 def _pick_trending_items(n: int = 3) -> list[dict]:
-    """Pick top N raw trending items. Merges YT TW + YT US by default (user
-    preference 2026-04-19: '娛樂用yt tw or us 1則'). Interleaves the two
-    lists so a single pick still gets TW priority but US gets a shot when
-    TW's top is already used / gaming-niche.
+    """Pick top N raw trending items by view_count, merged across configured
+    sources (default YT TW + YT US). Skips URLs already made into videos.
 
-    Skipped: URLs already made into videos. Source list tunable via the
-    `autopilot_trending_sources` DB setting.
+    Source list tunable via the `autopilot_trending_sources` DB setting.
+    Per user 2026-04-22: merge all sources into one pool and rank purely by
+    view count — beat the TW-only bias that was over-indexing on esports.
     """
     try:
         from web.routes.news import _fetch_all, _load_used_urls
@@ -157,28 +156,23 @@ def _pick_trending_items(n: int = 3) -> list[dict]:
     sources = [s.strip() for s in sources_csv.split(",") if s.strip()] or ["youtube_tw"]
 
     used = _load_used_urls()
-    # Fetch each source separately so we can interleave
-    per_source: dict[str, list[dict]] = {}
+    merged: list[dict] = []
+    seen_urls: set[str] = set()
     for src in sources:
         try:
             raw = _fetch_all(keyword="", lang="zh-TW", sources=[src])
-            per_source[src] = [it for it in (raw or []) if it.get("url") not in used]
         except Exception as e:
             log.warning("[autopilot] trending fetch %s failed: %s", src, e)
-            per_source[src] = []
+            continue
+        for it in (raw or []):
+            url = it.get("url", "")
+            if not url or url in used or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            merged.append(it)
 
-    # Round-robin interleave (TW first if present, then US, etc.)
-    fresh: list[dict] = []
-    while len(fresh) < n:
-        progress = False
-        for src in sources:
-            if per_source.get(src):
-                fresh.append(per_source[src].pop(0))
-                progress = True
-                if len(fresh) >= n:
-                    break
-        if not progress:
-            break
+    # Rank purely by view_count (desc). Missing view_count sinks to 0.
+    merged.sort(key=lambda it: int(it.get("view_count") or 0), reverse=True)
 
     return [{
         "title":       it.get("title", ""),
@@ -186,7 +180,8 @@ def _pick_trending_items(n: int = 3) -> list[dict]:
         "url":         it.get("url", ""),
         "source":      it.get("source", "YouTube"),
         "source_type": it.get("source_type", "youtube"),
-    } for it in fresh]
+        "view_count":  it.get("view_count"),
+    } for it in merged[:n]]
 
 
 def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
