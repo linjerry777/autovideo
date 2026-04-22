@@ -84,6 +84,7 @@ def trigger(req: TriggerRequest):
 
 _STRATEGY_LABEL = {
     "tech":          "科技",
+    "tech_tutorial": "科技教學",
     "entertainment": "娛樂",
     "finance":       "財經",
     "pet":           "寵物",
@@ -415,50 +416,25 @@ PLATFORMS = ["youtube", "tiktok", "instagram", "facebook", "threads", "x", "pint
 _HASHTAGS = {
     "tiktok": {
         "tech":          "#fyp #AI新聞 #科技新聞 #AI #AItools #Doro日報",
+        "tech_tutorial": "#fyp #AI教學 #AI工具 #AItips #學AI #Doro日報",
         "entertainment": "#TikTokTaiwan #台灣娛樂 #娛樂懶人包 #熱搜 #Doro日報 #fyp",
         "finance":       "#fyp #台股 #財經新聞 #投資 #股市 #Doro日報",
         "pet":           "#fyp #萌寵 #寵物日常 #貓狗 #療癒 #Doro日報",
         "generic":       "#fyp #每日新聞 #台灣熱搜 #懶人包 #Doro日報 #TikTokTaiwan",
     },
-    "instagram": {  # expand to 25-30 for first_comment
-        "tech": (
-            "#Doro日報 #AI新聞 #每日AI #AI懶人包 #Claude #Anthropic #ChatGPT #LLM "
-            "#AIAgent #AI代理 #生成式AI #GenAI #AI工具 #AItools #AInews "
-            "#tech #techtok #科技新聞 #科技趨勢 #AI趨勢 #AI產業 #AI應用 "
-            "#台灣科技 #未來科技 #科技宅 #每日科技 #AI觀察 #AI圈 #科技新知"
-        ),
-        "entertainment": (
-            "#Doro日報 #每日娛樂 #娛樂懶人包 #YT熱門 #台灣熱門 #TWtrending "
-            "#電競 #電競新聞 #esports #娛樂圈 #明星八卦 #追劇日常 #追劇推薦 "
-            "#電影預告 #必看電影 #遊戲實況 #實況主 #網路熱搜 #熱搜話題 "
-            "#週末追劇 #娛樂新聞 #popculture #fandom #movietok #gametok "
-            "#台灣娛樂 #TWent #twtok #每日精選 #娛樂整理"
-        ),
-        "finance": (
-            "#Doro日報 #每日財經 #台股 #美股 #財經新聞 #投資理財 #股市分析 "
-            "#台灣股市 #投資 #存股 #ETF #被動收入 #理財 #股票 #投資日常 "
-            "#finance #stocks #investing #台股日記 #股市觀察 #財經懶人包 "
-            "#財經筆記 #投資筆記 #理財生活 #每日市場 #股市 #TWstocks "
-            "#投資新手 #理財達人 #台灣投資"
-        ),
-        "pet": (
-            "#Doro日報 #萌寵日常 #寵物日常 #貓奴 #狗奴 #貓咪 #狗狗 "
-            "#柯基 #柴犬 #橘貓 #三花貓 #貓生活 #狗生活 #療癒系 #動物療癒 "
-            "#可愛動物 #寵物愛好者 #pet #cats #dogs #petlover "
-            "#cutepet #pettok #寵物頻道 #毛孩日常 #寵物 #萌寵動物 "
-            "#動物星球 #寵物世界"
-        ),
-        "generic": (  # mixed news — broad but named
-            "#Doro日報 #每日懶人包 #台灣新聞 #TWnews #熱搜 #trending "
-            "#網路熱議 #話題焦點 #新聞整理 #懶人包 #新聞日報 "
-            "#科技新聞 #娛樂新聞 #社會議題 #每日精選 #Taiwan #TaiwanNews "
-            "#news #每日話題 #熱門話題 #熱門整理 #追新聞 "
-            "#今日焦點 #台灣焦點 #新聞彙整 #每日焦點 #焦點新聞 "
-            "#新聞懶人包 #新聞彙整 #新聞日常"
-        ),
+    "instagram": {  # v5: 3-5 tags after IG removed hashtag-follow Dec 2024
+        # 2026 best practice: keyword-in-caption > hashtag count.
+        # Over-tagging (25+) now reads as spam signal.
+        "tech":          "#AI新聞 #科技新知 #AI工具 #Doro日報 #台灣科技",
+        "tech_tutorial": "#AI教學 #AI工具 #AItips #學AI #Doro日報",
+        "entertainment": "#娛樂懶人包 #台灣熱搜 #追劇 #Doro日報 #娛樂圈",
+        "finance":       "#財經新聞 #台股 #投資理財 #Doro日報 #股市",
+        "pet":           "#萌寵日常 #寵物 #療癒 #Doro日報 #毛孩",
+        "generic":       "#台灣新聞 #每日懶人包 #熱搜 #Doro日報 #新聞整理",
     },
     "facebook_body": {  # inline at end of description, 5-8 tags is FB norm
         "tech":          "#AI新聞 #科技新知 #AI工具 #台灣科技 #Doro日報",
+        "tech_tutorial": "#AI教學 #AI工具 #AItips #學AI #Doro日報",
         "entertainment": "#娛樂新聞 #台灣娛樂 #熱搜話題 #追劇 #Doro日報",
         "finance":       "#財經 #投資理財 #台股 #股市 #Doro日報",
         "pet":           "#萌寵 #寵物日常 #療癒 #Doro日報",
@@ -466,6 +442,7 @@ _HASHTAGS = {
     },
     "threads": {  # 1-2 topic tags max
         "tech":          "#AI新聞 #Doro日報",
+        "tech_tutorial": "#AI教學 #Doro日報",
         "entertainment": "#娛樂懶人包 #Doro日報",
         "finance":       "#財經 #Doro日報",
         "pet":           "#萌寵 #Doro日報",
@@ -473,6 +450,7 @@ _HASHTAGS = {
     },
     "x": {  # 2-3 tags, front of post style
         "tech":          "#AI #科技 #AINews",
+        "tech_tutorial": "#AI #AItips #學AI",
         "entertainment": "#娛樂 #熱搜",
         "finance":       "#台股 #投資",
         "pet":           "#萌寵 #寵物",
@@ -485,6 +463,7 @@ _HASHTAGS_BY_STRATEGY = _HASHTAGS["tiktok"]  # legacy alias (some callers may us
 # YouTube tags (comma-separated, no hashtag prefix) — 8-12 tags, IP-specific first
 _YOUTUBE_TAGS_BY_STRATEGY = {
     "tech":          "AI新聞,ChatGPT,Claude,Anthropic,AI工具,人工智慧,科技新聞,AI代理,生成式AI,Doro日報,每日AI",
+    "tech_tutorial": "AI教學,AI工具,AItips,ChatGPT教學,Claude教學,AI實用,AI技巧,人工智慧應用,Doro日報,學AI",
     "entertainment": "台灣娛樂,娛樂新聞,熱門話題,YT熱門,電競,電影預告,實況,娛樂懶人包,Doro日報,每日娛樂",
     "finance":       "台股,財經新聞,投資,股市,理財,美股,ETF,財經懶人包,Doro日報,每日財經",
     "pet":           "萌寵,寵物日常,貓狗,療癒,可愛動物,pet,寵物頻道,Doro日報",
@@ -499,6 +478,7 @@ _YOUTUBE_TAGS_BY_STRATEGY = {
 # tech news (no human footage).
 _IS_AIGC_BY_STRATEGY = {
     "tech":          True,
+    "tech_tutorial": True,
     "generic":       True,
     "finance":       True,
     "entertainment": False,
@@ -508,6 +488,7 @@ _IS_AIGC_BY_STRATEGY = {
 # Strategy-specific title hook formulas. {hook} = first item's hook, {n} = item count.
 _TITLE_FORMULA = {
     "tech":          "{hook}｜{n} 則 AI 大事一次看完",
+    "tech_tutorial": "{hook}｜{n} 招 AI 技巧學起來",
     "entertainment": "{hook}｜今天台灣 {n} 件熱搜一次看",
     "finance":       "{hook}｜{n} 則市場焦點",
     "pet":           "{hook}｜{n} 個萌寵時刻",
@@ -517,6 +498,7 @@ _TITLE_FORMULA = {
 # Strategy-specific sign-off line at end of long descriptions
 _SIGNOFF = {
     "tech":          "追蹤 @doro 每天一則 AI 懶人包 🐾",
+    "tech_tutorial": "想學更多 AI 技巧？追蹤 @doro 每天教你一招 🐾",
     "entertainment": "追蹤 @doro 每天一則娛樂懶人包 🐾",
     "finance":       "追蹤 @doro 每天一則財經懶人包 🐾",
     "pet":           "追蹤 @doro 每天一則萌寵日常 🐾",
@@ -553,6 +535,7 @@ def _compose_description(items: list[dict], strategy: str, signoff: bool = True)
 # Tech goes to 雙層甜甜圈; everything else (news, entertainment, pet) defaults to Mascot page.
 _FB_PAGE_BY_STRATEGY = {
     "tech":          "1100141579843223",   # 雙層甜甜圈
+    "tech_tutorial": "1100141579843223",   # 雙層甜甜圈（同 tech）
     "entertainment": "1012830001921459",   # Doro / Mascot
     "pet":           "1012830001921459",   # same Mascot page for now (swap if 奶烙 gets own page)
     "finance":       "1100141579843223",   # fallback to tech page (finance strategy dropped)

@@ -66,6 +66,11 @@ def call_claude(prompt: str, timeout: int = 180) -> tuple[str, dict]:
 _STRATEGY_PRESETS = {
     "tech":          {"script_len": "80~110 字",
                       "hook_style": "先說結論（1 秒內拋出核心賣點），適合技術解說"},
+    # 2026-04-22 新增：教學口吻版本（與 tech 並存，不取代）
+    # 用戶可在設定切 autopilot_news_strategy 從 tech 改 tech_tutorial 比較
+    "tech_tutorial": {"script_len": "80~110 字",
+                      "hook_style": "AI 圈友口吻分享實用 tips（「我昨天才發現...」「這招我實測有效」），"
+                                    "每則必須帶 how-to 或 why-you-care 結構，不是新聞播報"},
     "entertainment": {"script_len": "30~50 字",
                       "hook_style": "情緒衝擊（驚喜/反轉/搞笑），開頭必須在 1 秒內抓住注意力"},
     "finance":       {"script_len": "80~110 字",
@@ -82,7 +87,33 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None,
     strategy:  tech | entertainment | finance | pet   (None → 預設科技風格)
     回傳: [{hook, title, summary, script, scene_type, source_url, source_name}, ...]
     """
-    preset = _STRATEGY_PRESETS.get((strategy or "tech").lower(), _STRATEGY_PRESETS["tech"])
+    strat_key = (strategy or "tech").lower()
+    preset = _STRATEGY_PRESETS.get(strat_key, _STRATEGY_PRESETS["tech"])
+
+    # tech_tutorial 專屬 override：換掉 hook templates + script 口吻
+    # 保留原 tech 完全不受影響
+    tutorial_override = ""
+    if strat_key == "tech_tutorial":
+        tutorial_override = """
+
+⚠️ 此次生成為 **tech_tutorial 教學分享版** — 覆寫上方 hook 規則：
+Hook 必須是 AI 圈友口吻（像朋友分享實用 tips，不是新聞主播）：
+  1. 實測分享「我昨天用 X 才發現...」「實測這招有效」
+  2. 工具推薦「今年必試的 3 個 AI 工具」「這 1 招讓你...」
+  3. 學習誘惑「學這招 AI 面試就過」「3 分鐘學會 AI 會議記錄」
+  4. 使用場景「開會用這個 AI 超爽」「工作中最好用的 AI」
+
+**禁止**：純新聞播報式 hook（「XX 公司宣布 YY」「Anthropic 推出 Z」）
+
+Script 結構：每則新聞必須含 **how-to（怎麼用）** 或 **why-you-care（跟你有啥關係）**：
+- 差：「Anthropic 推 MCP 想一統 AI 代理」（講事件）
+- 好：「欸你看…用 Claude 的注意，MCP 出來後免費 credit 可能要變貴了！」（帶 why-you-care）
+
+CTA 語氣：驅動**關注**（權重 8×），不是評論。
+- 好：「想學更多 AI 技巧？追蹤 Doro 每天教你一招」
+- 好：「跟你分享的 AI 教學，追蹤不錯過」
+"""
+
     lines = "\n".join([
         f"{i+1}. [{it['source']}] {it['title']}\n   URL: {it['url']}\n   {it.get('summary','')[:120]}"
         for i, it in enumerate(raw_items)
@@ -125,7 +156,7 @@ hook 必須是 **中文區短影音 hook 格式**（抖音前 3 秒完播權重 
   6. 過程分享（台灣偏好）「我看了一下... 發現...」「點開那一刻我震驚了」
 **禁止陳述句**（例：「Token 稅爭議爆發」「JYP 又出王牌」—這些是結果不是鉤子）。
 hook_variants 恰好 3 個，從不同模板挑。
-
+{tutorial_override}
 bullets 是 3 條**新聞卡片重點**（≤15字/條），會被放在 Remotion 影片裡當文字 overlay。
 - 每條要是獨立成立的短金句，不是半句話
 - 避免重複 hook/title 的內容；應該是「延伸 / 數據 / 結論」三個不同面向
