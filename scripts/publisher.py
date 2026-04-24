@@ -17,6 +17,9 @@ from pathlib import Path
 from dotenv import load_dotenv
 from upload_post import UploadPostClient
 
+sys.path.insert(0, str(Path(__file__).parent))
+from thumbnail_uploader import upload_thumbnail, ThumbnailUploadError
+
 # Golden-hour first-slot per platform (local time). Mirrors UI _GOLDEN_HOURS.
 GOLDEN_HOUR_FIRST = {
     "youtube":   "14:00",
@@ -168,6 +171,18 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
 
     client = UploadPostClient(API_KEY)
 
+    # Custom cover — host thumbnail.png on a public URL so IG/YT can fetch it.
+    # Platforms that support URL-based covers (IG cover_url, YT thumbnail_url)
+    # share this URL. Silently skipped if no host is configured OR render missing.
+    thumb_path = pipe_dir / "thumbnail.png"
+    thumbnail_public_url: str | None = None
+    if thumb_path.exists():
+        try:
+            thumbnail_public_url = upload_thumbnail(thumb_path)
+            print(f"🖼️  封面 URL：{thumbnail_public_url}")
+        except ThumbnailUploadError as _e:
+            print(f"⚠️  封面 host 失敗（fallback 到平台自動取幀）：{_e}", file=sys.stderr)
+
     # Per-platform kwargs derived from platform_meta.json (falls back to meta if missing)
     fallback_title = meta["title"]
     fallback_desc  = meta["description"]
@@ -202,9 +217,9 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         kwargs["embeddable"]               = yt.get("embeddable", True)
         kwargs["publicStatsViewable"]      = yt.get("publicStatsViewable", True)
         kwargs["license"]                  = yt.get("license", "youtube")
-        thumb_path = pipe_dir / "thumbnail.png"
-        if yt.get("use_auto_thumbnail", True) and thumb_path.exists():
-            kwargs["thumbnail"] = str(thumb_path)
+        # Upload-Post's YT adapter accepts thumbnail_url (public URL, not a local path).
+        if yt.get("use_auto_thumbnail", True) and thumbnail_public_url:
+            kwargs["thumbnail_url"] = thumbnail_public_url
 
     # ── TikTok
     if "tiktok" in platforms:
@@ -233,6 +248,13 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
             kwargs["collaborators"] = ig["collaborators"]
         if ig.get("user_tags"):
             kwargs["user_tags"]     = ig["user_tags"]
+        # Custom cover — the hand-rendered 1080×1920 thumbnail.png (hook + title +
+        # hero image). Meta Graph expects a public URL. If unhosted, fall back to
+        # thumb_offset=2s to at least skip the pattern-interrupt black flash.
+        if thumbnail_public_url and ig.get("use_auto_thumbnail", True):
+            kwargs["cover_url"] = thumbnail_public_url
+        else:
+            kwargs["thumb_offset"] = int(ig.get("thumb_offset", 2))
 
     # Facebook (page_id required — drop platform if empty)
     if "facebook" in platforms:
