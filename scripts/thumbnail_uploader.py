@@ -19,14 +19,16 @@ Usage:
     url = upload_thumbnail(Path("pipeline/2026-04-24/job_5/thumbnail.png"))
 """
 import base64
-import io
 import mimetypes
 import os
 import sys
 from pathlib import Path
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+# NOTE: do NOT wrap sys.stdout/stderr here — this module is IMPORTED by
+# publisher.py which has already wrapped them. Re-wrapping detaches the parent
+# wrapper and closes the underlying buffer on GC, breaking all subsequent
+# prints with "I/O operation on closed file" (regression introduced 2026-04-24).
+# Standalone CLI mode only prints an ASCII URL, no UTF-8 wrapping needed.
 
 import requests
 from dotenv import load_dotenv
