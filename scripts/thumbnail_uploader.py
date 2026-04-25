@@ -40,6 +40,35 @@ class ThumbnailUploadError(RuntimeError):
     pass
 
 
+def _ensure_jpeg(src: Path) -> Path:
+    """Return a JPEG version of `src`. IG Reels rejects PNG cover_url ("Cover
+    image must be JPEG"). Other platforms accept JPEG fine, so we standardize.
+
+    If `src` is already .jpg/.jpeg, returns it unchanged. Otherwise creates
+    `<src.stem>.jpg` next to it (idempotent — re-uses existing JPEG).
+    """
+    if src.suffix.lower() in (".jpg", ".jpeg"):
+        return src
+    jpg = src.with_suffix(".jpg")
+    if jpg.exists() and jpg.stat().st_mtime >= src.stat().st_mtime:
+        return jpg
+    try:
+        from PIL import Image
+    except ImportError as e:
+        raise ThumbnailUploadError(f"Pillow required for PNG→JPEG conversion: {e}")
+    with Image.open(src) as im:
+        # Flatten alpha onto white — JPEG has no alpha channel.
+        if im.mode in ("RGBA", "LA", "P"):
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            im = im.convert("RGBA")
+            bg.paste(im, mask=im.split()[-1])
+            im = bg
+        elif im.mode != "RGB":
+            im = im.convert("RGB")
+        im.save(jpg, "JPEG", quality=92, optimize=True, progressive=True)
+    return jpg
+
+
 def _upload_supabase(path: Path) -> str | None:
     url = os.getenv("SUPABASE_URL", "").rstrip("/")
     key = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -86,20 +115,26 @@ def _upload_imgbb(path: Path) -> str | None:
 def upload_thumbnail(path: Path, use_cache: bool = True) -> str:
     """Upload `path` to the first configured provider. Returns the public URL.
 
+    PNG inputs are auto-converted to JPEG (IG Reels requires JPEG covers).
     Cached to `<path.parent>/thumbnail_url.txt` on success.
     Raises ThumbnailUploadError if every provider is unconfigured or fails.
     """
     if not path.exists():
         raise ThumbnailUploadError(f"thumbnail not found: {path}")
 
+    # Cache key tracks JPEG URL specifically — earlier PNG uploads are
+    # invalidated automatically because IG rejected them.
     cache = path.parent / "thumbnail_url.txt"
     if use_cache and cache.exists():
         cached = cache.read_text(encoding="utf-8").strip()
-        if cached.startswith("http"):
+        # Old caches may point at .png — those failed on IG, force re-upload.
+        if cached.startswith("http") and not cached.lower().endswith(".png"):
             return cached
 
+    jpg_path = _ensure_jpeg(path)
+
     for fn in (_upload_supabase, _upload_imgbb):
-        url = fn(path)
+        url = fn(jpg_path)
         if url:
             try:
                 cache.write_text(url, encoding="utf-8")
