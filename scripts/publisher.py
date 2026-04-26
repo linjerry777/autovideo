@@ -347,16 +347,49 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
             })
 
     responses = []
+    # Transient-error markers — Upload-Post occasionally returns 502/504 from
+    # their gateway; retrying after a short backoff usually succeeds. Without
+    # this guard a single 504 used to crash the script and skip every other
+    # platform (job #118: IG 504 → FB/Threads/TikTok/YT/X never attempted).
+    import time as _time
+    TRANSIENT_MARKERS = ("502", "503", "504", "Gateway", "Timeout", "Connection", "timed out")
+
+    def _is_transient(exc: Exception) -> bool:
+        msg = str(exc)
+        return any(m in msg for m in TRANSIENT_MARKERS)
+
+    def _upload_with_retry(label, video_path, group, merged_kwargs, max_attempts=3):
+        last_exc = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                return client.upload_video(
+                    video_path = str(video_path),
+                    title      = fallback_title,
+                    user       = PROFILE,
+                    platforms  = group,
+                    **merged_kwargs,
+                )
+            except Exception as e:
+                last_exc = e
+                if attempt < max_attempts and _is_transient(e):
+                    backoff = 5 * (3 ** (attempt - 1))   # 5s, 15s, 45s
+                    print(f"  ⚠️  {label} attempt {attempt}/{max_attempts} transient ({type(e).__name__}); retry in {backoff}s",
+                          file=sys.stderr)
+                    _time.sleep(backoff)
+                    continue
+                raise
+        raise last_exc
+
     for label, video_path, group, extra in upload_plan:
         merged_kwargs = {**kwargs, **extra}
         print(f"📤 上傳 {label} ({video_path.name}) → {group}")
-        resp = client.upload_video(
-            video_path = str(video_path),
-            title      = fallback_title,
-            user       = PROFILE,
-            platforms  = group,
-            **merged_kwargs,
-        )
+        try:
+            resp = _upload_with_retry(label, video_path, group, merged_kwargs)
+        except Exception as _e:
+            # Mark this group failed; continue to next platform group so a
+            # single platform's 504 doesn't tank the entire publish run.
+            print(f"  ❌ {label} 放棄：{type(_e).__name__}: {str(_e)[:200]}", file=sys.stderr)
+            resp = {"success": False, "request_id": "", "error": str(_e)[:300]}
         responses.append((label, resp))
         # Backfill status + request_id into schedule_entries for the UI
         for ent in schedule_entries:
