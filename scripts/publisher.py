@@ -171,6 +171,16 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
 
     client = UploadPostClient(API_KEY)
 
+    # Upload-Post SDK has no timeout — a stalled CDN can hang the upload call
+    # forever (job #118 was stuck 9 min on a single request). Monkey-patch the
+    # underlying session to enforce (connect, read) defaults so retries are
+    # actually reachable.
+    _orig_session_request = client.session.request
+    def _session_request_with_timeout(method, url, **kw):
+        kw.setdefault("timeout", (30, 180))   # 30s connect, 180s read
+        return _orig_session_request(method, url, **kw)
+    client.session.request = _session_request_with_timeout
+
     # Custom cover — host thumbnail.png on a public URL so IG/YT can fetch it.
     # Platforms that support URL-based covers (IG cover_url, YT thumbnail_url)
     # share this URL. Silently skipped if no host is configured OR render missing.
