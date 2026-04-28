@@ -495,14 +495,16 @@ _TITLE_FORMULA = {
     "generic":       "{hook}｜{n} 則今日重點",
 }
 
-# Strategy-specific sign-off line at end of long descriptions
+# Strategy-specific sign-off line at end of long descriptions.
+# 科技類（tech/tech_tutorial/finance）→ @_doro1998ai
+# 娛樂/生活類（entertainment/pet/generic）→ @_doro1998
 _SIGNOFF = {
-    "tech":          "追蹤 @doro 每天一則 AI 懶人包 🐾",
-    "tech_tutorial": "想學更多 AI 技巧？追蹤 @doro 每天教你一招 🐾",
-    "entertainment": "追蹤 @doro 每天一則娛樂懶人包 🐾",
-    "finance":       "追蹤 @doro 每天一則財經懶人包 🐾",
-    "pet":           "追蹤 @doro 每天一則萌寵日常 🐾",
-    "generic":       "追蹤 @doro 每天一則重點懶人包 🐾",
+    "tech":          "追蹤 @_doro1998ai 每天一則 AI 懶人包 🐾",
+    "tech_tutorial": "想學更多 AI 技巧？追蹤 @_doro1998ai 每天教你一招 🐾",
+    "entertainment": "追蹤 @_doro1998 每天一則娛樂懶人包 🐾",
+    "finance":       "追蹤 @_doro1998ai 每天一則財經懶人包 🐾",
+    "pet":           "追蹤 @_doro1998 每天一則萌寵日常 🐾",
+    "generic":       "追蹤 @_doro1998 每天一則重點懶人包 🐾",
 }
 
 
