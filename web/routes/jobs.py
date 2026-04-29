@@ -938,6 +938,65 @@ def retry_step(job_id: int, step: str):
     return {"ok": True, "job_id": job_id, "step": step}
 
 
+@router.post("/jobs/{job_id}/retry/upload/failed")
+def retry_failed_uploads(job_id: int):
+    """重發 schedule_log.json 裡 status=failed 的平台。
+
+    只跑 publisher.py 限定那些平台，publisher 會 merge 進現有 schedule_log，
+    所以已成功的 platforms（uploaded）不會被覆蓋或重發。
+    """
+    if job_runner.is_running():
+        raise HTTPException(409, "Pipeline already running")
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+
+    log_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "schedule_log.json"
+    if not log_file.exists():
+        raise HTTPException(404, "schedule_log.json 不存在 — 此 job 還沒跑過 publisher")
+
+    try:
+        log = _json.loads(log_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(500, f"讀 schedule_log 失敗：{e}")
+
+    failed_platforms = sorted({e["platform"] for e in log if e.get("status") == "failed"})
+    if not failed_platforms:
+        return {"ok": True, "retried": [], "message": "沒有失敗的平台"}
+
+    job_key = f"{job['date']}/job_{job_id}"
+    dry_run = get_setting("dry_run", "false") == "true"
+
+    # Re-use account_profile from news.json if present (same logic as upload_job)
+    news_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "news.json"
+    profile_override = ""
+    if news_file.exists():
+        try:
+            nd = _json.loads(news_file.read_text(encoding="utf-8"))
+            profile_override = nd.get("account_profile", "")
+        except Exception:
+            pass
+
+    plat_args = ["--platforms"] + failed_platforms
+    if dry_run:
+        plat_args += ["--dry-run"]
+    if profile_override:
+        plat_args += ["--profile", profile_override]
+
+    update_job(job_id, step_upload="uploading")
+    log_path_dest = Path(job["log_path"]) if job.get("log_path") else None
+
+    def _run():
+        ok, out = job_runner._call_script("publisher.py", job_key, plat_args, log_path_dest)
+        if ok:
+            update_job(job_id, status="done", step_upload="done")
+        else:
+            update_job(job_id, status="failed", step_upload="failed", error=out[-300:])
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"ok": True, "job_id": job_id, "retried": failed_platforms}
+
+
 @router.delete("/jobs/{job_id}/files")
 def cleanup_job_files(job_id: int):
     """刪除 job 的 pipeline 工作檔案（保留 output.mp4），釋放磁碟空間"""

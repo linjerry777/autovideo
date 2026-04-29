@@ -407,10 +407,23 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
                 ent["status"]     = "uploaded" if resp.get("success") else "failed"
                 ent["request_id"] = resp.get("request_id", "")
 
-    # Persist schedule log (even on failure — tells UI what was attempted)
+    # Persist schedule log — MERGE with any existing log so a partial-platform
+    # retry (e.g. retry/upload/failed for just YT+TT) doesn't wipe out the IG/
+    # FB/Threads/X rows that succeeded earlier. Replace by platform key.
+    log_path = pipe_dir / "schedule_log.json"
+    merged = list(schedule_entries)
+    new_platforms = {e["platform"] for e in schedule_entries}
+    if log_path.exists():
+        try:
+            old = json.loads(log_path.read_text(encoding="utf-8"))
+            for old_e in old:
+                if old_e.get("platform") not in new_platforms:
+                    merged.append(old_e)
+        except Exception as _e:
+            print(f"⚠️  讀舊 schedule_log 失敗（覆寫處理）：{_e}", file=sys.stderr)
     try:
-        (pipe_dir / "schedule_log.json").write_text(
-            json.dumps(schedule_entries, ensure_ascii=False, indent=2),
+        log_path.write_text(
+            json.dumps(merged, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
     except Exception as _e:

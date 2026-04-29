@@ -2311,6 +2311,12 @@
                         <button @click.stop="openJob(e.job_id)" class="text-xs text-violet-600 hover:text-violet-700 font-medium cursor-pointer">
                           開啟 Job #<span x-text="e.job_id"></span> →
                         </button>
+                        <!-- Retry-failed button: only when this row's status is failed -->
+                        <button x-show="e.status === 'failed'"
+                          @click.stop="retryFailedUpload(e.job_id)"
+                          class="text-xs px-2.5 py-1 rounded-md bg-red-50 hover:bg-red-100 text-red-700 font-medium border border-red-200 cursor-pointer transition">
+                          🔁 補發此 Job 失敗平台
+                        </button>
                         <span x-show="e.request_id" class="text-[10px] text-gray-400 font-mono" x-text="'req: ' + e.request_id?.slice(0,12)"></span>
                       </div>
                     </div>
@@ -2797,6 +2803,21 @@ function app() {
         this.showToast('分析讀取失敗：' + e.message)
       } finally {
         this.analyticsLoading = false
+      }
+    },
+
+    async retryFailedUpload(jobId) {
+      try {
+        const r = await this.api('POST', `/api/jobs/${jobId}/retry/upload/failed`)
+        if (r.retried && r.retried.length > 0) {
+          alert(`✅ 補發中：${r.retried.join(', ')}\n\n進度可在 Job 詳情頁看 SSE 即時 log。`)
+          // Reload schedule after a few seconds so the UI catches the new state
+          setTimeout(() => this.loadSchedule(), 4000)
+        } else {
+          alert(r.message || '沒有需要補發的平台')
+        }
+      } catch (err) {
+        alert('補發失敗：' + (err?.message || err))
       }
     },
 
