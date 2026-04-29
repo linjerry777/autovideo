@@ -938,6 +938,36 @@ def retry_step(job_id: int, step: str):
     return {"ok": True, "job_id": job_id, "step": step}
 
 
+def _build_retry_failed_plan(job: dict) -> tuple[list[str], list[str], str]:
+    """Return (failed_platforms, plat_args, log_path) or empty list if nothing to do."""
+    log_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job['id']}" / "schedule_log.json"
+    if not log_file.exists():
+        return [], [], ""
+    try:
+        log = _json.loads(log_file.read_text(encoding="utf-8"))
+    except Exception:
+        return [], [], ""
+    failed = sorted({e["platform"] for e in log if e.get("status") == "failed"})
+    if not failed:
+        return [], [], ""
+
+    dry_run = get_setting("dry_run", "false") == "true"
+    news_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job['id']}" / "news.json"
+    profile_override = ""
+    if news_file.exists():
+        try:
+            nd = _json.loads(news_file.read_text(encoding="utf-8"))
+            profile_override = nd.get("account_profile", "")
+        except Exception:
+            pass
+    plat_args = ["--platforms"] + failed
+    if dry_run:
+        plat_args += ["--dry-run"]
+    if profile_override:
+        plat_args += ["--profile", profile_override]
+    return failed, plat_args, str(job.get("log_path") or "")
+
+
 @router.post("/jobs/{job_id}/retry/upload/failed")
 def retry_failed_uploads(job_id: int):
     """重發 schedule_log.json 裡 status=failed 的平台。
@@ -951,40 +981,16 @@ def retry_failed_uploads(job_id: int):
     if not job:
         raise HTTPException(404, "Job not found")
 
-    log_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "schedule_log.json"
-    if not log_file.exists():
-        raise HTTPException(404, "schedule_log.json 不存在 — 此 job 還沒跑過 publisher")
-
-    try:
-        log = _json.loads(log_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        raise HTTPException(500, f"讀 schedule_log 失敗：{e}")
-
-    failed_platforms = sorted({e["platform"] for e in log if e.get("status") == "failed"})
-    if not failed_platforms:
+    failed, plat_args, log_path_str = _build_retry_failed_plan(job)
+    if not failed:
+        log_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "schedule_log.json"
+        if not log_file.exists():
+            raise HTTPException(404, "schedule_log.json 不存在 — 此 job 還沒跑過 publisher")
         return {"ok": True, "retried": [], "message": "沒有失敗的平台"}
 
     job_key = f"{job['date']}/job_{job_id}"
-    dry_run = get_setting("dry_run", "false") == "true"
-
-    # Re-use account_profile from news.json if present (same logic as upload_job)
-    news_file = BASE_DIR / "pipeline" / job["date"] / f"job_{job_id}" / "news.json"
-    profile_override = ""
-    if news_file.exists():
-        try:
-            nd = _json.loads(news_file.read_text(encoding="utf-8"))
-            profile_override = nd.get("account_profile", "")
-        except Exception:
-            pass
-
-    plat_args = ["--platforms"] + failed_platforms
-    if dry_run:
-        plat_args += ["--dry-run"]
-    if profile_override:
-        plat_args += ["--profile", profile_override]
-
     update_job(job_id, step_upload="uploading")
-    log_path_dest = Path(job["log_path"]) if job.get("log_path") else None
+    log_path_dest = Path(log_path_str) if log_path_str else None
 
     def _run():
         ok, out = job_runner._call_script("publisher.py", job_key, plat_args, log_path_dest)
@@ -994,7 +1000,53 @@ def retry_failed_uploads(job_id: int):
             update_job(job_id, status="failed", step_upload="failed", error=out[-300:])
 
     threading.Thread(target=_run, daemon=True).start()
-    return {"ok": True, "job_id": job_id, "retried": failed_platforms}
+    return {"ok": True, "job_id": job_id, "retried": failed}
+
+
+@router.post("/jobs/retry/upload/failed/all")
+def retry_failed_uploads_all():
+    """掃所有近期 jobs，把每個有 failed 平台的 job 序列執行 publisher 補發。
+
+    Backend 一次只能跑一支 publisher，所以 worker thread 會 serial 處理。
+    呼叫端立刻拿到 plan（哪幾支會被重跑），實際進度看每 job 的 SSE/log。
+    """
+    if job_runner.is_running():
+        raise HTTPException(409, "Pipeline already running")
+
+    jobs = list_jobs(limit=200)
+    plan = []  # [(job_id, job_dict, plat_args, log_path)]
+    for j in jobs:
+        failed, plat_args, log_path_str = _build_retry_failed_plan(j)
+        if failed:
+            plan.append({
+                "job_id":    j["id"],
+                "date":      j["date"],
+                "platforms": failed,
+                "_args":     plat_args,
+                "_logp":     log_path_str,
+            })
+    if not plan:
+        return {"ok": True, "queued": [], "message": "沒有任何 job 有失敗平台"}
+
+    # Mark all as uploading upfront so UI sees the work in progress
+    for p in plan:
+        update_job(p["job_id"], step_upload="uploading")
+
+    def _run_serial():
+        for p in plan:
+            job_key = f"{p['date']}/job_{p['job_id']}"
+            log_path_dest = Path(p["_logp"]) if p["_logp"] else None
+            ok, out = job_runner._call_script("publisher.py", job_key, p["_args"], log_path_dest)
+            if ok:
+                update_job(p["job_id"], status="done", step_upload="done")
+            else:
+                update_job(p["job_id"], status="failed", step_upload="failed", error=out[-300:])
+
+    threading.Thread(target=_run_serial, daemon=True).start()
+    return {
+        "ok": True,
+        "queued": [{"job_id": p["job_id"], "platforms": p["platforms"]} for p in plan],
+    }
 
 
 @router.delete("/jobs/{job_id}/files")

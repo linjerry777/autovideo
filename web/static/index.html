@@ -2159,6 +2159,14 @@
           <p class="text-sm text-gray-500 mt-1">未來 7 天各平台上傳時段 · 點擊任一項目展開 v2 文案預覽</p>
         </div>
         <div class="flex items-center gap-2">
+          <!-- Retry-all-failed: shown only when there's at least one failed entry across all jobs -->
+          <button x-show="scheduleFailedCount > 0"
+            @click="retryAllFailed()"
+            class="px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 text-sm font-medium border border-red-200 cursor-pointer transition">
+            🔁 一鍵補發全部失敗
+            <span class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 ml-1 rounded-full bg-red-600 text-white text-[10px] font-bold tabular-nums"
+              x-text="scheduleFailedCount"></span>
+          </button>
           <button @click="loadSchedule()" class="px-3 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 cursor-pointer transition">
             <svg class="inline w-3.5 h-3.5 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             重新整理
@@ -2811,7 +2819,6 @@ function app() {
         const r = await this.api('POST', `/api/jobs/${jobId}/retry/upload/failed`)
         if (r.retried && r.retried.length > 0) {
           alert(`✅ 補發中：${r.retried.join(', ')}\n\n進度可在 Job 詳情頁看 SSE 即時 log。`)
-          // Reload schedule after a few seconds so the UI catches the new state
           setTimeout(() => this.loadSchedule(), 4000)
         } else {
           alert(r.message || '沒有需要補發的平台')
@@ -2819,6 +2826,28 @@ function app() {
       } catch (err) {
         alert('補發失敗：' + (err?.message || err))
       }
+    },
+
+    async retryAllFailed() {
+      const count = this.scheduleFailedCount
+      if (count === 0) return
+      if (!confirm(`一次補發 ${count} 個失敗平台？\n\nbackend 會 serial 一個個跑（一次只能 1 支 publisher），可能要花幾分鐘。`)) return
+      try {
+        const r = await this.api('POST', `/api/jobs/retry/upload/failed/all`)
+        if (r.queued && r.queued.length > 0) {
+          const summary = r.queued.map(q => `Job #${q.job_id}: ${q.platforms.join(', ')}`).join('\n')
+          alert(`✅ 已排入序列：${r.queued.length} 支 jobs\n\n${summary}\n\nbackend serial 處理中。`)
+          setTimeout(() => this.loadSchedule(), 5000)
+        } else {
+          alert(r.message || '沒有需要補發的')
+        }
+      } catch (err) {
+        alert('一鍵補發失敗：' + (err?.message || err))
+      }
+    },
+
+    get scheduleFailedCount() {
+      return (this.scheduleEntries || []).filter(e => e.status === 'failed').length
     },
 
     async loadSchedule() {
