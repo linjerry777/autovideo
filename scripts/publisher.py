@@ -30,12 +30,24 @@ GOLDEN_HOUR_FIRST = {
     "x":         "09:00",
 }
 
+# Strategy → golden-hour offset (hours). News (tech/finance) uses the base
+# slot; trending (entertainment/pet/generic) shifts +4h so yt + pet posts
+# don't land on the same minute on Meta and trip cross-account spam detection.
+_STRATEGY_GOLDEN_OFFSET = {
+    "tech":          0,
+    "tech_tutorial": 0,
+    "finance":       0,
+    "entertainment": 4,
+    "pet":           4,
+    "generic":       4,
+}
 
-def _next_golden_slot(platform: str, tz: str | None) -> str | None:
+
+def _next_golden_slot(platform: str, tz: str | None, offset_hours: int = 0) -> str | None:
     """Return ISO datetime for the next golden-hour slot of this platform.
 
-    If today's slot has passed, returns tomorrow's. Emits local datetime in
-    ISO format (Upload-Post parses this + timezone kwarg).
+    `offset_hours` shifts the base time forward (e.g. trending → +4h).
+    If the resulting slot has already passed today, returns tomorrow's.
     """
     hh_mm = GOLDEN_HOUR_FIRST.get(platform)
     if not hh_mm:
@@ -48,6 +60,8 @@ def _next_golden_slot(platform: str, tz: str | None) -> str | None:
     now = datetime.now(tz=tzinfo)
     hh, mm = hh_mm.split(":")
     target = now.replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
+    if offset_hours:
+        target += timedelta(hours=int(offset_hours))
     if target <= now:
         target += timedelta(days=1)
     return target.strftime("%Y-%m-%dT%H:%M:%S")
@@ -130,12 +144,19 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         if schedule.get("timezone"):
             schedule_kwargs["timezone"] = schedule["timezone"]
     items = data["items"]
-    meta  = build_metadata(items, strategy=data.get("strategy") or "tech")
+    strategy = (data.get("strategy") or "tech").lower()
+    meta  = build_metadata(items, strategy=strategy)
+    # Trending pipelines (entertainment/pet/generic) shift +N hours so news
+    # (yt) and trending (pet) don't post the exact same minute and trip
+    # cross-account spam detection on Meta. News strategies use offset 0.
+    strategy_offset = _STRATEGY_GOLDEN_OFFSET.get(strategy, 0)
 
     print(f"📤 準備上傳：{output_mp4.name}")
     print(f"   平台：{', '.join(platforms)}")
     print(f"   標題：{meta['title'][:60]}...")
     print(f"   Profile：{PROFILE}")
+    if strategy_offset:
+        print(f"   Strategy={strategy} → golden-hour offset +{strategy_offset}h")
 
     if dry_run:
         # Still write schedule_log.json so the UI 📅 排程 page shows what WOULD
@@ -149,7 +170,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         for p in platforms:
             p_meta = pmeta.get(p, {}) if pmeta else {}
             version_key = p_meta.get("video_version", "legacy")
-            slot = _next_golden_slot(p, _tz) if _auto_per else ""
+            slot = _next_golden_slot(p, _tz, offset_hours=strategy_offset) if _auto_per else ""
             preview_entries.append({
                 "platform":       p,
                 "scheduled_date": slot or "",
@@ -333,7 +354,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
 
         if auto_per_platform:
             for p in group:
-                slot = _next_golden_slot(p, tz)
+                slot = _next_golden_slot(p, tz, offset_hours=strategy_offset)
                 extra = {"scheduled_date": slot, "timezone": tz} if slot else {}
                 label = f"{version_key}:{p}@{slot or 'now'}"
                 upload_plan.append((label, video_path, [p], extra))
