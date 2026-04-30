@@ -109,7 +109,14 @@ def init_db():
                 ('autopilot_trending_profile', 'pet'),
                 ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,tiktok'),
                 ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days'),
-                ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft');
+                ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft'),
+                -- ManyChat-funnel keywords: caption + first_comment 出現「留言『XX』」CTA。
+                -- ManyChat 那邊配對應的 keyword automation → DM 帶 UTM 連結到部落格。
+                -- tech 系（tech / tech_tutorial / finance）走 cta_kw_tech；
+                -- 娛樂/生活系（entertainment / pet / generic）走 cta_kw_entertain。
+                ('cta_kw_tech',          '今日科技'),
+                ('cta_kw_entertain',     '今日娛樂'),
+                ('cta_blog_url',         'https://doro-palace.vercel.app/zh/from-ig');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}

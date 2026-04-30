@@ -53,6 +53,10 @@ class SettingsUpdate(BaseModel):
     autopilot_trending_strategy:    str | None = None
     autopilot_trending_profile:     str | None = None
     autopilot_platforms:            str | None = None
+    # ManyChat funnel — caption + first_comment 帶 keyword 引流到部落格
+    cta_kw_tech:                    str | None = None
+    cta_kw_entertain:               str | None = None
+    cta_blog_url:                   str | None = None
 
 
 @router.get("/settings")

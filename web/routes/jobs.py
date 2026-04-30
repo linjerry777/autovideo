@@ -516,8 +516,43 @@ def _compose_title(hooks: list[str], items: list[dict], strategy: str) -> str:
     return template.format(hook=first_hook, n=max(n, 1))[:100]
 
 
+# Strategy → ManyChat funnel CTA group. tech-ish strategies pull cta_kw_tech;
+# entertainment-ish pull cta_kw_entertain. Settings live in DB so user can
+# tune the keyword without redeploy.
+_STRATEGY_CTA_GROUP = {
+    "tech":          "tech",
+    "tech_tutorial": "tech",
+    "finance":       "tech",
+    "entertainment": "entertain",
+    "pet":           "entertain",
+    "generic":       "entertain",
+}
+
+# Phrasing varies per group so caption isn't identical across both pipelines.
+_CTA_PHRASING = {
+    "tech":      ('完整版新聞', '完整版科技新聞'),     # short / verbose alts (rotate later if needed)
+    "entertain": ('完整版懶人包', '完整版娛樂懶人包'),
+}
+
+
+def _strategy_cta_keyword(strategy: str) -> str:
+    """Return the ManyChat keyword for this strategy, from DB settings."""
+    group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
+    setting_key = f"cta_kw_{group}"
+    default = "今日科技" if group == "tech" else "今日娛樂"
+    return get_setting(setting_key, default).strip() or default
+
+
+def _strategy_cta_line(strategy: str) -> str:
+    """One-line CTA: 「💬 留言『今日科技』我私訊你完整版新聞 ✨」"""
+    kw = _strategy_cta_keyword(strategy)
+    group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
+    noun = _CTA_PHRASING.get(group, _CTA_PHRASING["entertain"])[0]
+    return f"💬 留言「{kw}」我私訊你{noun} ✨"
+
+
 def _compose_description(items: list[dict], strategy: str, signoff: bool = True) -> str:
-    """Numbered + save-CTA + sign-off description (v2)."""
+    """Numbered + ManyChat-keyword CTA + sign-off description (v3 with funnel)."""
     if not items:
         return _SIGNOFF.get(strategy, _SIGNOFF["generic"])
     lines = []
@@ -529,8 +564,14 @@ def _compose_description(items: list[dict], strategy: str, signoff: bool = True)
         if s:
             lines.append(f"    {s}")
     body = "\n".join(lines)
-    tail = f"\n\n你怎麼看？留言告訴 Doro 👇\n📌 收藏起來，這週再看一次" if signoff else ""
-    tail += f"\n{_SIGNOFF.get(strategy, _SIGNOFF['generic'])}" if signoff else ""
+    if not signoff:
+        return f"🐾 Doro 日報\n\n{body}"
+    cta = _strategy_cta_line(strategy)
+    tail = (
+        f"\n\n{cta}"
+        f"\n📌 收藏起來，這週再看一次"
+        f"\n{_SIGNOFF.get(strategy, _SIGNOFF['generic'])}"
+    )
     return f"🐾 Doro 日報\n\n{body}{tail}"
 
 # Strategy → FB Page ID mapping.
@@ -606,7 +647,10 @@ def _seed_platform_meta(news: dict) -> dict:
         "instagram": {
             "video_version":         "short",
             "title":                 long_desc,           # v2: full IG-native caption body
-            "first_comment":         _tags("instagram"),  # v2: 25-30 mixed hashtags
+            # v3: ManyChat funnel — CTA on top so the keyword is visible
+            # before hashtag wall. ManyChat triggers on the keyword in user
+            # comments → DM with UTM-tagged blog link.
+            "first_comment":         f"{_strategy_cta_line(strategy)}\n\n{_tags('instagram')}",
             "share_mode":            "REELS",
             "share_to_feed":         True,
             "collaborators":         "",
