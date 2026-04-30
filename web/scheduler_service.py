@@ -206,19 +206,53 @@ def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) ->
     )
 
 
-def _daily_job() -> None:
-    """Called once per day by APScheduler at (schedule_hour, schedule_minute)."""
-    if not _bool_setting("autopilot_enabled", False):
-        # Legacy manual-review pipeline (what used to run unconditionally).
-        _legacy_daily()
-        return
-
+def _read_autopilot_runtime_settings() -> tuple[str, list[str], bool]:
+    """Common (date, platforms, dry_run) used by both fire functions."""
     today     = date_cls.today().isoformat()
     platforms = (get_setting("autopilot_platforms", _DEFAULT_PLATFORMS)
                  or _DEFAULT_PLATFORMS).split(",")
     platforms = [p.strip() for p in platforms if p.strip()]
     dry_run   = _bool_setting("autopilot_dry_run", True)
+    return today, platforms, dry_run
 
+
+def _news_cron_job() -> None:
+    """Fires news autopilot at schedule_hour:schedule_minute."""
+    if not _bool_setting("autopilot_enabled", False):
+        _legacy_daily()
+        return
+    if not _bool_setting("autopilot_news_enabled", True):
+        return
+    today, platforms, dry_run = _read_autopilot_runtime_settings()
+    _fire_news_autopilot(today, platforms, dry_run)
+
+
+def _trending_cron_job() -> None:
+    """Fires trending autopilot at offset hours after news.
+
+    Reason: cross-account same-minute posting (yt + pet) tripped Meta's
+    cross-account spam detector and dragged IG reach -20-40%. Stagger so
+    the two pipelines hit each platform at different times of day.
+    """
+    if not _bool_setting("autopilot_enabled", False):
+        return
+    if not _bool_setting("autopilot_trending_enabled", True):
+        return
+    today, platforms, dry_run = _read_autopilot_runtime_settings()
+    _fire_trending_autopilot(today, platforms, dry_run)
+
+
+def _daily_job() -> None:
+    """Manual `run_now()` and legacy callers — fires both back-to-back.
+
+    The two cron jobs (_news_cron_job + _trending_cron_job) are what fire
+    on a normal autopilot day; this combined version stays for the UI's
+    「立刻跑一次 autopilot」button.
+    """
+    if not _bool_setting("autopilot_enabled", False):
+        _legacy_daily()
+        return
+    today, platforms, dry_run = _read_autopilot_runtime_settings()
     if _bool_setting("autopilot_news_enabled", True):
         _fire_news_autopilot(today, platforms, dry_run)
     if _bool_setting("autopilot_trending_enabled", True):
@@ -236,17 +270,38 @@ def _legacy_daily() -> None:
                            platforms=platforms, dry_run=dry_run)
 
 
+def _trending_offset_hours() -> int:
+    try:
+        return max(0, min(20, int(get_setting("autopilot_trending_offset_hours", "4"))))
+    except (TypeError, ValueError):
+        return 4
+
+
 def start(hour: int = 8, minute: int = 0) -> None:
-    _scheduler.add_job(_daily_job, "cron", hour=hour, minute=minute,
-                       id="daily_pipeline", replace_existing=True)
+    offset = _trending_offset_hours()
+    trending_hour = (hour + offset) % 24
+    # News at schedule_hour, trending offset hours later (default +4h)
+    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute,
+                       id="autopilot_news", replace_existing=True)
+    _scheduler.add_job(_trending_cron_job, "cron", hour=trending_hour, minute=minute,
+                       id="autopilot_trending", replace_existing=True)
+    log.info("[autopilot] schedule registered news=%02d:%02d trending=%02d:%02d (+%dh)",
+             hour, minute, trending_hour, minute, offset)
     if not _scheduler.running:
         _scheduler.start()
 
 
 def update_schedule(hour: int, minute: int) -> None:
-    if _scheduler.running:
-        _scheduler.reschedule_job("daily_pipeline", trigger="cron",
-                                  hour=hour, minute=minute)
+    if not _scheduler.running:
+        return
+    offset = _trending_offset_hours()
+    trending_hour = (hour + offset) % 24
+    _scheduler.reschedule_job("autopilot_news", trigger="cron",
+                              hour=hour, minute=minute)
+    _scheduler.reschedule_job("autopilot_trending", trigger="cron",
+                              hour=trending_hour, minute=minute)
+    log.info("[autopilot] reschedule news=%02d:%02d trending=%02d:%02d (+%dh)",
+             hour, minute, trending_hour, minute, offset)
 
 
 def run_now() -> None:

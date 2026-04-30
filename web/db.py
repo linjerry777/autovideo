@@ -107,7 +107,10 @@ def init_db():
                 ('autopilot_news_profile',     'pet'),
                 ('autopilot_trending_strategy','entertainment'),
                 ('autopilot_trending_profile', 'pet'),
-                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,tiktok'),
+                -- TikTok 從 default 拿掉：帳號 shadow ban、每多發一支
+                -- 加深 algorithm 的 bot fingerprint。需要 1 個月手機手發 +
+                -- 互動才能慢慢復健。要恢復就手動把 tiktok 加回去。
+                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x'),
                 ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days'),
                 ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft'),
                 -- ManyChat-funnel keywords: caption + first_comment 出現「留言『XX』」CTA。
@@ -116,7 +119,10 @@ def init_db():
                 -- 娛樂/生活系（entertainment / pet / generic）走 cta_kw_entertain。
                 ('cta_kw_tech',          '今日科技'),
                 ('cta_kw_entertain',     '今日娛樂'),
-                ('cta_blog_url',         'https://doro-palace.vercel.app/zh/from-ig');
+                ('cta_blog_url',         'https://doro-palace.vercel.app/zh/from-ig'),
+                -- 娛樂 autopilot 相對新聞延後幾小時，避免 yt + pet 同分鐘
+                -- cross-account 觸發 Meta spam 偵測拉低 reach。
+                ('autopilot_trending_offset_hours', '4');
         """)
         # 遷移：為已存在的舊 DB 補欄位
         existing = {r[1] for r in conn.execute("PRAGMA table_info(jobs)")}

@@ -460,6 +460,99 @@ _HASHTAGS = {
 
 _HASHTAGS_BY_STRATEGY = _HASHTAGS["tiktok"]  # legacy alias (some callers may use)
 
+
+# v4 hashtag pools — instead of the same fixed 5 every day (algorithm
+# fingerprint), we keep an expanded pool per (platform, strategy) and pick
+# a deterministic subset per job. Caller: `_resolve_hashtags(platform, strategy, seed, n)`.
+# When a (platform, strategy) is absent below, we fall back to the fixed
+# `_HASHTAGS[platform][strategy]` string.
+_HASHTAG_POOLS = {
+    "instagram": {
+        "tech": [
+            "#AI新聞", "#科技新知", "#AI工具", "#Doro日報", "#台灣科技",
+            "#人工智慧", "#ChatGPT", "#Claude", "#AItools", "#AI懶人包",
+            "#科技新聞", "#AI觀察", "#科技焦點", "#AI日報", "#今日AI",
+        ],
+        "tech_tutorial": [
+            "#AI教學", "#AI工具", "#AItips", "#學AI", "#Doro日報",
+            "#AI技巧", "#ChatGPT教學", "#Claude教學", "#AI實用",
+            "#AI入門", "#AI應用", "#AI 必學", "#AI技能",
+        ],
+        "entertainment": [
+            "#娛樂懶人包", "#台灣熱搜", "#追劇", "#Doro日報", "#娛樂圈",
+            "#熱門話題", "#追星", "#熱搜", "#娛樂新聞", "#台灣娛樂",
+            "#明星", "#影視", "#爆紅", "#今日熱搜",
+        ],
+        "pet": [
+            "#萌寵日常", "#寵物", "#療癒", "#Doro日報", "#毛孩",
+            "#可愛動物", "#貓狗", "#寵物日記", "#萌寵生活",
+            "#療癒系", "#暖萌", "#寵物頻道",
+        ],
+        "finance": [
+            "#財經新聞", "#台股", "#投資理財", "#Doro日報", "#股市",
+            "#美股", "#ETF", "#財經", "#投資觀察", "#財經焦點",
+            "#理財", "#股市分析",
+        ],
+        "generic": [
+            "#台灣新聞", "#每日懶人包", "#熱搜", "#Doro日報", "#新聞整理",
+            "#今日重點", "#新聞速報", "#時事", "#台灣熱搜",
+        ],
+    },
+    "facebook_body": {
+        "tech": [
+            "#AI新聞", "#科技新知", "#AI工具", "#台灣科技", "#Doro日報",
+            "#ChatGPT", "#Claude", "#AItools", "#AI觀察", "#人工智慧",
+            "#科技新聞",
+        ],
+        "entertainment": [
+            "#娛樂新聞", "#台灣娛樂", "#熱搜話題", "#追劇", "#Doro日報",
+            "#明星", "#影視", "#台灣熱搜", "#爆紅",
+        ],
+        "pet": [
+            "#萌寵", "#寵物日常", "#療癒", "#Doro日報", "#毛孩",
+            "#可愛動物", "#療癒系",
+        ],
+    },
+    "tiktok": {
+        # TikTok ladder: keep #fyp + Doro日報 fixed, rotate the middle
+        "tech": [
+            "#AI新聞", "#科技新聞", "#AI", "#AItools", "#Anthropic",
+            "#人工智慧", "#科技焦點", "#AI觀察", "#AI日報",
+        ],
+        "entertainment": [
+            "#台灣娛樂", "#娛樂懶人包", "#熱搜", "#TikTokTaiwan",
+            "#追劇", "#明星", "#娛樂新聞", "#爆紅",
+        ],
+    },
+}
+
+
+def _resolve_hashtags(platform: str, strategy: str, seed: int, n: int = 5) -> str:
+    """Pick `n` hashtags from the pool, deterministically. Falls back to the
+    legacy fixed string if no pool defined for (platform, strategy).
+    Output is space-joined: "#A #B #C ..."
+    """
+    pool = _HASHTAG_POOLS.get(platform, {}).get(strategy.lower())
+    if not pool:
+        return _HASHTAGS[platform].get(strategy, _HASHTAGS[platform]["generic"])
+
+    # Stable rotation: shift starting index by seed, take next n with wrap-around.
+    start = seed % len(pool)
+    take = min(n, len(pool))
+    picked = [pool[(start + i) % len(pool)] for i in range(take)]
+    return " ".join(picked)
+
+
+def _resolve_tiktok_hashline(strategy: str, seed: int) -> str:
+    """TikTok-specific: ladder = #fyp + 3 from pool + #Doro日報."""
+    pool = _HASHTAG_POOLS.get("tiktok", {}).get(strategy.lower())
+    if not pool:
+        return _HASHTAGS["tiktok"].get(strategy, _HASHTAGS["tiktok"]["generic"])
+    start = seed % len(pool)
+    take = min(3, len(pool))
+    middle = [pool[(start + i) % len(pool)] for i in range(take)]
+    return " ".join(["#fyp", *middle, "#Doro日報"])
+
 # YouTube tags (comma-separated, no hashtag prefix) — 8-12 tags, IP-specific first
 _YOUTUBE_TAGS_BY_STRATEGY = {
     "tech":          "AI新聞,ChatGPT,Claude,Anthropic,AI工具,人工智慧,科技新聞,AI代理,生成式AI,Doro日報,每日AI",
@@ -528,11 +621,76 @@ _STRATEGY_CTA_GROUP = {
     "generic":       "entertain",
 }
 
+# Variable phrasing — caption pool randomization (v4).
+# Same fixed template every day = Meta/IG batch-upload spam fingerprint =
+# reach throttling. Each section now has 5-8 variants picked deterministically
+# by job seed (so re-renders of the same job stay identical).
+
+# Header above the body items (replaces the always-same "🐾 Doro 日報")
+_HEADER_POOL = {
+    "tech": [
+        "🐾 今日 AI 三件事",
+        "🤖 科技懶人包",
+        "📡 AI 圈動態",
+        "🔥 今日科技焦點",
+        "💡 AI 大事一次看",
+        "📰 今天 AI 圈在炒什麼",
+        "🐾 Doro AI 戰報",
+        "⚡ 科技 3 件你該知道",
+    ],
+    "entertain": [
+        "🐾 今日娛樂三件事",
+        "🎬 今天追什麼",
+        "🔥 今日熱搜",
+        "✨ 娛樂圈三件大事",
+        "📺 今日必追",
+        "🐾 Doro 娛樂日報",
+        "🍿 你不能錯過的今天",
+        "🎤 三條娛樂訊號",
+    ],
+}
+
+# Save-it CTA between content and account follow line (replaces "📌 收藏起來")
+_SAVE_CTA_POOL = [
+    "📌 收藏起來，這週再翻一次",
+    "🔖 怕忘記就先存",
+    "💾 點儲存留著之後看",
+    "📌 收藏起來，下次喝咖啡再聊",
+    "🔖 想記住就點收藏",
+    "📌 怕之後找不到？先收藏",
+]
+
+# CTA verbs — 7-9 phrasings combined with keyword + noun, picked per job
+_CTA_TEMPLATE_POOL = [
+    "💬 留言「{kw}」我私訊你{noun} ✨",
+    "📩 想看完整版？留言「{kw}」我傳給你",
+    "💬 留言「{kw}」幫你整理{noun}",
+    "✨ 在留言區打「{kw}」我發{noun}給你",
+    "💬「{kw}」留下來 → 我私訊{noun}",
+    "📬 想要{noun}？留言「{kw}」就好",
+    "💬 留「{kw}」我幫你私訊整份內容",
+    "📩 留言「{kw}」一鍵拿{noun}",
+]
+
 # Phrasing varies per group so caption isn't identical across both pipelines.
 _CTA_PHRASING = {
-    "tech":      ('完整版新聞', '完整版科技新聞'),     # short / verbose alts (rotate later if needed)
-    "entertain": ('完整版懶人包', '完整版娛樂懶人包'),
+    "tech":      ('完整版新聞', '完整版科技新聞', '完整版重點'),
+    "entertain": ('完整版懶人包', '完整版娛樂懶人包', '完整版心得'),
 }
+
+
+def _job_seed(strategy: str, items: list[dict]) -> int:
+    """Deterministic seed so re-running the same job produces identical caption."""
+    import hashlib
+    key = strategy + "|" + (items[0].get("title", "") if items else "")
+    return int(hashlib.md5(key.encode("utf-8")).hexdigest()[:8], 16)
+
+
+def _pick(pool: list, seed: int, salt: int = 0) -> str:
+    """Deterministic pick from a list given a seed."""
+    if not pool:
+        return ""
+    return pool[(seed + salt) % len(pool)]
 
 
 def _strategy_cta_keyword(strategy: str) -> str:
@@ -543,18 +701,29 @@ def _strategy_cta_keyword(strategy: str) -> str:
     return get_setting(setting_key, default).strip() or default
 
 
-def _strategy_cta_line(strategy: str) -> str:
-    """One-line CTA: 「💬 留言『今日科技』我私訊你完整版新聞 ✨」"""
+def _strategy_cta_line(strategy: str, seed: int = 0) -> str:
+    """One-line CTA, randomized per job from `_CTA_TEMPLATE_POOL`."""
     kw = _strategy_cta_keyword(strategy)
     group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
-    noun = _CTA_PHRASING.get(group, _CTA_PHRASING["entertain"])[0]
-    return f"💬 留言「{kw}」我私訊你{noun} ✨"
+    noun = _pick(list(_CTA_PHRASING.get(group, _CTA_PHRASING["entertain"])), seed, salt=7)
+    template = _pick(_CTA_TEMPLATE_POOL, seed, salt=13)
+    return template.format(kw=kw, noun=noun)
 
 
 def _compose_description(items: list[dict], strategy: str, signoff: bool = True) -> str:
-    """Numbered + ManyChat-keyword CTA + sign-off description (v3 with funnel)."""
+    """Numbered + ManyChat-keyword CTA + sign-off description (v4 with caption pool variation).
+
+    Each section (header / save-cta / cta wording) is picked deterministically
+    from a pool keyed on (strategy, first_title) → same job = same caption,
+    different jobs = different caption shape, killing the batch-upload
+    fingerprint Meta/IG/TT use to throttle reach.
+    """
     if not items:
         return _SIGNOFF.get(strategy, _SIGNOFF["generic"])
+    seed = _job_seed(strategy, items)
+    group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
+    header = _pick(_HEADER_POOL.get(group, _HEADER_POOL["entertain"]), seed, salt=3)
+
     lines = []
     for i, it in enumerate(items, 1):
         h = it.get("hook") or ""
@@ -565,14 +734,15 @@ def _compose_description(items: list[dict], strategy: str, signoff: bool = True)
             lines.append(f"    {s}")
     body = "\n".join(lines)
     if not signoff:
-        return f"🐾 Doro 日報\n\n{body}"
-    cta = _strategy_cta_line(strategy)
+        return f"{header}\n\n{body}"
+    cta = _strategy_cta_line(strategy, seed=seed)
+    save = _pick(_SAVE_CTA_POOL, seed, salt=17)
     tail = (
         f"\n\n{cta}"
-        f"\n📌 收藏起來，這週再看一次"
+        f"\n{save}"
         f"\n{_SIGNOFF.get(strategy, _SIGNOFF['generic'])}"
     )
-    return f"🐾 Doro 日報\n\n{body}{tail}"
+    return f"{header}\n\n{body}{tail}"
 
 # Strategy → FB Page ID mapping.
 # Tech goes to 雙層甜甜圈; everything else (news, entertainment, pet) defaults to Mascot page.
@@ -605,9 +775,17 @@ def _seed_platform_meta(news: dict) -> dict:
 
     main_title  = _compose_title(hooks, items, strategy)
     long_desc   = _compose_description(items, strategy, signoff=True)
+    # Same seed used inside _compose_description — keeps IG caption tail and
+    # IG first_comment CTA wording in sync (otherwise reader sees two
+    # different CTA phrasings on the same post).
+    job_seed    = _job_seed(strategy, items)
 
-    def _tags(platform: str) -> str:
-        return _HASHTAGS[platform].get(strategy, _HASHTAGS[platform]["generic"])
+    def _tags(platform: str, n: int = 5) -> str:
+        # v4: rotated pool for IG / FB / Threads / X.
+        # TikTok uses its own ladder via `_resolve_tiktok_hashline`.
+        if platform == "tiktok":
+            return _resolve_tiktok_hashline(strategy, job_seed)
+        return _resolve_hashtags(platform, strategy, job_seed, n=n)
 
     yt_tags_csv = _YOUTUBE_TAGS_BY_STRATEGY.get(strategy, _YOUTUBE_TAGS_BY_STRATEGY["generic"])
     fb_page_id  = _FB_PAGE_BY_STRATEGY.get(strategy,     FACEBOOK_PAGE_ID_DEFAULT)
@@ -650,7 +828,7 @@ def _seed_platform_meta(news: dict) -> dict:
             # v3: ManyChat funnel — CTA on top so the keyword is visible
             # before hashtag wall. ManyChat triggers on the keyword in user
             # comments → DM with UTM-tagged blog link.
-            "first_comment":         f"{_strategy_cta_line(strategy)}\n\n{_tags('instagram')}",
+            "first_comment":         f"{_strategy_cta_line(strategy, seed=job_seed)}\n\n{_tags('instagram')}",
             "share_mode":            "REELS",
             "share_to_feed":         True,
             "collaborators":         "",
