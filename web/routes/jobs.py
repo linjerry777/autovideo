@@ -857,6 +857,19 @@ def _seed_platform_meta(news: dict) -> dict:
             "reply_settings":        "everyone",
             "x_long_text_as_post":   False,
         },
+        "linkedin": {
+            # LinkedIn favors long-form professional content. We send the long
+            # version + Chinese caption for now; English translation is a
+            # separate later step (per Jerry: 等 reach 起色再做).
+            # NOTE: URL inside body IS clickable on LinkedIn (unlike IG), so
+            # the CTA in long_desc already drives traffic well.
+            "video_version":         "long",
+            "title":                 main_title,
+            "description":           long_desc,
+            "visibility":            "PUBLIC",   # PUBLIC | CONNECTIONS | LOGGED_IN | CONTAINER
+            # personal account — leave blank. Set to a Page ID for organization posts.
+            "target_linkedin_page_id": "",
+        },
         "_schedule": {
             # auto_per_platform → publisher computes each platform's next golden
             # slot (TikTok 19-23, IG 13-19, YT 07-09 / 20-22 etc) and Upload-Post

@@ -94,7 +94,7 @@ def build_metadata(items: list, strategy: str = "tech") -> dict:
     return dict(title=title, description=f"{desc}\n\n{hashtags}")
 
 
-SUPPORTED_PLATFORMS = {"youtube", "instagram", "tiktok", "facebook", "threads", "x"}
+SUPPORTED_PLATFORMS = {"youtube", "instagram", "tiktok", "facebook", "threads", "x", "linkedin"}
 
 
 def publish(job_key: str, platforms: list[str], dry_run: bool = False):
@@ -103,7 +103,7 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     # from old job DB rows). No crash; just warn.
     dropped = [p for p in platforms if p not in SUPPORTED_PLATFORMS]
     if dropped:
-        print(f"⚠️  忽略不支援的平台：{dropped}（reddit/pinterest/linkedin 已於 2026-04 移除）", file=sys.stderr)
+        print(f"⚠️  忽略不支援的平台：{dropped}（reddit/pinterest 已於 2026-04 移除）", file=sys.stderr)
     platforms = [p for p in platforms if p in SUPPORTED_PLATFORMS]
     if not platforms:
         print("❌ 過濾後沒有任何可上傳的平台，中止", file=sys.stderr)
@@ -315,6 +315,14 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
                 kwargs["poll_duration"] = int(xp.get("poll_duration", 1440))
         kwargs["reply_settings"]      = xp.get("reply_settings", "everyone")
         kwargs["x_long_text_as_post"] = xp.get("x_long_text_as_post", False)
+
+    # LinkedIn (personal account; for org pages set target_linkedin_page_id)
+    if "linkedin" in platforms:
+        li = _platform_meta("linkedin")
+        kwargs["linkedin_description"] = li.get("description") or fallback_desc
+        kwargs["visibility"]           = li.get("visibility", "PUBLIC")
+        if li.get("target_linkedin_page_id"):
+            kwargs["target_linkedin_page_id"] = li["target_linkedin_page_id"]
 
     if not platforms:
         print("❌ 沒有可上傳的平台（必填欄位未填）", file=sys.stderr)

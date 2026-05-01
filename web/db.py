@@ -110,14 +110,22 @@ def init_db():
                 -- TikTok 從 default 拿掉：帳號 shadow ban、每多發一支
                 -- 加深 algorithm 的 bot fingerprint。需要 1 個月手機手發 +
                 -- 互動才能慢慢復健。要恢復就手動把 tiktok 加回去。
-                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x'),
+                -- LinkedIn 加入：跟 open-carrusel 對齊 4-platform fan-out
+                -- (IG / Threads / FB / LinkedIn 都是 yt profile)。
+                ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,linkedin'),
                 ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days'),
                 ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft'),
                 -- ManyChat-funnel keywords: caption + first_comment 出現「留言『XX』」CTA。
                 -- ManyChat 那邊配對應的 keyword automation → DM 帶 UTM 連結到部落格。
                 -- tech 系（tech / tech_tutorial / finance）走 cta_kw_tech；
                 -- 娛樂/生活系（entertainment / pet / generic）走 cta_kw_entertain。
-                ('cta_kw_tech',          '今日科技'),
+                --
+                -- tech 用「日報」對接 open-carrusel 的 6-kw Hub Flow：
+                --   必掌 / 開掛 / 五訣 / 智囊 / 振頻 / 日報 共用同一個 ManyChat
+                --   automation。AutoVideo 影片是 daily news 性質，固定用「日報」，
+                --   DM 連到 claude-code-6-commands-i-use-daily blog post。
+                -- 娛樂另設 ManyChat（暫無 blog 對應，先 placeholder）。
+                ('cta_kw_tech',          '日報'),
                 ('cta_kw_entertain',     '今日娛樂'),
                 ('cta_blog_url',         'https://doro-palace.vercel.app/zh/from-ig'),
                 -- 娛樂 autopilot 相對新聞延後幾小時，避免 yt + pet 同分鐘
