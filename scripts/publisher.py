@@ -20,6 +20,17 @@ from upload_post import UploadPostClient
 sys.path.insert(0, str(Path(__file__).parent))
 from thumbnail_uploader import upload_thumbnail, ThumbnailUploadError
 
+# Cloudflare R2 pre-upload — sidesteps slow 跨國 routing (Taiwan→Frankfurt
+# direct ~180 KB/s; Taiwan→R2 Anycast ~5 MB/s, then R2→Upload-Post is
+# server-to-server). 6-10x faster publishes when configured.
+# Falls back to direct file upload if R2 env vars are missing or R2 is down.
+try:
+    from r2_uploader import upload_to_r2, R2ConfigError  # type: ignore
+    _R2_AVAILABLE = True
+except Exception as _r2_imp_err:
+    _R2_AVAILABLE = False
+    R2ConfigError = Exception  # type: ignore
+
 # Golden-hour first-slot per platform (local time). Mirrors UI _GOLDEN_HOURS.
 GOLDEN_HOUR_FIRST = {
     "youtube":   "14:00",
@@ -96,6 +107,21 @@ def build_metadata(items: list, strategy: str = "tech") -> dict:
 
 SUPPORTED_PLATFORMS = {"youtube", "instagram", "tiktok", "facebook", "threads", "x", "linkedin"}
 
+# Per-profile platform allowlist. Profiles not listed here may use any
+# SUPPORTED platform. Profiles listed here can ONLY upload to listed platforms
+# — anything else is silently dropped before the Upload-Post call.
+#
+# Why: pet profile (娛樂線, _doro1998) has no LinkedIn account configured on
+# Upload-Post, so attempting to publish there crashes with
+# `UploadPostError: Profile pet has no Linkedin account configured` and tanks
+# the rest of the run. yt profile (科技線, _doro1998ai) DOES have LinkedIn —
+# only it should fan out to LinkedIn. Keep this dict in sync with whatever
+# accounts each Upload-Post profile actually has connected.
+_PROFILE_PLATFORM_ALLOWLIST = {
+    # 娛樂線：no LinkedIn account configured on Upload-Post for this profile
+    "pet": {"youtube", "instagram", "tiktok", "facebook", "threads", "x"},
+}
+
 
 def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     """job_key is either a date "2026-03-22" or "2026-03-22/job_5" """
@@ -105,6 +131,20 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     if dropped:
         print(f"⚠️  忽略不支援的平台：{dropped}（reddit/pinterest 已於 2026-04 移除）", file=sys.stderr)
     platforms = [p for p in platforms if p in SUPPORTED_PLATFORMS]
+
+    # Profile-level allowlist: pet profile has no LinkedIn account on Upload-Post,
+    # so dropping linkedin here prevents `Profile pet has no Linkedin account
+    # configured` from bubbling up and failing the run. yt profile is unrestricted
+    # so 科技線 still fans out to all 6 platforms (incl. LinkedIn) unchanged.
+    profile_allow = _PROFILE_PLATFORM_ALLOWLIST.get((PROFILE or "").lower())
+    if profile_allow is not None:
+        before  = list(platforms)
+        platforms = [p for p in platforms if p in profile_allow]
+        skipped  = [p for p in before if p not in profile_allow]
+        if skipped:
+            print(f"⚠️  Profile={PROFILE} 沒有設定這些平台帳號，跳過：{skipped}",
+                  file=sys.stderr)
+
     if not platforms:
         print("❌ 過濾後沒有任何可上傳的平台，中止", file=sys.stderr)
         sys.exit(1)
@@ -397,12 +437,35 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         msg = str(exc)
         return any(m in msg for m in TRANSIENT_MARKERS)
 
+    def _resolve_video_arg(video_path: Path) -> str:
+        """Pre-upload to R2 if configured; return URL. Otherwise local path str.
+        URL path makes Upload-Post server-fetch (fast); local path streams
+        the file body through our slow 跨國 link.
+        """
+        if not _R2_AVAILABLE:
+            return str(video_path)
+        try:
+            url = upload_to_r2(video_path, prefix=f"publish/{PROFILE}")
+            print(f"  ☁️  R2 pre-uploaded → {url[-60:]}")
+            return url
+        except R2ConfigError as e:
+            # R2 not configured — silently fall back; this is the original
+            # codepath. Log only at first job to avoid noise.
+            print(f"  ℹ️  R2 skip (not configured): {e}", file=sys.stderr)
+            return str(video_path)
+        except Exception as e:
+            print(f"  ⚠️  R2 upload failed ({type(e).__name__}: {str(e)[:120]}); "
+                  f"falling back to direct upload", file=sys.stderr)
+            return str(video_path)
+
     def _upload_with_retry(label, video_path, group, merged_kwargs, max_attempts=3):
         last_exc = None
+        # Resolve to URL once per platform group; the URL is cheap to reuse.
+        video_arg = _resolve_video_arg(video_path)
         for attempt in range(1, max_attempts + 1):
             try:
                 return client.upload_video(
-                    video_path = str(video_path),
+                    video_path = video_arg,
                     title      = fallback_title,
                     user       = PROFILE,
                     platforms  = group,
