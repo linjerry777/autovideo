@@ -44,8 +44,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
+# NOTE: do NOT replace sys.stdout/sys.stderr at module top-level. publisher.py
+# (and other callers) already wrap stdout once; doing it a second time here
+# leaves the original wrapper as garbage, GC closes its underlying buffer, and
+# the next print() in the caller raises "I/O operation on closed file." This
+# was the cause of jobs 133-136 silently failing every upload after the R2
+# patch landed (commit 424c56f). Keep CJK-safe encoding via reconfigure() and
+# only when run as a CLI — never on import.
+if __name__ == "__main__" and hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import boto3  # type: ignore
 from botocore.client import Config  # type: ignore
