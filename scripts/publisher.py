@@ -385,11 +385,25 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
     tz = schedule.get("timezone") or "Asia/Taipei"
 
     # Build flat upload plan: list of (label, video_path, group, extra_kwargs)
+    # autovideo-pro post-processing layer can produce an enhanced/output.mp4
+    # (Hormozi-style word-by-word subtitles + Ken Burns + Loop tail + CTA banner).
+    # Setting USE_ENHANCED=true makes this publisher prefer that variant for
+    # every platform group. When the env var is unset OR the file is missing
+    # the original behavior is preserved exactly — autopilot keeps working,
+    # autovideo-pro stays a non-invasive layer.
+    _use_enhanced = os.getenv("USE_ENHANCED", "").lower() in ("1", "true", "yes")
+    _enhanced_mp4 = pipe_dir / "enhanced" / "output.mp4"
+    _use_enhanced = _use_enhanced and _enhanced_mp4.exists()
+    if _use_enhanced:
+        print(f"✨ USE_ENHANCED=true — 全平台用 enhanced/output.mp4 ({_enhanced_mp4.stat().st_size//1024} KB)")
+
     upload_plan: list[tuple[str, Path, list[str], dict]] = []
     for version_key, group in version_groups.items():
         if not group:
             continue
-        if version_key == "legacy":
+        if _use_enhanced:
+            video_path = _enhanced_mp4
+        elif version_key == "legacy":
             video_path = output_mp4
         else:
             video_path = pipe_dir / version_key / "output.mp4"
