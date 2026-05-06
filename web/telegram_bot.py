@@ -175,6 +175,14 @@ class TelegramBot:
             self._deliver_video(chat, job_id)
             self._job_chat = None
             self._active_job_id = None
+        elif status == "manual_review":
+            # NOTE: For obstruction-gate manual_reviews, job_runner._notify_obstruction
+            # has already sent a detailed message with affected URLs / kinds /
+            # reasons via the Telegram REST API directly. Skip the duplicate
+            # short message here. (We still reset the active-job tracker so
+            # the next /run is unblocked.)
+            self._job_chat = None
+            self._active_job_id = None
         elif status == "failed":
             err = data.get("error", "未知錯誤")
             _send(self.token, chat, f"💥 Pipeline 失敗：{err[:300]}")

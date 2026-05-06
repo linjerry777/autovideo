@@ -259,6 +259,72 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def _notify_obstruction(job_id: int, bad_items: list[dict],
+                         kinds: list[str], news_file: Path) -> None:
+    """Send Telegram alert when the obstruction gate trips.
+
+    Best-effort: pulls TG token + chat_id from settings. If neither is
+    configured the function returns silently so the gate still works.
+    """
+    token = get_setting("telegram_bot_token", "")
+    chat_csv = get_setting("telegram_chat_ids", "")
+    if not token or not chat_csv:
+        return
+    chat_ids = [c.strip() for c in chat_csv.split(",") if c.strip()]
+    if not chat_ids:
+        return
+
+    # Build a short message
+    kinds_label = "/".join(kinds) if kinds else "unknown"
+    lines = [
+        f"⚠️ <b>AutoVideo Job #{job_id} 截圖被擋</b>",
+        f"已暫停發布等手動 review",
+        f"原因：<b>{kinds_label}</b>",
+    ]
+    # Include affected URLs from news.json so Jerry can recognise the source
+    try:
+        if news_file.exists():
+            data = _json.loads(news_file.read_text(encoding="utf-8"))
+            news_items = data.get("items", [])
+            for r in bad_items[:3]:
+                idx = r.get("idx", 0)
+                if 1 <= idx <= len(news_items):
+                    it = news_items[idx - 1]
+                    title = (it.get("title") or "")[:60]
+                    url = it.get("resolved_url") or it.get("source_url") or ""
+                    lines.append(f"\n<b>#{idx}</b> {title}")
+                    if url:
+                        lines.append(f"URL: <code>{url[:120]}</code>")
+                    lines.append(
+                        f"  → {r.get('kind')} (conf {r.get('confidence')}): "
+                        f"{(r.get('why') or '')[:140]}"
+                    )
+    except Exception:
+        pass
+
+    text = "\n".join(lines)
+    import urllib.request
+    for chat in chat_ids:
+        try:
+            payload = _json.dumps({
+                "chat_id": chat,
+                "text": text[:4096],
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            }).encode("utf-8")
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            urllib.request.urlopen(req, timeout=10).read()
+        except Exception:
+            # Best-effort; the broadcast hook will already have notified
+            # the bot via on_event if running.
+            pass
+
+
 def _call_script(script: str, date: str, extra: list = [],
                  log_path: Path = None) -> tuple[bool, str]:
     cmd = [PYTHON, str(SCRIPTS / script), date, *extra]
@@ -404,6 +470,72 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         su("screenshot", "done")
         _check_cancel(job_id)
 
+        # ── Step 2.6: 截圖遮擋偵測 (Obstruction Gate) ──────────────
+        # screenshot_collector writes screenshots/quality.json with a per-item
+        # verdict from scripts/screenshot_quality.py (Pillow heuristic + Groq
+        # vision LLM). If any item is obstructed (paywall/popup/ad/cookie/
+        # signup/login wall) we abort the autopilot publish path, mark the
+        # job as needing manual_review, and ping Telegram so Jerry can
+        # approve / replace the bad item from the UI before publish.
+        screenshot_obstructed = False
+        obstructed_kinds: list[str] = []
+        try:
+            quality_file = pipe_dir / "screenshots" / "quality.json"
+            if quality_file.exists():
+                qd = _json.loads(quality_file.read_text(encoding="utf-8"))
+                if qd.get("any_obstructed"):
+                    bad_items = [r for r in qd.get("items", [])
+                                  if r.get("obstructed")]
+                    obstructed_kinds = qd.get("obstructed_kinds") or sorted({
+                        r.get("kind", "other") for r in bad_items
+                    })
+                    screenshot_obstructed = True
+                    with open(log_path, "a", encoding="utf-8") as f:
+                        f.write("\n[OBSTRUCTION_GATE] 截圖偵測到遮擋；將進入 manual_review\n")
+                        for r in bad_items:
+                            f.write(f"  - item {r.get('idx')} ({r.get('image')}): "
+                                    f"kind={r.get('kind')} "
+                                    f"conf={r.get('confidence')} "
+                                    f"why={r.get('why', '')[:200]}\n")
+                    # Mark the bad URLs as screenshot_blocked in news_cache so
+                    # they get pushed to the bottom of future news pickers.
+                    try:
+                        from web.db import mark_news_blocked_by_url
+                        if news_file.exists():
+                            news_data = _json.loads(
+                                news_file.read_text(encoding="utf-8")
+                            )
+                            news_items = news_data.get("items", [])
+                            for r in bad_items:
+                                idx = r.get("idx", 0)
+                                if 1 <= idx <= len(news_items):
+                                    it = news_items[idx - 1]
+                                    bad_url = (it.get("source_url") or
+                                                it.get("url") or "")
+                                    if bad_url:
+                                        mark_news_blocked_by_url(bad_url)
+                    except Exception as _e:
+                        with open(log_path, "a", encoding="utf-8") as f:
+                            f.write(f"  [WARN] mark_news_blocked failed: {_e}\n")
+                    # Notify TG (best effort).
+                    try:
+                        _notify_obstruction(job_id, bad_items, obstructed_kinds,
+                                             news_file)
+                    except Exception as _e:
+                        with open(log_path, "a", encoding="utf-8") as f:
+                            f.write(f"  [WARN] TG notify failed: {_e}\n")
+                    # Force the run out of autopilot publish: video will still
+                    # render so the operator can preview, but upload is gated
+                    # behind a manual confirm in the UI.
+                    if autopilot:
+                        autopilot = False
+                        with open(log_path, "a", encoding="utf-8") as f:
+                            f.write("[OBSTRUCTION_GATE] autopilot disabled, "
+                                    "upload requires manual approval.\n")
+        except Exception as _e:
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"\n[WARN] obstruction gate exception (non-fatal): {_e}\n")
+
         # ── 暫停：等用戶確認截圖 (autopilot 跳過) ─────────────────
         if not autopilot:
             ev = threading.Event()
@@ -511,14 +643,25 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
             if not ok_pub:
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(f"\n[autopilot] publisher 失敗:\n{out_pub[-500:]}\n")
+        elif screenshot_obstructed:
+            # Render finished but upload is gated behind manual review.
+            su("upload", "manual_review")
         else:
             su("upload", "pending")
 
         # ── 完成 ────────────────────────────────────────────────────
-        update_job(job_id, status="done", finished_at=_now(),
-                   output_path=str(output_mp4))
-        _broadcast(job_id, {"job_id": job_id, "status": "done",
-                             "output_path": str(output_mp4)})
+        if screenshot_obstructed:
+            update_job(job_id, status="manual_review", finished_at=_now(),
+                       output_path=str(output_mp4))
+            _broadcast(job_id, {"job_id": job_id, "status": "manual_review",
+                                  "output_path": str(output_mp4),
+                                  "screenshot_obstructed": True,
+                                  "obstructed_kinds": obstructed_kinds})
+        else:
+            update_job(job_id, status="done", finished_at=_now(),
+                       output_path=str(output_mp4))
+            _broadcast(job_id, {"job_id": job_id, "status": "done",
+                                 "output_path": str(output_mp4)})
 
     except Exception as e:
         if str(e) == "__CANCELLED__":
