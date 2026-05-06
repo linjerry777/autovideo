@@ -88,10 +88,15 @@ export const NewsItemComponent: React.FC<NewsItemProps> = ({
 
   const palette = PALETTES[index % PALETTES.length];
 
-  const FADE = 9;
+  // Fade in/out 9 frames (~0.3s @ 30fps), but cap at 1/3 of the chunk so the
+  // inputRange stays strictly monotonically increasing for very short clips.
+  // (See Subtitle.tsx for the matching subtitle-level guard — same rationale.)
+  const FADE = Math.min(9, Math.floor(totalFrames / 3));
+  const fadeIn  = FADE;
+  const fadeOut = Math.max(FADE + 1, totalFrames - FADE);
   const fadeOpacity = interpolate(
     localFrame,
-    [0, FADE, totalFrames - FADE, totalFrames],
+    [0, fadeIn, fadeOut, totalFrames],
     [0, 1, 1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );

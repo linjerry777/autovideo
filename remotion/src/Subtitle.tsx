@@ -106,9 +106,16 @@ export const Subtitle: React.FC<SubtitleProps> = ({
   const scale = interpolate(scaleSpring, [0, 1], [0.85, 1]);
 
   // Fade in 0.12s, fade out last 0.12s
+  // Cap fade length at 1/3 of the chunk so the inputRange stays strictly
+  // monotonically increasing for very short chunks (e.g. hook stickers like
+  // 「欸，」 produce ~0.235s clips, where a fixed 0.12s fade would make
+  // chunkDuration - 0.12 = 0.115 < 0.12 and crash interpolate()).
+  const fadeDur = Math.min(0.12, chunkDuration / 3);
+  const fadeInEnd  = Math.min(fadeDur, chunkDuration / 2);
+  const fadeOutStart = Math.max(fadeInEnd + 1e-4, chunkDuration - fadeDur);
   const opacity = interpolate(
     progressInChunk,
-    [0, 0.12, Math.max(0, chunkDuration - 0.12), chunkDuration],
+    [0, fadeInEnd, fadeOutStart, chunkDuration],
     [0, 1, 1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
   );
