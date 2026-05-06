@@ -141,6 +141,18 @@ FISH_AUDIO_VOICE_PET=           # pet 用可愛女聲
 
 ---
 
+## Doro mascot LoRA (2026-05-06+, optional)
+
+跨專案 4 個 doro LoRA 已訓好，可換 mascot 用 doro 變體（古風/水墨/翡翠）取代當前 `assets/brand/mascot.png`。
+
+- 登錄表 + prompt 模板：**`C:\Users\User\Documents\GitHub\DORO_LORA_REGISTRY.md`** ← 必讀
+- 預生成透明 PNG：`C:\Users\User\Documents\GitHub\open-carrusel\public\uploads\doro-lora\demo-{gufeng,feicui,shumo}-cut.png`
+- 注意：訓 LoRA / ComfyUI 推理會搶 GPU，pipeline 跑時要避開（kohya 訓練排程在凌晨）
+
+預設仍用既有 `mascot.png`，要切換 mascot path 在 env 改。
+
+---
+
 ## Upload-Post Feature Coverage
 
 We use Upload-Post's per-platform API extensively. Coverage per platform:
