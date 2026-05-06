@@ -15,7 +15,7 @@ class SettingsUpdate(BaseModel):
     skip_upload:     str | None = None
     dry_run:         str | None = None
     # LLM
-    llm_provider:    str | None = None   # "claude" | "ollama"
+    llm_provider:    str | None = None   # "codex" | "claude" | "ollama" | "openai"
     llm_model:       str | None = None
     llm_proxy_url:   str | None = None
     # API Keys
@@ -103,9 +103,12 @@ def list_llm_models(url: str = None):
         ollama_url = url
     else:
         db_url = get_setting("llm_proxy_url", "")
-        ollama_url = db_url or os.getenv("CLAUDE_PROXY_URL", "http://localhost:11434")
+        ollama_url = db_url or os.getenv("LLM_PROXY_URL") or os.getenv("CODEX_PROXY_URL") or os.getenv("CLAUDE_PROXY_URL", "http://localhost:11434")
 
     # 若不是 Ollama（沒有 11434），直接回傳 Claude 選項
+    if "3458" in ollama_url:
+        return {"provider": "codex", "models": ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-image-2"]}
+
     if "11434" not in ollama_url:
         return {"provider": "claude", "models": []}
 

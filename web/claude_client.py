@@ -3,11 +3,28 @@ web/claude_client.py — 共用 LLM API 呼叫
 支援 Claude proxy (localhost:3456) 或 Ollama (localhost:11434)
 切換方式：.env 設定 CLAUDE_PROXY_URL 與 LLM_MODEL
 """
-import json, os, re, requests
+import base64, json, os, re, requests
+from pathlib import Path
 
 # 預設用 Claude proxy；改成 Ollama 只需 .env 改兩行
-_DEFAULT_PROXY = "http://localhost:3456"
-_DEFAULT_MODEL = "claude-sonnet-4-6"
+_DEFAULT_CLAUDE_PROXY = "http://localhost:3456"
+_DEFAULT_OLLAMA_PROXY = "http://localhost:11434"
+_DEFAULT_CODEX_PROXY = "http://127.0.0.1:3458"
+_DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-6"
+_DEFAULT_CODEX_TEXT_MODEL = "gpt-5.5"
+_DEFAULT_CODEX_IMAGE_MODEL = "gpt-image-2"
+
+
+def _default_provider() -> str:
+    return os.getenv("LLM_PROVIDER", "codex").strip().lower()
+
+
+def _provider_from_proxy(proxy_url: str) -> str:
+    if "11434" in proxy_url:
+        return "ollama"
+    if "3458" in proxy_url:
+        return "codex"
+    return _default_provider()
 
 
 def _get_llm_config() -> tuple[str, str]:
@@ -16,8 +33,20 @@ def _get_llm_config() -> tuple[str, str]:
         from web.db import get_setting
         db_url      = get_setting("llm_proxy_url", "")
         db_model    = get_setting("llm_model", "")
-        db_provider = get_setting("llm_provider", "claude")
-        proxy_url   = db_url or os.getenv("CLAUDE_PROXY_URL", _DEFAULT_PROXY)
+        db_provider = get_setting("llm_provider", _default_provider()).strip().lower()
+        if db_url:
+            proxy_url = db_url
+        elif db_provider == "ollama":
+            proxy_url = os.getenv("OLLAMA_PROXY_URL", _DEFAULT_OLLAMA_PROXY)
+        elif db_provider in {"codex", "openai"}:
+            proxy_url = (
+                os.getenv("CODEX_PROXY_URL")
+                or os.getenv("OPENAI_PROXY_URL")
+                or os.getenv("LLM_PROXY_URL")
+                or _DEFAULT_CODEX_PROXY
+            )
+        else:
+            proxy_url = os.getenv("CLAUDE_PROXY_URL", _DEFAULT_CLAUDE_PROXY)
         if db_model:
             model = db_model
         elif db_provider == "ollama" or "11434" in proxy_url:
@@ -29,11 +58,18 @@ def _get_llm_config() -> tuple[str, str]:
                 print(f"[llm_config] Ollama 自動選用模型：{model}")
             except Exception:
                 model = "qwen2.5:14b"
+        elif db_provider in {"codex", "openai"} or "3458" in proxy_url:
+            model = os.getenv("CODEX_TEXT_MODEL") or os.getenv("OPENAI_TEXT_MODEL") or os.getenv("LLM_MODEL", _DEFAULT_CODEX_TEXT_MODEL)
         else:
-            model = os.getenv("LLM_MODEL", _DEFAULT_MODEL)
+            model = os.getenv("LLM_MODEL", _DEFAULT_CLAUDE_MODEL)
     except Exception:
-        proxy_url = os.getenv("CLAUDE_PROXY_URL", _DEFAULT_PROXY)
-        model     = os.getenv("LLM_MODEL", _DEFAULT_MODEL)
+        provider = _default_provider()
+        if provider in {"codex", "openai"}:
+            proxy_url = os.getenv("CODEX_PROXY_URL") or os.getenv("OPENAI_PROXY_URL") or os.getenv("LLM_PROXY_URL", _DEFAULT_CODEX_PROXY)
+            model = os.getenv("CODEX_TEXT_MODEL") or os.getenv("OPENAI_TEXT_MODEL") or os.getenv("LLM_MODEL", _DEFAULT_CODEX_TEXT_MODEL)
+        else:
+            proxy_url = os.getenv("CLAUDE_PROXY_URL", _DEFAULT_CLAUDE_PROXY)
+            model = os.getenv("LLM_MODEL", _DEFAULT_CLAUDE_MODEL)
     return proxy_url, model
 
 
@@ -58,9 +94,34 @@ def call_claude(prompt: str, timeout: int = 180) -> tuple[str, dict]:
         return "", usage
     pt = usage.get("prompt_tokens", 0)
     ct = usage.get("completion_tokens", 0)
-    backend = "ollama" if "11434" in proxy_url else "claude"
+    backend = _provider_from_proxy(proxy_url)
     print(f"[llm_client:{backend}/{model}] tokens: prompt={pt}, completion={ct}, total={pt+ct}")
     return content.strip(), usage
+
+
+def generate_image(prompt: str, output_path: str | Path, size: str = "1024x1024", timeout: int = 180) -> Path:
+    """Generate an image through the Codex Pro/CliRelay image endpoint."""
+    proxy_url = (
+        os.getenv("CODEX_PROXY_URL")
+        or os.getenv("OPENAI_PROXY_URL")
+        or os.getenv("LLM_PROXY_URL")
+        or _DEFAULT_CODEX_PROXY
+    ).rstrip("/")
+    model = os.getenv("CODEX_IMAGE_MODEL") or os.getenv("OPENAI_IMAGE_MODEL") or _DEFAULT_CODEX_IMAGE_MODEL
+    r = requests.post(
+        f"{proxy_url}/v1/images/generations",
+        json={"model": model, "prompt": prompt, "n": 1, "size": size},
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    data = r.json()
+    b64 = data["data"][0].get("b64_json")
+    if not b64:
+        raise ValueError(f"image endpoint returned no b64_json: {str(data)[:300]}")
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(base64.b64decode(b64))
+    return path
 
 
 _STRATEGY_PRESETS = {
