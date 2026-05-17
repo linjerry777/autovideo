@@ -22,6 +22,15 @@ def _default_layout_for_strategy(strategy: str | None) -> str:
     return "article_rotate"
 
 
+def _figure_group_for_strategy(strategy: str | None) -> str | None:
+    strat = (strategy or "").lower()
+    if strat == "figure_tech":
+        return "tech"
+    if strat == "figure_entertainment":
+        return "entertainment"
+    return None
+
+
 def _detect_versions(job_key: str) -> list[str | None]:
     """Return list of versions to render.
 
@@ -364,8 +373,17 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         # ── Step 1: 新聞 ────────────────────────────────────────────
         su("news", "running")
         news_file = pipe_dir / "news.json"
+        figure_group = _figure_group_for_strategy(strategy)
 
-        if pre_news:
+        if figure_group:
+            extra = ["--group", figure_group, "--strategy", strategy or ""]
+            if account_profile:
+                extra += ["--profile", account_profile]
+            ok, out = _call_script("figure_quote_collector.py", job_key, extra, log_path)
+            if not ok:
+                su("news", "failed")
+                raise RuntimeError(f"figure_quote_collector 失敗:\n{out[-800:]}")
+        elif pre_news:
             # 用戶已選好原始新聞，Claude 只針對這幾筆生成腳本
             from web.claude_client import enrich_news_items, _last_usage
             enriched = enrich_news_items(pre_news, topic, strategy)
@@ -434,7 +452,15 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         # ── Step 2: 背景素材（截圖 or B-roll）──────────────────────
         bg_mode = get_setting("background_mode", "screenshot")
         su("screenshot", "running")
-        if bg_mode == "broll":
+        if figure_group:
+            broll_file = pipe_dir / "broll" / "broll_01.mp4"
+            if not broll_file.exists():
+                su("screenshot", "failed")
+                raise RuntimeError(f"名人原片片段不存在: {broll_file}")
+            ok, out = True, "[figure_quote] using downloaded source clip as broll"
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write("\n[figure_quote] 使用原始影片片段 broll_01.mp4，略過新聞截圖\n")
+        elif bg_mode == "broll":
             ok, out = _call_script("broll_fetcher.py", job_key, [], log_path)
             if not ok:
                 # B-roll 抓取失敗不是致命錯誤：fallback 到截圖
@@ -459,7 +485,12 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
         # / byline for article_rotate / article_* layout modes. Failure is
         # non-fatal — ArticleLayer falls back to the existing screenshot.
         try:
-            ok_ae, _out_ae = _call_script("article_extractor.py", job_key, [], log_path)
+            if figure_group:
+                ok_ae, _out_ae = True, ""
+                with open(log_path, "a", encoding="utf-8") as f:
+                    f.write("\n[figure_quote] 略過 article_extractor\n")
+            else:
+                ok_ae, _out_ae = _call_script("article_extractor.py", job_key, [], log_path)
             if not ok_ae:
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write("\n[WARN] article_extractor failed (non-fatal)\n")
@@ -572,7 +603,10 @@ def _run_pipeline(job_id: int, date: str, topic: str | None,
 
         # ── Step 4: 合成影片 (dual-version or legacy) ────────────────
         renderer = get_setting("video_renderer", "ffmpeg").lower()
-        script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
+        if figure_group:
+            script_name = "insight_quote_composer.py"
+        else:
+            script_name = "remotion_renderer.py" if renderer == "remotion" else "video_composer.py"
         su("video", "running")
         for v in versions:
             extra_video = ["--version", v] if v else []

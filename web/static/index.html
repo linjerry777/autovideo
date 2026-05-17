@@ -92,6 +92,14 @@
         <span class="font-medium" :class="page==='new'||page==='job' ? 'text-green-700' : ''">生成影片</span>
       </button>
 
+      <button @click="page='library'; loadVideoLibrary()"
+        class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
+        :class="page==='library' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
+        <span x-show="page==='library'" class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-green-600 rounded-r-full"></span>
+        <svg class="w-[15px] h-[15px] flex-shrink-0 transition-colors" :class="page==='library' ? 'text-green-600' : 'text-gray-400 group-hover:text-gray-600'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M10 9l5 3-5 3V9z"/></svg>
+        <span class="font-medium" :class="page==='library' ? 'text-green-700' : ''">短片庫</span>
+      </button>
+
       <button @click="page='accounts'; loadAccounts()"
         class="group relative flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-all duration-150"
         :class="page==='accounts' ? 'bg-green-50 text-green-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'">
@@ -341,6 +349,231 @@
     </div>
 
     <!-- ── New Video (all-in-one) ──────────────────────────────────── -->
+    <!-- Video Library -->
+    <div x-show="page==='library'" class="p-8 max-w-7xl mx-auto space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-gray-900">短片庫</h1>
+          <p class="text-sm text-gray-500 mt-1">所有已輸出的短影音，包含正式 job 與名人解析預覽</p>
+        </div>
+        <button @click="loadVideoLibrary()"
+          class="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-white border border-gray-200 hover:border-gray-300 text-gray-700 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 9a8 8 0 00-13.5-3.5L4 8m16 8l-2.5 2.5A8 8 0 014 15"/></svg>
+          重新整理
+        </button>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <span class="px-2 py-1 rounded-md bg-white border border-gray-200" x-text="'已產出 ' + videoLibrary.length + ' 支'"></span>
+        <span class="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100" x-text="'名人影片 ' + videoLibraryCount('figure') + ' 支'"></span>
+        <span class="px-2 py-1 rounded-md bg-sky-50 text-sky-700 border border-sky-100" x-text="'Job ' + videoLibraryCount('job') + ' 支'"></span>
+        <span class="px-2 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-100" x-text="'名人來源池可用 ' + figureSourceAvailable() + ' 支'"></span>
+        <span class="px-2 py-1 rounded-md bg-violet-50 text-violet-700 border border-violet-100" x-text="'名人片段池可用 ' + figureSegmentAvailable() + ' 段'"></span>
+        <span class="px-2 py-1 rounded-md bg-gray-50 text-gray-600 border border-gray-200" x-show="filteredVideoLibrary().length !== videoLibrary.length" x-text="'篩選後 ' + filteredVideoLibrary().length + ' 支'"></span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-[1.5fr_0.8fr_0.8fr_0.8fr] gap-3">
+        <input x-model.debounce.150ms="videoLibraryFilters.q" type="search" placeholder="搜尋標題、人物、來源、資料夾"
+          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-4 focus:ring-gray-100">
+        <select x-model="videoLibraryFilters.kind"
+          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-4 focus:ring-gray-100">
+          <option value="all">全部類型</option>
+          <option value="figure">名人影片</option>
+          <option value="job">Job</option>
+          <option value="preview">Preview</option>
+        </select>
+        <select x-model="videoLibraryFilters.variant"
+          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-4 focus:ring-gray-100">
+          <option value="all">全部版本</option>
+          <template x-for="variant in videoLibraryVariants()" :key="variant">
+            <option :value="variant" x-text="variantLabel(variant)"></option>
+          </template>
+        </select>
+        <select x-model="videoLibraryFilters.date"
+          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-4 focus:ring-gray-100">
+          <option value="all">全部日期</option>
+          <template x-for="date in videoLibraryDates()" :key="date">
+            <option :value="date" x-text="date"></option>
+          </template>
+        </select>
+      </div>
+
+      <div x-show="videoLibraryLoading" class="py-20 text-center text-sm text-gray-400">載入短片中...</div>
+      <div x-show="!videoLibraryLoading && videoLibrary.length === 0" class="glass rounded-2xl py-20 text-center">
+        <p class="text-sm text-gray-500">目前沒有找到 output.mp4</p>
+      </div>
+      <div x-show="!videoLibraryLoading && videoLibrary.length > 0 && filteredVideoLibrary().length === 0" class="glass rounded-2xl py-20 text-center">
+        <p class="text-sm text-gray-500">沒有符合篩選條件的短片</p>
+      </div>
+
+      <div x-show="!videoLibraryLoading && filteredVideoLibrary().length > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+        <template x-for="v in filteredVideoLibrary()" :key="v.key">
+          <article class="glass rounded-2xl overflow-hidden hover:border-gray-300 transition">
+            <div class="bg-black aspect-[9/16]">
+              <video class="w-full h-full object-contain bg-black"
+                controls preload="metadata" playsinline
+                :poster="v.thumbnail_url || null"
+                :src="v.video_url"></video>
+            </div>
+            <div class="p-4 space-y-3">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-900 leading-snug line-clamp-2" x-text="v.title || v.folder"></p>
+                  <p class="text-xs text-gray-400 mt-1 font-mono" x-text="v.date + ' / ' + v.folder + (v.variant && v.variant !== 'default' ? ' / ' + v.variant : '')"></p>
+                </div>
+                <span class="shrink-0 px-2 py-1 rounded-md text-[11px] font-semibold border"
+                  :class="v.kind === 'figure' ? 'bg-amber-50 text-amber-700 border-amber-100' : (v.kind === 'job' ? 'bg-sky-50 text-sky-700 border-sky-100' : 'bg-gray-50 text-gray-600 border-gray-200')"
+                  x-text="v.kind === 'figure' ? '名人' : (v.kind === 'job' ? 'Job' : 'Preview')"></span>
+              </div>
+              <div class="text-xs text-gray-500 space-y-1">
+                <p x-show="v.figure_name" x-text="v.figure_name"></p>
+                <p x-show="v.source_name" x-text="v.source_name"></p>
+                <p x-show="v.source_published_at" class="font-mono text-gray-400" x-text="'原片 ' + v.source_published_at"></p>
+                <p class="font-mono text-gray-400" x-text="variantLabel(v.variant) + ' · ' + formatBytes(v.size_bytes)"></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="openVideoDetail(v)"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100 hover:bg-amber-100 transition">查看文案</button>
+                <button @click="openLibraryUpload(v)"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-green-600 text-white hover:bg-green-700 transition">上傳</button>
+                <button x-show="v.job_id" @click="openJob(v.job_id)"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white hover:bg-gray-800 transition">打開 Job</button>
+                <a :href="v.video_url" target="_blank"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:border-gray-300 transition">新分頁播放</a>
+              </div>
+            </div>
+          </article>
+        </template>
+      </div>
+
+      <div x-show="selectedLibraryVideo" x-cloak
+        class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+        @click.self="selectedLibraryVideo=null">
+        <div class="w-full max-w-4xl max-h-[88vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-gray-200">
+          <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-100">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-amber-600" x-text="selectedLibraryVideo?.figure_name || selectedLibraryVideo?.source_name || '短片文案'"></p>
+              <h2 class="text-lg font-bold text-gray-900 leading-snug mt-1" x-text="selectedLibraryVideo?.title || selectedLibraryVideo?.folder"></h2>
+              <p class="text-xs text-gray-400 mt-1 font-mono"
+                x-text="(selectedLibraryVideo?.source_published_at ? '原片 ' + selectedLibraryVideo.source_published_at + ' · ' : '') + selectedLibraryVideo?.date + ' / ' + selectedLibraryVideo?.folder"></p>
+            </div>
+            <button @click="selectedLibraryVideo=null"
+              class="shrink-0 w-9 h-9 rounded-full border border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300">×</button>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-0 max-h-[74vh] overflow-y-auto">
+            <div class="bg-black">
+              <video class="w-full aspect-[9/16] object-contain bg-black"
+                controls preload="metadata" playsinline
+                :poster="selectedLibraryVideo?.thumbnail_url || null"
+                :src="selectedLibraryVideo?.video_url || ''"></video>
+            </div>
+            <div class="p-5 space-y-4">
+              <div x-show="selectedLibraryVideo?.quote_zh || selectedLibraryVideo?.quote_original" class="space-y-2">
+                <p class="text-xs font-semibold text-gray-400">金句</p>
+                <p x-show="selectedLibraryVideo?.quote_zh" class="text-base font-semibold text-gray-900 leading-relaxed" x-text="selectedLibraryVideo?.quote_zh"></p>
+                <p x-show="selectedLibraryVideo?.quote_original" class="text-sm text-gray-500 leading-relaxed" x-text="selectedLibraryVideo?.quote_original"></p>
+              </div>
+              <div x-show="selectedLibraryVideo?.script_long || selectedLibraryVideo?.script || selectedLibraryVideo?.script_short" class="space-y-2">
+                <p class="text-xs font-semibold text-gray-400">Doro 解析旁白</p>
+                <pre class="font-sans whitespace-pre-wrap text-sm leading-relaxed text-gray-700 bg-gray-50 border border-gray-100 rounded-xl p-4 max-h-56 overflow-y-auto"
+                  x-text="selectedLibraryVideo?.script_long || selectedLibraryVideo?.script || selectedLibraryVideo?.script_short"></pre>
+              </div>
+              <div x-show="selectedLibraryVideo?.transcript_window" class="space-y-2">
+                <p class="text-xs font-semibold text-gray-400">原片片段逐字稿</p>
+                <pre class="font-mono whitespace-pre-wrap text-xs leading-relaxed text-gray-600 bg-gray-50 border border-gray-100 rounded-xl p-4 max-h-56 overflow-y-auto"
+                  x-text="selectedLibraryVideo?.transcript_window"></pre>
+              </div>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <a x-show="selectedLibraryVideo?.source_url" :href="selectedLibraryVideo?.source_url" target="_blank"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white border border-gray-200 text-gray-700 hover:border-gray-300 transition">打開原片</a>
+                <a :href="selectedLibraryVideo?.video_url" target="_blank"
+                  class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-900 text-white hover:bg-gray-800 transition">新分頁播放</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div x-show="libraryUploadVideo" x-cloak
+        class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
+        @click.self="closeLibraryUpload()">
+        <div class="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl border border-gray-200">
+          <div class="flex items-start justify-between gap-4 px-5 py-4 border-b border-gray-100">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-green-600">短片庫上傳</p>
+              <h2 class="text-lg font-bold text-gray-900 leading-snug mt-1" x-text="libraryUploadVideo?.title || libraryUploadVideo?.folder"></h2>
+              <p class="text-xs text-gray-400 mt-1">
+                Upload-Post profile
+                <code class="text-orange-700 bg-orange-100 px-2 py-0.5 rounded" x-text="libraryUploadProfile || 'yt'"></code>
+              </p>
+            </div>
+            <button @click="closeLibraryUpload()"
+              class="shrink-0 w-9 h-9 rounded-full border border-gray-200 text-gray-400 hover:text-gray-700 hover:border-gray-300">×</button>
+          </div>
+
+          <div x-show="libraryUploadLoading" class="py-16 text-center text-sm text-gray-400">載入上傳設定...</div>
+
+          <div x-show="!libraryUploadLoading && libraryUploadMeta" class="grid grid-cols-1 lg:grid-cols-[280px_1fr] max-h-[78vh] overflow-y-auto">
+            <div class="bg-black">
+              <video class="w-full aspect-[9/16] object-contain bg-black"
+                controls preload="metadata" playsinline
+                :poster="libraryUploadVideo?.thumbnail_url || null"
+                :src="libraryUploadVideo?.video_url || ''"></video>
+            </div>
+            <div class="p-5 space-y-5">
+              <div class="flex flex-wrap gap-2">
+                <template x-for="pid in libraryUploadPlatformList" :key="pid">
+                  <button type="button" @click="toggleLibraryUploadPlatform(pid)"
+                    class="px-3 py-2 rounded-xl text-xs font-semibold border transition"
+                    :class="libraryUploadPlatforms.has(pid) ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'">
+                    <span x-text="platformIcon(pid)"></span>
+                    <span x-text="(_PLATFORM_STYLE[pid]?.name || pid)"></span>
+                  </button>
+                </template>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <template x-for="pid in libraryUploadPlatformList.filter(p => libraryUploadPlatforms.has(p))" :key="pid">
+                  <div class="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-2">
+                    <div class="flex items-center justify-between gap-3">
+                      <p class="text-xs font-bold text-gray-700" x-text="_PLATFORM_STYLE[pid]?.name || pid"></p>
+                      <span class="text-[10px] text-gray-400" x-text="libraryUploadMeta?.[pid]?.video_version || 'legacy'"></span>
+                    </div>
+                    <input x-model="libraryUploadMeta[pid].title"
+                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-gray-400"
+                      placeholder="標題 / caption">
+                    <textarea x-show="['youtube','facebook','linkedin'].includes(pid)"
+                      x-model="libraryUploadMeta[pid].description"
+                      rows="3"
+                      class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs outline-none focus:border-gray-400"
+                      placeholder="描述"></textarea>
+                  </div>
+                </template>
+              </div>
+
+              <div class="rounded-2xl border border-orange-100 bg-orange-50 p-4 text-xs text-orange-700">
+                會使用這支短片資料夾內的 <code>output.mp4</code> 與 <code>thumbnail.png</code>，並寫入 <code>schedule_log.json</code>。這條路徑不需要建立 DB Job。
+              </div>
+
+              <div class="flex items-center justify-between gap-3 pt-2">
+                <button @click="saveLibraryUploadMeta()"
+                  class="px-4 py-2 rounded-xl text-sm font-semibold bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                  儲存草稿
+                </button>
+                <button @click="uploadLibraryVideo()"
+                  :disabled="libraryUploadUploading || libraryUploadPlatforms.size === 0 || !uploadKeySet"
+                  :class="(libraryUploadUploading || libraryUploadPlatforms.size === 0 || !uploadKeySet) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-green-700'"
+                  class="px-5 py-2 rounded-xl text-sm font-semibold bg-green-600 text-white transition">
+                  <span x-show="!libraryUploadUploading">全部上傳</span>
+                  <span x-show="libraryUploadUploading">上傳中...</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div x-show="page==='new'" class="p-8 max-w-3xl mx-auto">
 
       <!-- Header (always visible) -->
@@ -411,6 +644,7 @@
           <div class="flex flex-wrap gap-2">
             <template x-for="[id, icon, label, desc] in [
               ['tech',          '🔬', '科技',   '腳本 80-110 字 · 先說結論 · 自動發 YT+TT+X'],
+              ['quote_analysis','🧠', '語錄解析', '腳本 70-100 字 · 名人觀點拆解 · 自動發 YT+IG+FB+X'],
               ['entertainment', '🎭', '娛樂',   '腳本 30-50 字 · 情緒衝擊 · 自動發 TT+IG+FB'],
               ['finance',       '💰', '財經',   '腳本 80-110 字 · 數字衝擊 · 自動發 YT+X'],
               ['pet',           '🤖', 'AI寵物', '腳本 40-60 字 · 可愛互動 · 自動發 TT+IG+FB']
@@ -669,6 +903,7 @@
             <span class="font-semibold text-gray-500">📋 當前策略：</span>
             <span x-text="({
               tech:          '🔬 科技 · 腳本 80-110 字 · 預設發 YouTube+TikTok+X',
+              quote_analysis:'🧠 語錄解析 · 腳本 70-100 字 · 名人觀點拆解 · 預設發 YT+IG+FB+X',
               entertainment: '🎭 娛樂 · 腳本 30-50 字 · 預設發 TikTok+IG+Facebook',
               finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X',
               pet:           '🤖 AI寵物 · 腳本 40-60 字 · 預設發 TikTok+IG+Facebook'
@@ -789,8 +1024,8 @@
                 <div class="flex gap-4 p-4">
                   <!-- Screenshot / B-roll preview -->
                   <div class="w-40 h-28 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
-                    <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover">
-                    <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-full object-cover" autoplay muted loop playsinline></video>
+                    <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:9000' + shot.url" class="w-full h-full object-cover">
+                    <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:9000' + shot.url" class="w-full h-full object-cover" autoplay muted loop playsinline></video>
                     <div x-show="!shot.url" class="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-gray-50 to-gray-100 p-2">
                       <span class="text-xl">📰</span>
                       <p class="text-[10px] text-gray-500 text-center leading-tight line-clamp-3" x-text="shot.title || '截圖失敗'"></p>
@@ -879,14 +1114,14 @@
                 <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
                 <span class="text-[10px] text-gray-400">(YouTube 會用這張；TikTok/IG/FB 自動從影片抽)</span>
               </div>
-              <a :href="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+              <a :href="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                  download="thumbnail.png"
                  class="text-xs text-green-600 hover:text-green-700 border border-green-200 rounded-lg px-3 py-1">
                 下載
               </a>
             </div>
             <img x-show="thumbOk"
-                 :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+                 :src="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                  class="w-full max-h-80 object-contain bg-black"
                  @error="thumbOk = false"
                  alt="thumbnail">
@@ -917,7 +1152,7 @@
                   </button>
                 </div>
                 <video controls class="w-full max-h-80 bg-black"
-                  :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
+                  :src="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
               </div>
             </template>
           </div>
@@ -1219,6 +1454,7 @@
           <span class="font-semibold text-gray-500">📋 當前策略：</span>
           <span x-text="({
             tech:          '🔬 科技 · 腳本 80-110 字 · 預設發 YouTube+TikTok+X',
+            quote_analysis:'🧠 語錄解析 · 腳本 70-100 字 · 名人觀點拆解 · 預設發 YT+IG+FB+X',
             entertainment: '🎭 娛樂 · 腳本 30-50 字 · 預設發 TikTok+IG+Facebook',
             finance:       '💰 財經 · 腳本 80-110 字 · 預設發 YouTube+X',
             pet:           '🤖 AI寵物 · 腳本 40-60 字 · 預設發 TikTok+IG+Facebook'
@@ -1352,8 +1588,8 @@
         <div class="grid grid-cols-3 gap-4">
           <template x-for="shot in screenshots" :key="shot.index">
             <div class="glass rounded-2xl overflow-hidden">
-              <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100">
-              <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:8000' + shot.url" class="w-full h-40 object-cover bg-gray-100" autoplay muted loop playsinline></video>
+              <img x-show="shot.url && shot.type !== 'broll'" :src="'http://localhost:9000' + shot.url" class="w-full h-40 object-cover bg-gray-100">
+              <video x-show="shot.url && shot.type === 'broll'" :src="'http://localhost:9000' + shot.url" class="w-full h-40 object-cover bg-gray-100" autoplay muted loop playsinline></video>
               <div x-show="!shot.url" class="h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center gap-1 p-3">
                 <span class="text-2xl">📰</span>
                 <p class="text-[10px] text-gray-500 text-center leading-tight line-clamp-3" x-text="shot.title || '截圖失敗'"></p>
@@ -1403,14 +1639,14 @@
               <p class="text-xs font-semibold text-gray-500">封面縮圖 (1080×1920)</p>
               <span class="text-[10px] text-gray-400">(YouTube 會用這張；TikTok/IG/FB 自動從影片抽)</span>
             </div>
-            <a :href="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+            <a :href="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                download="thumbnail.png"
                class="text-xs text-green-600 hover:text-green-700 border border-green-200 rounded-lg px-3 py-1">
               下載
             </a>
           </div>
           <img x-show="thumbOk"
-               :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+               :src="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                class="w-full max-h-80 object-contain bg-black"
                @error="thumbOk = false"
                alt="thumbnail">
@@ -1441,7 +1677,7 @@
                 </button>
               </div>
               <video controls class="w-full max-h-96 bg-black"
-                :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
+                :src="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/video?v=' + currentJobVersion + '&t=' + encodeURIComponent((currentJob?.finished_at || currentJob?.id) + ':' + currentJobVersion)"></video>
             </div>
           </template>
         </div>
@@ -1572,7 +1808,7 @@
             <!-- Video thumbnail (shared across all cards) -->
             <div class="relative aspect-[9/16] bg-black mx-auto" style="max-width:280px">
               <img x-show="currentJob"
-                   :src="'http://localhost:8000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
+                   :src="'http://localhost:9000/api/media/jobs/' + currentJob?.id + '/thumbnail?t=' + encodeURIComponent(currentJob?.finished_at || currentJob?.id)"
                    class="w-full h-full object-cover"
                    @error="$event.target.style.display='none'"
                    alt="thumbnail">
@@ -1783,11 +2019,11 @@
                 <label class="text-xs font-medium text-gray-500 block mb-1">主要語言</label>
                 <select x-model="platformMeta.youtube.defaultLanguage"
                   class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm">
-                  <option value="zh-Hant">繁體中文</option>
-                  <option value="zh-Hans">簡體中文</option>
-                  <option value="en">English</option>
-                  <option value="ja">日本語</option>
-                  <option value="ko">한국어</option>
+                  <option value="zh-TW">繁體中文</option>
+                  <option value="zh-CN">簡體中文</option>
+                  <option value="en-US">English</option>
+                  <option value="ja-JP">日本語</option>
+                  <option value="ko-KR">한국어</option>
                 </select>
               </div>
               <div>
@@ -2339,71 +2575,143 @@
 
     <!-- ── Settings ───────────────────────────────────────────────────── -->
     <!-- ═══════ ANALYTICS PAGE ═══════ -->
-    <div x-show="page==='analytics'" class="p-8 max-w-6xl mx-auto space-y-6">
-      <div class="flex items-center justify-between">
+    <div x-show="page==='analytics'" class="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 class="text-2xl font-bold text-gray-900">📊 流量分析</h2>
-          <p class="text-sm text-gray-500 mt-1" x-text="analyticsSummary ? (`${analyticsSummary.total_videos} 支影片 · ${formatNum(analyticsSummary.total_views)} 總觀看`) : '尚未抓取數據'"></p>
+          <h2 class="text-2xl font-bold text-gray-900">流量分析</h2>
+          <p class="text-sm text-gray-500 mt-1">每支影片表現、平台回收、封面與 hook 復盤。</p>
         </div>
         <button @click="refreshAnalytics()" :disabled="analyticsRefreshing"
-          class="px-4 py-2 rounded-xl text-sm font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white transition-all">
-          <span x-show="!analyticsRefreshing">🔄 重新抓取（YT + FB）</span>
-          <span x-show="analyticsRefreshing">⏳ 抓取中…</span>
+          class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white transition-all">
+          <svg class="w-4 h-4" :class="analyticsRefreshing ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M5.6 15A7 7 0 0017 18.2M18.4 9A7 7 0 007 5.8"/>
+          </svg>
+          <span x-text="analyticsRefreshing ? '全量抓取中...' : '全量抓取已發影片'"></span>
         </button>
       </div>
 
-      <div x-show="!analyticsJobs.length && !analyticsLoading" class="glass rounded-2xl p-12 text-center text-gray-500">
-        <p class="text-sm">還沒有分析資料。</p>
-        <p class="text-xs mt-2">前提：job 已 status=done + .env 有 <code>YOUTUBE_API_KEY</code> / <code>YOUTUBE_CHANNEL_ID</code> / <code>META_PAGE_ACCESS_TOKEN</code>。</p>
-        <p class="text-xs mt-1">按右上「重新抓取」觸發 analytics_fetcher.py。</p>
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="glass rounded-xl p-4">
+          <p class="text-[11px] text-gray-400 font-semibold uppercase">影片數</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1" x-text="analyticsSummary ? formatNum(analyticsSummary.total_videos) : '-'"></p>
+        </div>
+        <div class="glass rounded-xl p-4">
+          <p class="text-[11px] text-gray-400 font-semibold uppercase">總觀看</p>
+          <p class="text-2xl font-bold text-green-600 mt-1" x-text="analyticsSummary ? formatNum(analyticsSummary.total_views) : '-'"></p>
+        </div>
+        <div class="glass rounded-xl p-4">
+          <p class="text-[11px] text-gray-400 font-semibold uppercase">平均觀看</p>
+          <p class="text-2xl font-bold text-blue-600 mt-1" x-text="analyticsSummary ? formatNum(analyticsSummary.avg_views) : '-'"></p>
+        </div>
+        <div class="glass rounded-xl p-4">
+          <p class="text-[11px] text-gray-400 font-semibold uppercase">互動率</p>
+          <p class="text-2xl font-bold text-violet-600 mt-1" x-text="analyticsSummary ? `${analyticsSummary.engagement_rate || 0}%` : '-'"></p>
+        </div>
+        <div class="glass rounded-xl p-4 col-span-2 lg:col-span-1">
+          <p class="text-[11px] text-gray-400 font-semibold uppercase">最佳平台</p>
+          <p class="text-2xl font-bold text-gray-900 mt-1" x-text="platformLabel(analyticsSummary?.top_platform)"></p>
+        </div>
       </div>
 
-      <template x-for="j in analyticsJobs" :key="j.job_id">
-        <div class="glass rounded-2xl p-5 space-y-3">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 text-xs text-gray-500">
-                <span>#<span x-text="j.job_id"></span></span>
-                <span>·</span>
-                <span x-text="j.date"></span>
-                <span>·</span>
-                <span x-text="j.finished_at ? j.finished_at.slice(0,16).replace('T',' ') : ''"></span>
+      <div x-show="analyticsSummary && !analyticsSummary.stats_available && analyticsJobs.length"
+        class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        目前只有已完成影片清單，還沒有平台數據。確認 .env 有 <code>YOUTUBE_API_KEY</code> / <code>YOUTUBE_CHANNEL_ID</code> / <code>META_PAGE_ACCESS_TOKEN</code> 後，按「重新抓取」回收數據。
+      </div>
+
+      <div x-show="analyticsSummary && analyticsSummary.suspect_stats_count"
+        class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        已排除 <span class="font-semibold" x-text="analyticsSummary?.suspect_stats_count || 0"></span> 筆疑似誤配平台數據（同一個 platform video id 被多個 job 共用）。重新抓取後會用更嚴格的 title / hook / 排程時間匹配。
+      </div>
+
+      <div x-show="analyticsLoading" class="glass rounded-xl p-8 text-center text-sm text-gray-500">
+        讀取流量資料中...
+      </div>
+
+      <div x-show="!analyticsJobs.length && !analyticsLoading" class="glass rounded-xl p-12 text-center text-gray-500">
+        <p class="text-sm">還沒有可分析的 completed job。</p>
+        <p class="text-xs mt-2">影片完成並發布後，按右上「重新抓取」觸發 analytics_fetcher.py。</p>
+      </div>
+
+      <div class="space-y-4">
+        <template x-for="j in analyticsJobs" :key="j.job_id">
+          <div class="glass rounded-xl overflow-hidden">
+            <div class="p-4 lg:p-5 flex flex-col lg:flex-row gap-4">
+              <div class="w-full lg:w-36 flex-shrink-0">
+                <div class="aspect-[9/16] rounded-lg overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center">
+                  <img x-show="j.thumbnail" :src="j.thumbnail" class="w-full h-full object-cover" alt="">
+                  <span x-show="!j.thumbnail" class="text-xs text-gray-400">無封面</span>
+                </div>
               </div>
-              <p class="text-sm font-semibold text-gray-900 truncate" x-text="j.topic || '(無主題)'"></p>
-            </div>
-            <div class="flex gap-4 text-right flex-shrink-0">
-              <div>
-                <p class="text-[10px] text-gray-400">總觀看</p>
-                <p class="text-lg font-bold text-green-600" x-text="formatNum(j.total_views)"></p>
-              </div>
-              <div>
-                <p class="text-[10px] text-gray-400">❤️</p>
-                <p class="text-sm font-semibold text-gray-700" x-text="formatNum(j.total_likes)"></p>
-              </div>
-              <div>
-                <p class="text-[10px] text-gray-400">💬</p>
-                <p class="text-sm font-semibold text-gray-700" x-text="formatNum(j.total_comments)"></p>
+
+              <div class="flex-1 min-w-0 space-y-4">
+                <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      <span class="font-mono">Job #<span x-text="j.job_id"></span></span>
+                      <span>·</span>
+                      <span x-text="j.date"></span>
+                      <span x-show="j.finished_at">·</span>
+                      <span x-show="j.finished_at" x-text="j.finished_at ? j.finished_at.slice(0,16).replace('T',' ') : ''"></span>
+                      <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold" :class="performanceClass(j.performance)" x-text="performanceLabel(j.performance)"></span>
+                    </div>
+                    <p class="mt-1 text-base font-semibold text-gray-900 line-clamp-2" x-text="j.title || j.topic || '(無主題)'"></p>
+                    <p x-show="j.hook" class="mt-1 text-sm text-gray-600 line-clamp-2">
+                      <span class="text-gray-400">Hook：</span><span x-text="j.hook"></span>
+                    </p>
+                  </div>
+
+                  <div class="grid grid-cols-4 gap-3 text-right flex-shrink-0 xl:min-w-[360px]">
+                    <div>
+                      <p class="text-[10px] text-gray-400 font-semibold uppercase">Views</p>
+                      <p class="text-xl font-bold text-green-600" x-text="formatNum(j.total_views)"></p>
+                    </div>
+                    <div>
+                      <p class="text-[10px] text-gray-400 font-semibold uppercase">ER</p>
+                      <p class="text-xl font-bold text-violet-600" x-text="`${j.engagement_rate || 0}%`"></p>
+                    </div>
+                    <div>
+                      <p class="text-[10px] text-gray-400 font-semibold uppercase">Comments</p>
+                      <p class="text-xl font-bold text-gray-800" x-text="formatNum(j.total_comments)"></p>
+                    </div>
+                    <div>
+                      <p class="text-[10px] text-gray-400 font-semibold uppercase">Best</p>
+                      <p class="text-sm font-bold text-gray-800 mt-1" x-text="platformLabel(j.best_platform)"></p>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                    <span>相對近期中位數 <span x-text="formatNum(analyticsSummary?.baseline_views || 0)"></span></span>
+                    <span x-text="analyticsBaselineRatio(j)"></span>
+                  </div>
+                  <div class="h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div class="h-full rounded-full bg-green-500" :style="`width: ${analyticsBaselineWidth(j)}%`"></div>
+                  </div>
+                </div>
+
+                <div x-show="(j.platforms || []).length" class="border-t border-gray-100 pt-3 space-y-2">
+                  <template x-for="p in j.platforms || []" :key="p.platform">
+                    <a :href="p.platform_url || '#'" :target="p.platform_url ? '_blank' : '_self'" rel="noopener"
+                      class="grid grid-cols-2 md:grid-cols-6 gap-3 items-center rounded-lg px-3 py-2 bg-gray-50 hover:bg-gray-100 text-xs transition-colors">
+                      <span class="font-semibold text-gray-800" x-text="platformLabel(p.platform)"></span>
+                      <span><span class="text-gray-400">觀看</span> <b x-text="formatNum(p.views)"></b></span>
+                      <span><span class="text-gray-400">讚</span> <b x-text="formatNum(p.likes)"></b></span>
+                      <span><span class="text-gray-400">留言</span> <b x-text="formatNum(p.comments)"></b></span>
+                      <span><span class="text-gray-400">分享</span> <b x-text="formatNum(p.shares)"></b></span>
+                      <span class="text-gray-500 md:text-right" x-text="p.fetched_at ? p.fetched_at.slice(0,16).replace('T',' ') : '待更新'"></span>
+                    </a>
+                  </template>
+                </div>
+
+                <div x-show="!(j.platforms || []).length" class="border-t border-dashed border-gray-200 pt-3 text-xs text-gray-400">
+                  尚未回收到平台數據；這支先保留封面 / hook，等抓到 views 後再判斷是否需要換封面。
+                </div>
               </div>
             </div>
           </div>
-          <div x-show="j.platforms.length" class="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
-            <template x-for="p in j.platforms" :key="p.platform">
-              <a :href="p.platform_url" target="_blank" rel="noopener"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs transition-colors">
-                <span x-text="({youtube:'▶️',tiktok:'🎵',instagram:'📷',facebook:'📘',threads:'🧵',x:'✖️'})[p.platform] || '🔗'"></span>
-                <span class="font-medium capitalize" x-text="p.platform"></span>
-                <span class="text-gray-400">·</span>
-                <span><span x-text="formatNum(p.views)"></span> 👁</span>
-                <span class="text-gray-400" x-show="p.likes">·</span>
-                <span x-show="p.likes"><span x-text="formatNum(p.likes)"></span> ❤️</span>
-                <span class="text-gray-400" x-show="p.comments">·</span>
-                <span x-show="p.comments"><span x-text="formatNum(p.comments)"></span> 💬</span>
-              </a>
-            </template>
-          </div>
-          <p x-show="!j.platforms.length" class="text-xs text-gray-400">（尚未抓到任何平台資料 — 可能 YT/FB ID 未綁或 token 過期）</p>
-        </div>
-      </template>
+        </template>
+      </div>
     </div>
 
     <div x-show="page==='settings'" class="p-8 max-w-xl mx-auto space-y-6">
@@ -2453,6 +2761,58 @@
       </div>
 
       <div class="glass rounded-2xl p-6 space-y-5">
+        <div class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-800">LLM Provider</h3>
+              <p class="text-xs text-gray-500 mt-0.5">
+                目前使用：
+                <span class="font-mono font-semibold text-blue-700" x-text="settings.llm_status?.provider || settings.llm_provider || 'codex'"></span>
+                /
+                <span class="font-mono text-blue-700" x-text="settings.llm_status?.model || settings.llm_model || 'gpt-5.5'"></span>
+              </p>
+            </div>
+            <span class="text-[11px] px-2 py-1 rounded-full bg-white border border-blue-100 text-blue-700 font-mono"
+              x-text="settings.llm_status?.proxy_url || settings.llm_proxy_url || ''"></span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Provider</label>
+              <select x-model="settings.llm_provider"
+                @change="
+                  if (settings.llm_provider === 'codex') {
+                    settings.llm_proxy_url = settings.llm_proxy_url || 'http://127.0.0.1:3458';
+                    settings.llm_model = settings.llm_model || 'gpt-5.5';
+                  } else if (settings.llm_provider === 'claude') {
+                    settings.llm_proxy_url = 'http://localhost:3456';
+                    settings.llm_model = 'claude-sonnet-4-6';
+                  } else if (settings.llm_provider === 'ollama') {
+                    settings.llm_proxy_url = 'http://localhost:11434';
+                    settings.llm_model = settings.llm_model || 'qwen2.5:14b';
+                  }
+                "
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all">
+                <option value="codex">Codex / CliRelay (:3458)</option>
+                <option value="claude">Claude proxy (:3456)</option>
+                <option value="ollama">Ollama local (:11434)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Proxy URL</label>
+              <input x-model="settings.llm_proxy_url" placeholder="http://127.0.0.1:3458"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all">
+            </div>
+            <div>
+              <label class="text-xs text-gray-500 block mb-1">Text Model</label>
+              <input x-model="settings.llm_model" placeholder="gpt-5.5"
+                class="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all">
+            </div>
+          </div>
+          <p class="text-xs text-gray-500">
+            Codex 走 ChatGPT Pro/CliRelay；Claude proxy 保留，可隨時切回原本路線。
+          </p>
+        </div>
+
         <template x-for="[key, label, type, placeholder] in settingsFields" :key="key">
           <div>
             <label class="text-sm font-medium text-gray-700 block mb-1.5" x-text="label"></label>
@@ -2492,7 +2852,7 @@
             </div>
             <div class="flex-1">
               <p class="text-sm font-medium text-gray-700">🤖 Autopilot（排程時間自動跑 + 自動發布）</p>
-              <p class="text-[11px] text-gray-400">啟用後，每日排程會自動跑「新聞 + 趨勢」各 1 支影片，跳過所有 review pause</p>
+              <p class="text-[11px] text-gray-400">啟用後，每日排程會自動跑「科技新聞 + 娛樂趨勢 + 科技名人解析」，跳過所有 review pause</p>
             </div>
           </label>
           <label class="flex items-center gap-3 cursor-pointer group ml-12"
@@ -2507,6 +2867,20 @@
             <div class="flex-1">
               <p class="text-sm text-gray-700">Dry-run 預覽（不實際推到社群平台）</p>
               <p class="text-[11px] text-gray-400">預設開啟 — 確認過整個流程沒問題再關掉</p>
+            </div>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer group ml-12"
+            x-show="settings.autopilot_enabled === 'true'">
+            <div class="relative">
+              <input type="checkbox" :checked="settings.autopilot_figure_enabled==='true'"
+                @change="settings.autopilot_figure_enabled = $event.target.checked ? 'true' : 'false'"
+                class="sr-only peer">
+              <div class="w-9 h-5 bg-gray-200 peer-checked:bg-indigo-600 rounded-full transition-colors"></div>
+              <div class="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </div>
+            <div class="flex-1">
+              <p class="text-sm text-gray-700">人物原片解析（科技大咖）</p>
+              <p class="text-[11px] text-gray-400">YouTube MVP：下載科技演講/訪談片段，AI 找金句並加旁白解析</p>
             </div>
           </label>
           <div x-show="settings.autopilot_enabled === 'true'" class="ml-12">
@@ -2670,13 +3044,25 @@
 </div>
 
 <script>
-const API = 'http://localhost:8000'
+const API = window.location.origin
 
 function app() {
   return {
     page: 'dashboard',
     stats: {},
     jobs: [],
+    videoLibrary: [],
+    videoLibraryMeta: {},
+    videoLibraryLoading: false,
+    videoLibraryFilters: { q: '', kind: 'all', variant: 'all', date: 'all' },
+    selectedLibraryVideo: null,
+    libraryUploadVideo: null,
+    libraryUploadMeta: null,
+    libraryUploadProfile: '',
+    libraryUploadLoading: false,
+    libraryUploadUploading: false,
+    libraryUploadPlatformList: ['youtube','instagram','facebook','threads','x','linkedin'],
+    libraryUploadPlatforms: new Set(['youtube','instagram','facebook','threads','x','linkedin']),
 
     // schedule preview (v2)
     scheduleDays: 7,
@@ -2704,7 +3090,7 @@ function app() {
     appendLangs: new Set(),          // multi-lang selection for append
     appending: false,
     selectedSources: new Set(['google','bing','zhihu']),  // per-source toggle
-    strategy: 'tech',   // tech | entertainment | finance | pet
+    strategy: 'tech',   // tech | tech_tutorial | quote_analysis | entertainment | finance | pet
     newsItems: [],      // currently displayed items (may be filtered)
     newsPool: [],       // all fetched items (for replacement)
     selectedIds: new Set(),
@@ -2770,9 +3156,12 @@ function app() {
       ['upload_post_profile', 'Upload-Post Profile 名稱', 'text', 'yt'],
       ['pexels_api_key',  'Pexels API Key（B-roll 背景影片）', 'password', '申請：pexels.com/api'],
       ['trending_profile_tech',          '趨勢 — 科技帳號 profile 名稱',  'text', 'tech_yt'],
+      ['trending_profile_quote_analysis','趨勢 — 語錄解析 profile 名稱',  'text', 'yt'],
       ['trending_profile_entertainment', '趨勢 — 娛樂帳號 profile 名稱',  'text', 'entertainment_yt'],
       ['trending_profile_finance',       '趨勢 — 財經帳號 profile 名稱',  'text', 'finance_yt'],
       ['trending_profile_pet',           '趨勢 — 寵物帳號 profile 名稱',  'text', 'pet'],
+      ['autopilot_figure_tech_profile',  '人物解析 — 科技帳號 profile 名稱', 'text', 'yt'],
+      ['autopilot_figure_tech_names',    '人物解析 — 科技大咖名單（逗號分隔）', 'text', '黃仁勳 Jensen Huang,張忠謀 Morris Chang'],
       ['cta_kw_tech',                    'ManyChat — 科技類 keyword（caption 用）', 'text', '今日科技'],
       ['cta_kw_entertain',               'ManyChat — 娛樂類 keyword（caption 用）', 'text', '今日娛樂'],
       ['cta_blog_url',                   'ManyChat — DM 連結（部落格 URL）', 'text', 'https://doro-palace.vercel.app/zh/from-ig'],
@@ -2962,14 +3351,13 @@ function app() {
     async refreshAnalytics() {
       this.analyticsRefreshing = true
       try {
-        await this.api('POST', '/api/analytics/refresh?limit=30')
-        this.showToast('🔄 背景抓取中，20-40 秒後重整')
-        // Poll back after 25s
+        await this.api('POST', '/api/analytics/refresh?all_done=true')
+        this.showToast('背景全量抓取中，約 1-3 分鐘後更新')
         setTimeout(async () => {
           await this.loadAnalytics()
           this.analyticsRefreshing = false
-          this.showToast('✅ 分析已更新')
-        }, 25000)
+          this.showToast('分析資料已更新')
+        }, 90000)
       } catch (e) {
         this.analyticsRefreshing = false
         this.showToast('觸發失敗：' + e.message)
@@ -2981,6 +3369,54 @@ function app() {
       if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
       if (n >= 1000)    return (n / 1000).toFixed(1) + 'K'
       return String(n)
+    },
+
+    platformLabel(platform) {
+      return ({
+        youtube: 'YouTube',
+        tiktok: 'TikTok',
+        instagram: 'Instagram',
+        facebook: 'Facebook',
+        threads: 'Threads',
+        x: 'X',
+        linkedin: 'LinkedIn',
+      })[platform] || (platform || '-')
+    },
+
+    performanceLabel(status) {
+      return ({
+        winner: '爆款候選',
+        steady: '正常表現',
+        watch: '觀察中',
+        needs_cover: '封面待修',
+        tracking: '回收中',
+        needs_data: '待回收',
+      })[status] || '待回收'
+    },
+
+    performanceClass(status) {
+      return ({
+        winner: 'bg-green-100 text-green-700',
+        steady: 'bg-blue-100 text-blue-700',
+        watch: 'bg-amber-100 text-amber-700',
+        needs_cover: 'bg-red-100 text-red-700',
+        tracking: 'bg-gray-100 text-gray-700',
+        needs_data: 'bg-gray-100 text-gray-500',
+      })[status] || 'bg-gray-100 text-gray-500'
+    },
+
+    analyticsBaselineWidth(job) {
+      const baseline = Number(this.analyticsSummary?.baseline_views || job?.baseline_views || 0)
+      const views = Number(job?.total_views || 0)
+      if (!baseline || !views) return views ? 100 : 0
+      return Math.max(4, Math.min(100, Math.round((views / baseline) * 100)))
+    },
+
+    analyticsBaselineRatio(job) {
+      const baseline = Number(this.analyticsSummary?.baseline_views || job?.baseline_views || 0)
+      const views = Number(job?.total_views || 0)
+      if (!baseline || !views) return '尚無基準'
+      return `${(views / baseline).toFixed(1)}x`
     },
 
     async api(method, path, body) {
@@ -3005,6 +3441,136 @@ function app() {
       } catch (e) {
         this.showToast('無法連接後端：' + e.message)
       }
+    },
+
+    async loadVideoLibrary() {
+      this.videoLibraryLoading = true
+      try {
+        const data = await this.api('GET', '/api/media/library?limit=500')
+        this.videoLibrary = data.items || []
+        this.videoLibraryMeta = data || {}
+      } catch (e) {
+        this.showToast('短片庫載入失敗：' + e.message)
+      } finally {
+        this.videoLibraryLoading = false
+      }
+    },
+
+    filteredVideoLibrary() {
+      const f = this.videoLibraryFilters || {}
+      const q = (f.q || '').trim().toLowerCase()
+      return (this.videoLibrary || []).filter(v => {
+        if (f.kind && f.kind !== 'all' && v.kind !== f.kind) return false
+        if (f.variant && f.variant !== 'all' && (v.variant || 'default') !== f.variant) return false
+        if (f.date && f.date !== 'all' && v.date !== f.date) return false
+        if (!q) return true
+        return [
+          v.title, v.figure_name, v.source_name, v.folder, v.variant,
+          v.content_type, v.strategy, v.date, v.source_published_at,
+          v.quote_zh, v.quote_original, v.script, v.script_long, v.script_short
+        ].some(x => String(x || '').toLowerCase().includes(q))
+      })
+    },
+
+    openVideoDetail(video) {
+      this.selectedLibraryVideo = video
+    },
+
+    async openLibraryUpload(video) {
+      this.libraryUploadVideo = video
+      this.libraryUploadMeta = null
+      this.libraryUploadProfile = ''
+      this.libraryUploadLoading = true
+      this.libraryUploadUploading = false
+      try {
+        const data = await this.api('GET', `/api/media/library/platform_meta?key=${encodeURIComponent(video.key)}`)
+        this.libraryUploadMeta = data.platform_meta || {}
+        this.libraryUploadProfile = data.profile || 'yt'
+        this.libraryUploadPlatformList = data.default_platforms || ['youtube','instagram','facebook','threads','x','linkedin']
+        this.libraryUploadPlatforms = new Set(this.libraryUploadPlatformList.filter(p => this.libraryUploadMeta[p]))
+      } catch (e) {
+        this.showToast('上傳設定載入失敗：' + e.message)
+        this.libraryUploadVideo = null
+      } finally {
+        this.libraryUploadLoading = false
+      }
+    },
+
+    closeLibraryUpload() {
+      this.libraryUploadVideo = null
+      this.libraryUploadMeta = null
+      this.libraryUploadUploading = false
+    },
+
+    toggleLibraryUploadPlatform(pid) {
+      const s = new Set(this.libraryUploadPlatforms)
+      s.has(pid) ? s.delete(pid) : s.add(pid)
+      this.libraryUploadPlatforms = s
+    },
+
+    async saveLibraryUploadMeta() {
+      if (!this.libraryUploadVideo || !this.libraryUploadMeta) return
+      await this.api('PUT', '/api/media/library/platform_meta', {
+        key: this.libraryUploadVideo.key,
+        platform_meta: this.libraryUploadMeta,
+      })
+      this.showToast('短片上傳草稿已儲存')
+    },
+
+    async uploadLibraryVideo() {
+      if (!this.libraryUploadVideo || !this.libraryUploadMeta) return
+      const platforms = [...this.libraryUploadPlatforms]
+      if (platforms.length === 0) {
+        this.showToast('沒有選擇任何平台')
+        return
+      }
+      this.libraryUploadUploading = true
+      try {
+        await this.api('PUT', '/api/media/library/platform_meta', {
+          key: this.libraryUploadVideo.key,
+          platform_meta: this.libraryUploadMeta,
+        })
+        const res = await this.api('POST', '/api/media/library/upload', {
+          key: this.libraryUploadVideo.key,
+          platforms,
+        })
+        this.showToast(`開始上傳到 ${platforms.length} 個平台（profile: ${res.profile || this.libraryUploadProfile}）`)
+        this.closeLibraryUpload()
+      } catch (e) {
+        this.showToast('上傳失敗：' + e.message)
+        this.libraryUploadUploading = false
+      }
+    },
+
+    videoLibraryCount(kind) {
+      return (this.videoLibrary || []).filter(v => v.kind === kind).length
+    },
+
+    videoLibraryDates() {
+      return [...new Set((this.videoLibrary || []).map(v => v.date).filter(Boolean))]
+    },
+
+    videoLibraryVariants() {
+      return [...new Set((this.videoLibrary || []).map(v => v.variant || 'default'))]
+        .sort((a, b) => this.variantLabel(a).localeCompare(this.variantLabel(b), 'zh-Hant'))
+    },
+
+    variantLabel(variant) {
+      return ({ default: '單版', short: '短版', long: '長版', enhanced: '強化版' })[variant || 'default'] || variant
+    },
+
+    figureSourceAvailable() {
+      return Number(this.videoLibraryMeta?.figure_sources?.total?.available || 0)
+    },
+
+    figureSegmentAvailable() {
+      return Number(this.videoLibraryMeta?.figure_segments?.total?.available || 0)
+    },
+
+    formatBytes(bytes) {
+      const n = Number(bytes || 0)
+      if (!n) return '0 MB'
+      return (n / 1024 / 1024).toFixed(1) + ' MB'
     },
 
     startNewVideo() {
@@ -3240,6 +3806,7 @@ function app() {
 
     _STRATEGY_PLATFORMS: {
       tech:          ['youtube', 'tiktok', 'x'],
+      quote_analysis:['youtube', 'instagram', 'facebook', 'threads', 'x', 'linkedin'],
       entertainment: ['tiktok', 'instagram', 'facebook'],
       finance:       ['youtube', 'x'],
       pet:           ['tiktok', 'instagram', 'facebook'],
@@ -3286,6 +3853,7 @@ function app() {
       facebook:  { bg: 'bg-[#18191A]',           text: 'text-white',    accent: '#1877F2', name: 'Facebook Reels', logo: 'fb' },
       threads:   { bg: 'bg-black',               text: 'text-white',    accent: '#ffffff', name: 'Threads',        logo: 'th' },
       x:         { bg: 'bg-black',               text: 'text-white',    accent: '#1D9BF0', name: 'X (Twitter)',    logo: 'x'  },
+      linkedin:  { bg: 'bg-[#0A66C2]',           text: 'text-white',    accent: '#0A66C2', name: 'LinkedIn',       logo: 'li' },
     },
 
     applyStrategyPlatforms() {
@@ -3603,7 +4171,7 @@ function app() {
         this.editorInstance = new tui.ImageEditor(el, {
           includeUI: {
             loadImage: {
-              path: 'http://localhost:8000' + shot.url + '?t=' + Date.now(),
+              path: 'http://localhost:9000' + shot.url + '?t=' + Date.now(),
               name: 'screenshot',
             },
             theme: { 'common.bi.image': '', 'common.backgroundColor': '#f9fafb' },
@@ -3999,7 +4567,7 @@ function app() {
     },
 
     async runAutopilotNow() {
-      if (!confirm('確定要立刻跑 autopilot？會產生 1 支新聞 + 1 支趨勢影片。')) return
+      if (!confirm('確定要立刻跑 autopilot？會產生 1 支科技新聞 + 1 支娛樂趨勢 + 1 支科技名人解析。')) return
       try {
         await this.api('POST', '/api/autopilot/run', {})
         this.showToast('🤖 autopilot 已觸發，到 Jobs 頁看進度')

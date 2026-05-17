@@ -7,6 +7,9 @@ export interface ThumbnailProps extends Record<string, unknown> {
   hook:       string;
   title:      string;
   screenshot: string;   // data URL or http URL
+  variant?:   "figure_quote" | string;
+  figure?:    string;
+  logo?:      string;
   palette?:   { bg1: string; bg2: string; bg3: string; accent: string; glow: string };
 }
 
@@ -15,8 +18,120 @@ const DEFAULT_PALETTE = {
   accent: "#ff6bcb", glow: "rgba(255,107,203,0.5)",
 };
 
-export const Thumbnail: React.FC<ThumbnailProps> = ({ hook, title, screenshot, palette }) => {
+export const Thumbnail: React.FC<ThumbnailProps> = (props) => {
+  const { hook, title, screenshot, palette } = props;
   const p = palette ?? DEFAULT_PALETTE;
+
+  if (props.variant === "figure_quote") {
+    return (
+      <AbsoluteFill style={{ backgroundColor: "#050505", overflow: "hidden" }}>
+        {screenshot && (
+          <>
+            <Img
+              src={screenshot}
+              style={{
+                position: "absolute",
+                inset: 0,
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                filter: "blur(28px) brightness(0.42) saturate(0.85)",
+                transform: "scale(1.08)",
+              }}
+            />
+            <Img
+              src={screenshot}
+              style={{
+                position: "absolute",
+                left: 86,
+                top: 470,
+                width: 908,
+                height: 760,
+                objectFit: "cover",
+                borderRadius: 24,
+                boxShadow: "0 42px 120px rgba(0,0,0,0.82), 0 0 0 4px rgba(255,210,52,0.86)",
+              }}
+            />
+          </>
+        )}
+
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.08) 43%, rgba(0,0,0,0.90) 100%)",
+          }}
+        />
+
+        <div
+          style={{
+            position: "absolute",
+            left: 70,
+            top: 74,
+            display: "flex",
+            alignItems: "center",
+            gap: 20,
+          }}
+        >
+          {props.logo && <Img src={props.logo} style={{ width: 112, height: 112, borderRadius: 24 }} />}
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            left: 58,
+            right: 58,
+            top: 170,
+            fontFamily: FONT_CJK,
+            fontSize: hook.length > 5 ? 142 : 176,
+            fontWeight: 950,
+            lineHeight: 1.02,
+            color: "#fff03a",
+            textShadow: "0 8px 0 #000, 0 22px 50px rgba(0,0,0,0.85)",
+          }}
+        >
+          {hook || "這句值得聽"}
+        </div>
+
+        <div
+          style={{
+            position: "absolute",
+            left: 70,
+            right: 70,
+            bottom: 150,
+            fontFamily: FONT_CJK,
+            fontSize: title.length > 16 ? 66 : 78,
+            fontWeight: 900,
+            lineHeight: 1.18,
+            color: "#ffffff",
+            textShadow: "0 6px 28px rgba(0,0,0,1)",
+          }}
+        >
+          {title}
+        </div>
+
+        {props.figure && (
+          <div
+            style={{
+              position: "absolute",
+              left: 72,
+              bottom: 90,
+              fontFamily: FONT_CJK,
+              fontSize: 34,
+              fontWeight: 800,
+              color: "#111111",
+              backgroundColor: "#fff03a",
+              padding: "8px 18px",
+              borderRadius: 12,
+            }}
+          >
+            名人金句解析
+          </div>
+        )}
+      </AbsoluteFill>
+    );
+  }
 
   return (
     <AbsoluteFill

@@ -40,6 +40,7 @@ class SettingsUpdate(BaseModel):
     video_renderer:       str | None = None   # "ffmpeg" | "remotion"
     # Trending account profiles
     trending_profile_tech:          str | None = None
+    trending_profile_quote_analysis: str | None = None
     trending_profile_entertainment: str | None = None
     trending_profile_finance:       str | None = None
     trending_profile_pet:           str | None = None
@@ -48,11 +49,16 @@ class SettingsUpdate(BaseModel):
     autopilot_dry_run:              str | None = None
     autopilot_news_enabled:         str | None = None
     autopilot_trending_enabled:     str | None = None
+    autopilot_figure_enabled:       str | None = None
     autopilot_news_strategy:        str | None = None
     autopilot_news_profile:         str | None = None
     autopilot_trending_strategy:    str | None = None
     autopilot_trending_profile:     str | None = None
+    autopilot_figure_tech_profile:  str | None = None
+    autopilot_figure_entertainment_profile: str | None = None
     autopilot_platforms:            str | None = None
+    autopilot_figure_tech_names:    str | None = None
+    autopilot_figure_entertainment_names: str | None = None
     # ManyChat funnel — caption + first_comment 帶 keyword 引流到部落格
     cta_kw_tech:                    str | None = None
     cta_kw_entertain:               str | None = None
@@ -62,6 +68,13 @@ class SettingsUpdate(BaseModel):
 @router.get("/settings")
 def get_settings():
     s = get_all_settings()
+    from web.claude_client import get_llm_status
+
+    llm_status = get_llm_status()
+    s.setdefault("llm_provider", os.getenv("LLM_PROVIDER", "codex"))
+    s.setdefault("llm_proxy_url", llm_status["proxy_url"])
+    s.setdefault("llm_model", llm_status["model"])
+    s["llm_status"] = llm_status
     # Expose whether optional API keys are configured (without revealing the key)
     # DB key takes priority over .env
     s["youtube_key_set"] = bool(s.get("youtube_api_key") or os.getenv("YOUTUBE_API_KEY", ""))
@@ -81,7 +94,7 @@ def update_settings(body: SettingsUpdate):
             int(s.get("schedule_minute", 0)),
         )
 
-    return get_all_settings()
+    return get_settings()
 
 
 @router.post("/autopilot/run")

@@ -1,6 +1,7 @@
 """
 web/db.py — SQLite job tracking for AutoVideo Dashboard
 """
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -88,12 +89,70 @@ def init_db():
                 UNIQUE(job_id, platform)
             );
 
+            CREATE TABLE IF NOT EXISTS figure_source_candidates (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_name          TEXT NOT NULL,
+                figure_name         TEXT DEFAULT '',
+                topic               TEXT DEFAULT '',
+                query               TEXT DEFAULT '',
+                video_id            TEXT DEFAULT '',
+                url                 TEXT NOT NULL UNIQUE,
+                title               TEXT DEFAULT '',
+                channel             TEXT DEFAULT '',
+                duration_seconds    INTEGER DEFAULT 0,
+                source_published_at TEXT DEFAULT '',
+                caption_count       INTEGER DEFAULT 0,
+                transcript_source   TEXT DEFAULT 'youtube',
+                status              TEXT DEFAULT 'available',
+                fail_reason         TEXT DEFAULT '',
+                used_at             TEXT,
+                last_checked_at     TEXT,
+                created_at          TEXT NOT NULL,
+                updated_at          TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS figure_quote_segments (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_candidate_id INTEGER,
+                group_name          TEXT NOT NULL,
+                figure_name         TEXT DEFAULT '',
+                topic               TEXT DEFAULT '',
+                source_url          TEXT NOT NULL,
+                source_title        TEXT DEFAULT '',
+                source_channel      TEXT DEFAULT '',
+                source_published_at TEXT DEFAULT '',
+                video_id            TEXT DEFAULT '',
+                start_seconds       REAL NOT NULL,
+                end_seconds         REAL NOT NULL,
+                quote_original      TEXT DEFAULT '',
+                quote_zh            TEXT DEFAULT '',
+                hook                TEXT DEFAULT '',
+                title               TEXT DEFAULT '',
+                summary             TEXT DEFAULT '',
+                bullets_json        TEXT DEFAULT '[]',
+                script_short        TEXT DEFAULT '',
+                script_long         TEXT DEFAULT '',
+                scene_type          TEXT DEFAULT 'default',
+                emotion             TEXT DEFAULT 'curiosity',
+                virality_score      INTEGER DEFAULT 0,
+                virality_reason     TEXT DEFAULT '',
+                transcript_window   TEXT DEFAULT '',
+                status              TEXT DEFAULT 'available',
+                used_at             TEXT,
+                created_at          TEXT NOT NULL,
+                updated_at          TEXT NOT NULL,
+                UNIQUE(source_url, start_seconds, end_seconds)
+            );
+
             INSERT OR IGNORE INTO settings (key, value) VALUES
                 ('schedule_hour',    '8'),
                 ('schedule_minute',  '0'),
                 ('platforms',        'youtube,instagram'),
                 ('skip_upload',      'false'),
                 ('dry_run',          'false'),
+                ('llm_provider',     'codex'),
+                ('llm_proxy_url',    'http://127.0.0.1:3458'),
+                ('llm_model',        'gpt-5.5'),
                 ('background_mode',  'screenshot'),
                 ('ai_video_mode',         ''),
                 ('telegram_bot_token',    ''),
@@ -103,10 +162,14 @@ def init_db():
                 ('autopilot_dry_run',          'true'),
                 ('autopilot_news_enabled',     'true'),
                 ('autopilot_trending_enabled', 'true'),
+                ('autopilot_figure_enabled',   'false'),
                 ('autopilot_news_strategy',    'generic'),
                 ('autopilot_news_profile',     'pet'),
                 ('autopilot_trending_strategy','entertainment'),
                 ('autopilot_trending_profile', 'pet'),
+                ('trending_profile_quote_analysis', 'yt'),
+                ('autopilot_figure_tech_profile', 'yt'),
+                ('autopilot_figure_entertainment_profile', 'pet'),
                 -- TikTok 從 default 拿掉：帳號 shadow ban、每多發一支
                 -- 加深 algorithm 的 bot fingerprint。需要 1 個月手機手發 +
                 -- 互動才能慢慢復健。要恢復就手動把 tiktok 加回去。
@@ -115,6 +178,10 @@ def init_db():
                 ('autopilot_platforms',        'youtube,instagram,facebook,threads,x,linkedin'),
                 ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days'),
                 ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft'),
+                ('autopilot_figure_tech_names', '黃仁勳 Jensen Huang,張忠謀 Morris Chang,Sam Altman,Satya Nadella,Lisa Su,Elon Musk AI,Mark Zuckerberg AI'),
+                ('autopilot_figure_entertainment_names', '蔡康永 訪談,小S 訪談,周杰倫 訪談,劉德華 訪談,林志玲 訪談,吳宗憲 訪談'),
+                ('autopilot_figure_tech_offset_hours', '8'),
+                ('autopilot_figure_entertainment_offset_hours', '10'),
                 -- ManyChat-funnel keywords: caption + first_comment 出現「留言『XX』」CTA。
                 -- ManyChat 那邊配對應的 keyword automation → DM 帶 UTM 連結到部落格。
                 -- tech 系（tech / tech_tutorial / finance）走 cta_kw_tech；
@@ -149,6 +216,16 @@ def init_db():
         nc_existing = {r[1] for r in conn.execute("PRAGMA table_info(news_cache)")}
         if "source_type" not in nc_existing:
             conn.execute("ALTER TABLE news_cache ADD COLUMN source_type TEXT DEFAULT 'google'")
+
+        fsc_existing = {r[1] for r in conn.execute("PRAGMA table_info(figure_source_candidates)")}
+        if fsc_existing and "transcript_source" not in fsc_existing:
+            conn.execute("ALTER TABLE figure_source_candidates ADD COLUMN transcript_source TEXT DEFAULT 'youtube'")
+        if fsc_existing and "source_published_at" not in fsc_existing:
+            conn.execute("ALTER TABLE figure_source_candidates ADD COLUMN source_published_at TEXT DEFAULT ''")
+
+        fqs_existing = {r[1] for r in conn.execute("PRAGMA table_info(figure_quote_segments)")}
+        if fqs_existing and "source_published_at" not in fqs_existing:
+            conn.execute("ALTER TABLE figure_quote_segments ADD COLUMN source_published_at TEXT DEFAULT ''")
 
 
 def _now():
@@ -298,6 +375,300 @@ def get_all_settings() -> dict:
     with get_conn() as conn:
         rows = conn.execute("SELECT key, value FROM settings").fetchall()
         return {r[0]: r[1] for r in rows}
+
+
+# ── figure source pool helpers ──────────────────────────────────────────────
+
+_FIGURE_SOURCE_FIELDS = {
+    "group_name",
+    "figure_name",
+    "topic",
+    "query",
+    "video_id",
+    "url",
+    "title",
+    "channel",
+    "duration_seconds",
+    "source_published_at",
+    "caption_count",
+    "transcript_source",
+    "status",
+    "fail_reason",
+}
+
+
+def upsert_figure_source_candidate(candidate: dict) -> int:
+    """Insert/update one source-video candidate for the figure autopilot pool."""
+    now = _now()
+    fields = {k: candidate.get(k) for k in _FIGURE_SOURCE_FIELDS if k in candidate}
+    fields["url"] = str(fields.get("url") or "").strip()
+    if not fields["url"]:
+        raise ValueError("figure source candidate requires url")
+    fields["group_name"] = str(fields.get("group_name") or "tech").strip()
+    fields["figure_name"] = str(fields.get("figure_name") or "").strip()
+    fields["topic"] = str(fields.get("topic") or "").strip()
+    fields["query"] = str(fields.get("query") or "").strip()
+    fields["video_id"] = str(fields.get("video_id") or "").strip()
+    fields["title"] = str(fields.get("title") or "").strip()
+    fields["channel"] = str(fields.get("channel") or "").strip()
+    fields["duration_seconds"] = int(fields.get("duration_seconds") or 0)
+    fields["source_published_at"] = str(fields.get("source_published_at") or "").strip()
+    fields["caption_count"] = int(fields.get("caption_count") or 0)
+    fields["transcript_source"] = str(fields.get("transcript_source") or "youtube").strip()
+    fields["status"] = str(fields.get("status") or "available").strip()
+    fields["fail_reason"] = str(fields.get("fail_reason") or "").strip()
+    fields["last_checked_at"] = now
+    fields["updated_at"] = now
+
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM figure_source_candidates WHERE url=?",
+            (fields["url"],),
+        ).fetchone()
+        if row:
+            keys = list(fields.keys())
+            sets = ", ".join(f"{k}=?" for k in keys)
+            conn.execute(
+                f"UPDATE figure_source_candidates SET {sets} WHERE id=?",
+                [*fields.values(), row["id"]],
+            )
+            return int(row["id"])
+
+        fields["created_at"] = now
+        cols = ", ".join(fields.keys())
+        qs = ", ".join("?" * len(fields))
+        cur = conn.execute(
+            f"INSERT INTO figure_source_candidates ({cols}) VALUES ({qs})",
+            list(fields.values()),
+        )
+        return int(cur.lastrowid)
+
+
+def mark_figure_source_used(url: str) -> None:
+    now = _now()
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE figure_source_candidates
+               SET status='used', used_at=?, updated_at=?
+               WHERE url=?""",
+            (now, now, url),
+        )
+
+
+def mark_figure_source_status(url: str, status: str, fail_reason: str = "") -> None:
+    now = _now()
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE figure_source_candidates
+               SET status=?, fail_reason=?, updated_at=?
+               WHERE url=?""",
+            (status, fail_reason[:500], now, url),
+        )
+
+
+def sync_figure_source_usage(used_urls: set[str]) -> int:
+    """Mark candidates as used when their URLs already appear in pipeline jobs."""
+    if not used_urls:
+        return 0
+    now = _now()
+    with get_conn() as conn:
+        count = 0
+        for url in used_urls:
+            cur = conn.execute(
+                """UPDATE figure_source_candidates
+                   SET status='used', used_at=COALESCE(used_at, ?), updated_at=?
+                   WHERE url=? AND status!='used'""",
+                (now, now, url),
+            )
+            count += cur.rowcount
+        return count
+
+
+def pick_figure_source_candidate(
+    group_name: str,
+    used_urls: set[str] | None = None,
+    min_caption_count: int = 8,
+) -> dict | None:
+    """Return the strongest unused source candidate for a figure group."""
+    used_urls = used_urls or set()
+    sync_figure_source_usage(used_urls)
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT *
+               FROM figure_source_candidates
+               WHERE group_name=?
+                 AND status='available'
+                 AND caption_count>=?
+               ORDER BY caption_count DESC, duration_seconds DESC, last_checked_at DESC
+               LIMIT 25""",
+            (group_name, min_caption_count),
+        ).fetchall()
+    for row in rows:
+        item = dict(row)
+        if item.get("url") not in used_urls:
+            return item
+    return None
+
+
+def list_figure_source_candidates(group_name: str | None = None, limit: int = 100) -> list[dict]:
+    with get_conn() as conn:
+        if group_name:
+            rows = conn.execute(
+                """SELECT * FROM figure_source_candidates
+                   WHERE group_name=?
+                   ORDER BY status, caption_count DESC, updated_at DESC
+                   LIMIT ?""",
+                (group_name, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM figure_source_candidates
+                   ORDER BY group_name, status, caption_count DESC, updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ── figure quote segment pool helpers ───────────────────────────────────────
+
+_FIGURE_SEGMENT_FIELDS = {
+    "source_candidate_id",
+    "group_name",
+    "figure_name",
+    "topic",
+    "source_url",
+    "source_title",
+    "source_channel",
+    "source_published_at",
+    "video_id",
+    "start_seconds",
+    "end_seconds",
+    "quote_original",
+    "quote_zh",
+    "hook",
+    "title",
+    "summary",
+    "bullets_json",
+    "script_short",
+    "script_long",
+    "scene_type",
+    "emotion",
+    "virality_score",
+    "virality_reason",
+    "transcript_window",
+    "status",
+}
+
+
+def upsert_figure_quote_segment(segment: dict) -> int:
+    """Insert/update one reusable quote segment extracted from a source video."""
+    now = _now()
+    fields = {k: segment.get(k) for k in _FIGURE_SEGMENT_FIELDS if k in segment}
+    fields["source_url"] = str(fields.get("source_url") or "").strip()
+    if not fields["source_url"]:
+        raise ValueError("figure quote segment requires source_url")
+    fields["group_name"] = str(fields.get("group_name") or "tech").strip()
+    fields["figure_name"] = str(fields.get("figure_name") or "").strip()
+    fields["topic"] = str(fields.get("topic") or "").strip()
+    fields["source_title"] = str(fields.get("source_title") or "").strip()
+    fields["source_channel"] = str(fields.get("source_channel") or "").strip()
+    fields["source_published_at"] = str(fields.get("source_published_at") or "").strip()
+    fields["video_id"] = str(fields.get("video_id") or "").strip()
+    fields["start_seconds"] = float(fields.get("start_seconds") or 0)
+    fields["end_seconds"] = float(fields.get("end_seconds") or 0)
+    if fields["end_seconds"] <= fields["start_seconds"]:
+        raise ValueError("figure quote segment end_seconds must be after start_seconds")
+    fields["quote_original"] = str(fields.get("quote_original") or "").strip()
+    fields["quote_zh"] = str(fields.get("quote_zh") or "").strip()
+    fields["hook"] = str(fields.get("hook") or "").strip()
+    fields["title"] = str(fields.get("title") or "").strip()
+    fields["summary"] = str(fields.get("summary") or "").strip()
+    bullets = fields.get("bullets_json")
+    if isinstance(bullets, (list, tuple)):
+        bullets = json.dumps(list(bullets), ensure_ascii=False)
+    fields["bullets_json"] = str(bullets or "[]")
+    fields["script_short"] = str(fields.get("script_short") or "").strip()
+    fields["script_long"] = str(fields.get("script_long") or "").strip()
+    fields["scene_type"] = str(fields.get("scene_type") or "default").strip()
+    fields["emotion"] = str(fields.get("emotion") or "curiosity").strip()
+    fields["virality_score"] = int(fields.get("virality_score") or 0)
+    fields["virality_reason"] = str(fields.get("virality_reason") or "").strip()
+    fields["transcript_window"] = str(fields.get("transcript_window") or "").strip()
+    fields["status"] = str(fields.get("status") or "available").strip()
+    if fields.get("source_candidate_id") is not None:
+        fields["source_candidate_id"] = int(fields.get("source_candidate_id") or 0)
+    fields["updated_at"] = now
+
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT id FROM figure_quote_segments
+               WHERE source_url=? AND start_seconds=? AND end_seconds=?""",
+            (fields["source_url"], fields["start_seconds"], fields["end_seconds"]),
+        ).fetchone()
+        if row:
+            keys = list(fields.keys())
+            sets = ", ".join(f"{k}=?" for k in keys)
+            conn.execute(
+                f"UPDATE figure_quote_segments SET {sets} WHERE id=?",
+                [*fields.values(), row["id"]],
+            )
+            return int(row["id"])
+
+        fields["created_at"] = now
+        cols = ", ".join(fields.keys())
+        qs = ", ".join("?" * len(fields))
+        cur = conn.execute(
+            f"INSERT INTO figure_quote_segments ({cols}) VALUES ({qs})",
+            list(fields.values()),
+        )
+        return int(cur.lastrowid)
+
+
+def mark_figure_quote_segment_used(segment_id: int) -> None:
+    now = _now()
+    with get_conn() as conn:
+        conn.execute(
+            """UPDATE figure_quote_segments
+               SET status='used', used_at=?, updated_at=?
+               WHERE id=?""",
+            (now, now, segment_id),
+        )
+
+
+def pick_figure_quote_segment(group_name: str, min_score: int = 0) -> dict | None:
+    with get_conn() as conn:
+        row = conn.execute(
+            """SELECT *
+               FROM figure_quote_segments
+               WHERE group_name=?
+                 AND status='available'
+                 AND virality_score>=?
+               ORDER BY virality_score DESC, source_published_at DESC, updated_at DESC
+               LIMIT 1""",
+            (group_name, min_score),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def list_figure_quote_segments(group_name: str | None = None, limit: int = 100) -> list[dict]:
+    with get_conn() as conn:
+        if group_name:
+            rows = conn.execute(
+                """SELECT * FROM figure_quote_segments
+                   WHERE group_name=?
+                   ORDER BY status, virality_score DESC, source_published_at DESC, updated_at DESC
+                   LIMIT ?""",
+                (group_name, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM figure_quote_segments
+                   ORDER BY group_name, status, virality_score DESC, source_published_at DESC, updated_at DESC
+                   LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        return [dict(r) for r in rows]
 
 
 # ── video_stats helpers ─────────────────────────────────────────────────────

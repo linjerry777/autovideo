@@ -21,6 +21,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 _STRATEGY_LABEL = {
     "tech":          "科技",
+    "tech_tutorial": "科技教學",
+    "quote_analysis": "語錄解析",
+    "figure_tech": "科技大咖",
+    "figure_entertainment": "娛樂咖",
     "entertainment": "娛樂",
     "finance":       "財經",
     "pet":           "寵物",

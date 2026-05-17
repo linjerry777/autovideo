@@ -399,6 +399,7 @@ def main():
 
     data  = json.loads(NEWS_FILE.read_text(encoding="utf-8"))
     items = data["items"]
+    content_type = (data.get("content_type") or "").lower()
 
     SEG_DIR.mkdir(parents=True, exist_ok=True)
     BROLL_DIR = PIPE_DIR / "broll"
@@ -444,9 +445,11 @@ def main():
 
     # ── 組合最終清單（片頭 + 片段 + 片尾）───────────────────────────
     final_segs: list[Path] = []
-    if INTRO_PATH.exists():
+    if INTRO_PATH.exists() and content_type != "figure_quote":
         print(f"  🎬 加入片頭：{INTRO_PATH.name}")
         final_segs.append(INTRO_PATH)
+    elif content_type == "figure_quote":
+        print("  ℹ️  figure_quote：跳過 Doro 片頭")
     final_segs.extend(seg_files)
     if OUTRO_PATH.exists():
         print(f"  🎬 加入片尾：{OUTRO_PATH.name}")

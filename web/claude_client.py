@@ -73,6 +73,18 @@ def _get_llm_config() -> tuple[str, str]:
     return proxy_url, model
 
 
+def get_llm_status() -> dict:
+    """Expose the effective provider/model/proxy for API/UI diagnostics."""
+    proxy_url, model = _get_llm_config()
+    return {
+        "provider": _provider_from_proxy(proxy_url),
+        "configured_provider": _default_provider(),
+        "proxy_url": proxy_url.rstrip("/"),
+        "model": model,
+        "image_model": os.getenv("CODEX_IMAGE_MODEL") or os.getenv("OPENAI_IMAGE_MODEL") or _DEFAULT_CODEX_IMAGE_MODEL,
+    }
+
+
 def call_claude(prompt: str, timeout: int = 180) -> tuple[str, dict]:
     """回傳 (content, usage)，usage = {prompt_tokens, completion_tokens, total_tokens}"""
     proxy_url, model = _get_llm_config()
@@ -132,6 +144,8 @@ _STRATEGY_PRESETS = {
     "tech_tutorial": {"script_len": "80~110 字",
                       "hook_style": "AI 圈友口吻分享實用 tips（「我昨天才發現...」「這招我實測有效」），"
                                     "每則必須帶 how-to 或 why-you-care 結構，不是新聞播報"},
+    "quote_analysis": {"script_len": "70~100 字",
+                       "hook_style": "名人一句話 + 反直覺解讀 + AI/vibe coding 行動提醒，像觀點短評，不是新聞播報"},
     "entertainment": {"script_len": "30~50 字",
                       "hook_style": "情緒衝擊（驚喜/反轉/搞笑），開頭必須在 1 秒內抓住注意力"},
     "finance":       {"script_len": "80~110 字",
@@ -145,7 +159,7 @@ def enrich_news_items(raw_items: list[dict], topic: str | None = None,
                      strategy: str | None = None) -> list[dict]:
     """
     raw_items: [{title, summary, url, source}, ...]
-    strategy:  tech | entertainment | finance | pet   (None → 預設科技風格)
+    strategy:  tech | tech_tutorial | quote_analysis | entertainment | finance | pet   (None → 預設科技風格)
     回傳: [{hook, title, summary, script, scene_type, source_url, source_name}, ...]
     """
     strat_key = (strategy or "tech").lower()
@@ -186,6 +200,38 @@ CTA 語氣：驅動**關注**（權重 8×），不是評論。
 
 承接詞庫：第二件／第三件／再來這個／接著這則／最後這則／另外／還有…
 **禁止**承接詞用「最後這招」「第二招」（硬套教學化讓非技巧類新聞變怪）
+"""
+
+    quote_override = ""
+    if strat_key == "quote_analysis":
+        quote_override = """
+
+⚠️ 此次生成為 **quote_analysis 名人語錄解析版** — 覆寫上方 hook 規則：
+定位：不是快訊播報，也不是雞湯；要像「拿一個名人/創辦人/AI 領袖的觀點，拆成一個可執行的工作提醒」。
+
+素材規則：
+- 若標題/摘要有逐字引言，可以引用那句話，但要短，不要整段照抄。
+- 若素材沒有逐字引言，禁止硬編名人原話；改寫成「某某的觀點可以濃縮成：……」或「這件事背後其實在說：……」。
+- 優先選 AI、科技、創業、產品、投資、vibe coding、工作方式相關的人物或公司觀點。
+
+Hook 範例方向：
+  1. 「這句話不是雞湯」
+  2. 「他其實在提醒你」
+  3. 「AI 時代更可怕」
+  4. 「別只聽表面」
+
+Script 結構：
+1. 第一句：點出人物/觀點，直接抓注意力。
+2. 第二句：反直覺解讀，說明「表面是 X，其實是 Y」。
+3. 第三句：落到 AI/vibe coding/工作流的一個行動提醒。
+
+Bullets 要像畫面上的三段式金句，例如：
+- 「不是努力，是槓桿」
+- 「把想法變流程」
+- 「會提問的人先贏」
+
+scene_type 優先用 robot / warning / trophy / default；emotion 優先用 curiosity 或 surprise。
+CTA 語氣：鼓勵追蹤觀點拆解，不要叫觀眾吵架留言。
 """
 
     lines = "\n".join([
@@ -230,7 +276,7 @@ hook 必須是 **中文區短影音 hook 格式**（抖音前 3 秒完播權重 
   6. 過程分享（台灣偏好）「我看了一下... 發現...」「點開那一刻我震驚了」
 **禁止陳述句**（例：「Token 稅爭議爆發」「JYP 又出王牌」—這些是結果不是鉤子）。
 hook_variants 恰好 3 個，從不同模板挑。
-{tutorial_override}
+{tutorial_override}{quote_override}
 bullets 是 3 條**新聞卡片重點**（≤15字/條），會被放在 Remotion 影片裡當文字 overlay。
 - 每條要是獨立成立的短金句，不是半句話
 - 避免重複 hook/title 的內容；應該是「延伸 / 數據 / 結論」三個不同面向

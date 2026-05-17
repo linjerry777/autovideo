@@ -50,7 +50,7 @@ class TriggerRequest(BaseModel):
     selected_news:      list[dict] | None = None   # 前端預選的新聞，有則跳過爬蟲
     selected_cache_ids: list[int] | None  = None   # 對應快取 ID
     account_profile:    str | None        = None   # 覆蓋預設 Upload-Post profile
-    strategy:           str | None        = None   # tech|entertainment|finance|pet
+    strategy:           str | None        = None   # tech|tech_tutorial|quote_analysis|entertainment|finance|pet
     autopilot:          bool              = False  # 略過 review pause + 自動發布
 
 
@@ -85,6 +85,9 @@ def trigger(req: TriggerRequest):
 _STRATEGY_LABEL = {
     "tech":          "科技",
     "tech_tutorial": "科技教學",
+    "quote_analysis": "名人語錄解析",
+    "figure_tech": "科技大咖解析",
+    "figure_entertainment": "娛樂咖解析",
     "entertainment": "娛樂",
     "finance":       "財經",
     "pet":           "寵物",
@@ -94,6 +97,8 @@ _STRATEGY_LABEL = {
 _TRIGGERED_LABEL = {
     "autopilot_news":     ("📰", "新聞"),
     "autopilot_trending": ("🔥", "娛樂"),
+    "autopilot_figure_tech": ("🧠", "科技大咖"),
+    "autopilot_figure_entertainment": ("🎬", "娛樂咖"),
     "schedule":           ("⏰", "排程"),
     "manual":             ("✋", "手動"),
 }
@@ -417,6 +422,9 @@ _HASHTAGS = {
     "tiktok": {
         "tech":          "#fyp #AI新聞 #科技新聞 #AI #AItools #Doro日報",
         "tech_tutorial": "#fyp #AI教學 #AI工具 #AItips #學AI #Doro日報",
+        "quote_analysis": "#fyp #名人語錄 #AI思維 #創業思維 #vibecoding #Doro日報",
+        "figure_tech": "#fyp #科技大咖 #黃仁勳 #AI思維 #創業思維 #Doro日報",
+        "figure_entertainment": "#fyp #娛樂咖 #名人金句 #人生金句 #台灣娛樂 #Doro日報",
         "entertainment": "#TikTokTaiwan #台灣娛樂 #娛樂懶人包 #熱搜 #Doro日報 #fyp",
         "finance":       "#fyp #台股 #財經新聞 #投資 #股市 #Doro日報",
         "pet":           "#fyp #萌寵 #寵物日常 #貓狗 #療癒 #Doro日報",
@@ -427,6 +435,9 @@ _HASHTAGS = {
         # Over-tagging (25+) now reads as spam signal.
         "tech":          "#AI新聞 #科技新知 #AI工具 #Doro日報 #台灣科技",
         "tech_tutorial": "#AI教學 #AI工具 #AItips #學AI #Doro日報",
+        "quote_analysis": "#名人語錄 #AI思維 #創業思維 #vibecoding #Doro日報",
+        "figure_tech": "#科技大咖 #黃仁勳 #AI思維 #創業思維 #Doro日報",
+        "figure_entertainment": "#娛樂咖 #名人金句 #人生金句 #台灣娛樂 #Doro日報",
         "entertainment": "#娛樂懶人包 #台灣熱搜 #追劇 #Doro日報 #娛樂圈",
         "finance":       "#財經新聞 #台股 #投資理財 #Doro日報 #股市",
         "pet":           "#萌寵日常 #寵物 #療癒 #Doro日報 #毛孩",
@@ -435,6 +446,9 @@ _HASHTAGS = {
     "facebook_body": {  # inline at end of description, 5-8 tags is FB norm
         "tech":          "#AI新聞 #科技新知 #AI工具 #台灣科技 #Doro日報",
         "tech_tutorial": "#AI教學 #AI工具 #AItips #學AI #Doro日報",
+        "quote_analysis": "#名人語錄 #AI思維 #創業思維 #vibecoding #Doro日報",
+        "figure_tech": "#科技大咖 #AI思維 #創業思維 #黃仁勳 #Doro日報",
+        "figure_entertainment": "#娛樂咖 #名人金句 #台灣娛樂 #人生金句 #Doro日報",
         "entertainment": "#娛樂新聞 #台灣娛樂 #熱搜話題 #追劇 #Doro日報",
         "finance":       "#財經 #投資理財 #台股 #股市 #Doro日報",
         "pet":           "#萌寵 #寵物日常 #療癒 #Doro日報",
@@ -443,6 +457,9 @@ _HASHTAGS = {
     "threads": {  # 1-2 topic tags max
         "tech":          "#AI新聞 #Doro日報",
         "tech_tutorial": "#AI教學 #Doro日報",
+        "quote_analysis": "#AI思維 #Doro日報",
+        "figure_tech": "#科技大咖 #Doro日報",
+        "figure_entertainment": "#娛樂咖 #Doro日報",
         "entertainment": "#娛樂懶人包 #Doro日報",
         "finance":       "#財經 #Doro日報",
         "pet":           "#萌寵 #Doro日報",
@@ -451,6 +468,9 @@ _HASHTAGS = {
     "x": {  # 2-3 tags, front of post style
         "tech":          "#AI #科技 #AINews",
         "tech_tutorial": "#AI #AItips #學AI",
+        "quote_analysis": "#AI #名人語錄 #vibecoding",
+        "figure_tech": "#AI #科技大咖 #黃仁勳",
+        "figure_entertainment": "#娛樂 #名人金句",
         "entertainment": "#娛樂 #熱搜",
         "finance":       "#台股 #投資",
         "pet":           "#萌寵 #寵物",
@@ -478,6 +498,11 @@ _HASHTAG_POOLS = {
             "#AI技巧", "#ChatGPT教學", "#Claude教學", "#AI實用",
             "#AI入門", "#AI應用", "#AI 必學", "#AI技能",
         ],
+        "quote_analysis": [
+            "#名人語錄", "#AI思維", "#創業思維", "#vibecoding", "#Doro日報",
+            "#科技觀點", "#產品思維", "#工作流", "#AI時代", "#高手思維",
+            "#創辦人思維", "#每日觀點", "#AI工作術",
+        ],
         "entertainment": [
             "#娛樂懶人包", "#台灣熱搜", "#追劇", "#Doro日報", "#娛樂圈",
             "#熱門話題", "#追星", "#熱搜", "#娛樂新聞", "#台灣娛樂",
@@ -504,6 +529,10 @@ _HASHTAG_POOLS = {
             "#ChatGPT", "#Claude", "#AItools", "#AI觀察", "#人工智慧",
             "#科技新聞",
         ],
+        "quote_analysis": [
+            "#名人語錄", "#AI思維", "#創業思維", "#vibecoding", "#Doro日報",
+            "#科技觀點", "#產品思維", "#工作流", "#AI時代",
+        ],
         "entertainment": [
             "#娛樂新聞", "#台灣娛樂", "#熱搜話題", "#追劇", "#Doro日報",
             "#明星", "#影視", "#台灣熱搜", "#爆紅",
@@ -518,6 +547,10 @@ _HASHTAG_POOLS = {
         "tech": [
             "#AI新聞", "#科技新聞", "#AI", "#AItools", "#Anthropic",
             "#人工智慧", "#科技焦點", "#AI觀察", "#AI日報",
+        ],
+        "quote_analysis": [
+            "#名人語錄", "#AI思維", "#創業思維", "#vibecoding",
+            "#科技觀點", "#產品思維", "#工作流", "#AI時代",
         ],
         "entertainment": [
             "#台灣娛樂", "#娛樂懶人包", "#熱搜", "#TikTokTaiwan",
@@ -557,6 +590,9 @@ def _resolve_tiktok_hashline(strategy: str, seed: int) -> str:
 _YOUTUBE_TAGS_BY_STRATEGY = {
     "tech":          "AI新聞,ChatGPT,Claude,Anthropic,AI工具,人工智慧,科技新聞,AI代理,生成式AI,Doro日報,每日AI",
     "tech_tutorial": "AI教學,AI工具,AItips,ChatGPT教學,Claude教學,AI實用,AI技巧,人工智慧應用,Doro日報,學AI",
+    "quote_analysis": "名人語錄,AI思維,創業思維,vibecoding,科技觀點,產品思維,AI工作術,創辦人思維,Doro日報,每日觀點",
+    "figure_tech": "黃仁勳,張忠謀,科技大咖,AI思維,創業思維,科技觀點,產品思維,AI工作術,Doro日報,名人金句",
+    "figure_entertainment": "娛樂咖,名人金句,人生金句,台灣娛樂,訪談精華,明星訪談,娛樂觀點,Doro日報",
     "entertainment": "台灣娛樂,娛樂新聞,熱門話題,YT熱門,電競,電影預告,實況,娛樂懶人包,Doro日報,每日娛樂",
     "finance":       "台股,財經新聞,投資,股市,理財,美股,ETF,財經懶人包,Doro日報,每日財經",
     "pet":           "萌寵,寵物日常,貓狗,療癒,可愛動物,pet,寵物頻道,Doro日報",
@@ -572,6 +608,9 @@ _YOUTUBE_TAGS_BY_STRATEGY = {
 _IS_AIGC_BY_STRATEGY = {
     "tech":          True,
     "tech_tutorial": True,
+    "quote_analysis": True,
+    "figure_tech": True,
+    "figure_entertainment": False,
     "generic":       True,
     "finance":       True,
     "entertainment": False,
@@ -582,6 +621,9 @@ _IS_AIGC_BY_STRATEGY = {
 _TITLE_FORMULA = {
     "tech":          "{hook}｜{n} 則 AI 大事一次看完",
     "tech_tutorial": "{hook}｜{n} 招 AI 技巧學起來",
+    "quote_analysis": "{hook}｜一句話拆解 AI 時代的工作方式",
+    "figure_tech": "{hook}｜科技大咖原片解析",
+    "figure_entertainment": "{hook}｜娛樂咖原片解析",
     "entertainment": "{hook}｜今天台灣 {n} 件熱搜一次看",
     "finance":       "{hook}｜{n} 則市場焦點",
     "pet":           "{hook}｜{n} 個萌寵時刻",
@@ -594,6 +636,9 @@ _TITLE_FORMULA = {
 _SIGNOFF = {
     "tech":          "追蹤 @_doro1998ai 每天一則 AI 懶人包 🐾",
     "tech_tutorial": "想學更多 AI 技巧？追蹤 @_doro1998ai 每天教你一招 🐾",
+    "quote_analysis": "想看更多 AI 思維拆解？追蹤 @_doro1998ai 每天一個觀點 🐾",
+    "figure_tech": "想看更多科技大咖原片解析？追蹤 @_doro1998ai 每天拆一段 🐾",
+    "figure_entertainment": "想看更多娛樂咖原片解析？追蹤 @_doro1998 每天拆一段 🐾",
     "entertainment": "追蹤 @_doro1998 每天一則娛樂懶人包 🐾",
     "finance":       "追蹤 @_doro1998ai 每天一則財經懶人包 🐾",
     "pet":           "追蹤 @_doro1998 每天一則萌寵日常 🐾",
@@ -615,7 +660,10 @@ def _compose_title(hooks: list[str], items: list[dict], strategy: str) -> str:
 _STRATEGY_CTA_GROUP = {
     "tech":          "tech",
     "tech_tutorial": "tech",
+    "quote_analysis": "tech",
+    "figure_tech": "tech",
     "finance":       "tech",
+    "figure_entertainment": "entertain",
     "entertainment": "entertain",
     "pet":           "entertain",
     "generic":       "entertain",
@@ -678,6 +726,25 @@ _CTA_PHRASING = {
     "entertain": ('完整版懶人包', '完整版娛樂懶人包', '完整版心得'),
 }
 
+# 6-keyword Hub Flow (對齊 doro-palace blog + open-carrusel):
+# tech 系（_doro1998ai）的 CTA 從 6 個 kw 中輪流抽，對接 ManyChat 6 個 keyword
+# automation → DM 帶不同 UTM 連結到對應 blog post。
+#
+# 只 tech group 用 rotate；entertain group 仍走 DB setting `cta_kw_entertain`
+# （娛樂線目前沒有對應 funnel 末端）。
+#
+# Seeded by _job_seed → 同一個 job 永遠抽到同一個 kw（caption 與 IG first_comment
+# 完全一致），不同 job 之間自然均勻分布。
+#
+# Mapping at ManyChat side (for reference, NOT in caption):
+#   必掌 → claude-not-just-chatgpt-7-tips
+#   開掛 → claude-code-5-power-plugins
+#   五訣 → claude-code-5-power-plugins
+#   智囊 → claude-not-just-chatgpt-7-tips
+#   振頻 → claude-code-vs-typing
+#   日報 → claude-code-6-commands-i-use-daily
+_TECH_CTA_KEYWORDS = ['必掌', '開掛', '五訣', '智囊', '振頻', '日報']
+
 
 def _job_seed(strategy: str, items: list[dict]) -> int:
     """Deterministic seed so re-running the same job produces identical caption."""
@@ -693,17 +760,27 @@ def _pick(pool: list, seed: int, salt: int = 0) -> str:
     return pool[(seed + salt) % len(pool)]
 
 
-def _strategy_cta_keyword(strategy: str) -> str:
-    """Return the ManyChat keyword for this strategy, from DB settings."""
+def _strategy_cta_keyword(strategy: str, seed: int = 0) -> str:
+    """Return the ManyChat keyword for this strategy.
+
+    tech group → rotate deterministically through `_TECH_CTA_KEYWORDS`
+        (6-kw Hub Flow on ManyChat side, each kw → its own blog DM).
+    entertain group → DB setting `cta_kw_entertain` (single kw for now).
+    """
     group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
+    if group == "tech":
+        # Rotate via seed (same hash that drives the rest of the caption pool).
+        # `salt=23` keeps the rotation independent from template/noun/save picks
+        # so the kw doesn't always pair with the same template.
+        return _pick(_TECH_CTA_KEYWORDS, seed, salt=23) or _TECH_CTA_KEYWORDS[-1]
     setting_key = f"cta_kw_{group}"
-    default = "今日科技" if group == "tech" else "今日娛樂"
+    default = "今日娛樂"
     return get_setting(setting_key, default).strip() or default
 
 
 def _strategy_cta_line(strategy: str, seed: int = 0) -> str:
     """One-line CTA, randomized per job from `_CTA_TEMPLATE_POOL`."""
-    kw = _strategy_cta_keyword(strategy)
+    kw = _strategy_cta_keyword(strategy, seed=seed)
     group = _STRATEGY_CTA_GROUP.get(strategy.lower(), "entertain")
     noun = _pick(list(_CTA_PHRASING.get(group, _CTA_PHRASING["entertain"])), seed, salt=7)
     template = _pick(_CTA_TEMPLATE_POOL, seed, salt=13)
@@ -749,6 +826,9 @@ def _compose_description(items: list[dict], strategy: str, signoff: bool = True)
 _FB_PAGE_BY_STRATEGY = {
     "tech":          "1100141579843223",   # 雙層甜甜圈
     "tech_tutorial": "1100141579843223",   # 雙層甜甜圈（同 tech）
+    "quote_analysis": "1100141579843223",  # 名人語錄解析走科技帳號
+    "figure_tech": "1100141579843223",     # 科技大咖原片解析
+    "figure_entertainment": "1012830001921459",  # 娛樂咖原片解析
     "entertainment": "1012830001921459",   # Doro / Mascot
     "pet":           "1012830001921459",   # same Mascot page for now (swap if 奶烙 gets own page)
     "finance":       "1100141579843223",   # fallback to tech page (finance strategy dropped)

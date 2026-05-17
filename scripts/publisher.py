@@ -47,7 +47,10 @@ GOLDEN_HOUR_FIRST = {
 _STRATEGY_GOLDEN_OFFSET = {
     "tech":          0,
     "tech_tutorial": 0,
+    "quote_analysis": 0,
+    "figure_tech":   0,
     "finance":       0,
+    "figure_entertainment": 4,
     "entertainment": 4,
     "pet":           4,
     "generic":       4,
@@ -86,6 +89,9 @@ PROFILE   = os.getenv("UPLOAD_POST_PROFILE", "default")   # 在 .env 設定你�
 
 _HASHTAGS_BY_STRATEGY = {
     "tech":          "#AI快訊 #人工智慧 #科技新聞 #AINews #TechNews",
+    "quote_analysis": "#名人語錄 #AI思維 #創業思維 #vibecoding #科技觀點",
+    "figure_tech":   "#科技大咖 #黃仁勳 #AI思維 #創業思維 #名人金句",
+    "figure_entertainment": "#娛樂咖 #名人金句 #人生金句 #台灣娛樂 #訪談精華",
     "entertainment": "#娛樂 #明星 #藝人 #熱門話題 #八卦",
     "finance":       "#股市 #投資 #財經 #台股 #理財",
     "pet":           "#萌寵 #貓狗 #寵物 #可愛動物 #療癒",
@@ -262,6 +268,23 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
         """Return platform-specific meta dict (never None)."""
         return pmeta.get(platform, {})
 
+    def _youtube_language(value: str | None, fallback: str = "zh-TW") -> str:
+        """Upload-Post expects locale-region format like zh-TW or en-US."""
+        aliases = {
+            "zh": "zh-TW",
+            "zh-Hant": "zh-TW",
+            "zh-TW": "zh-TW",
+            "zh-Hans": "zh-CN",
+            "zh-CN": "zh-CN",
+            "en": "en-US",
+            "en-US": "en-US",
+            "ja": "ja-JP",
+            "ja-JP": "ja-JP",
+            "ko": "ko-KR",
+            "ko-KR": "ko-KR",
+        }
+        return aliases.get(str(value or "").strip(), fallback)
+
     kwargs = dict(async_upload=True, description=fallback_desc)
     kwargs.update(schedule_kwargs)   # scheduled_date + timezone if set
 
@@ -281,8 +304,8 @@ def publish(job_key: str, platforms: list[str], dry_run: bool = False):
             kwargs["tags"] = ["AI", "人工智慧", "科技新聞", "AINews", "TechNews"]
         kwargs["privacyStatus"]            = yt.get("privacyStatus", "public")
         kwargs["categoryId"]               = yt.get("categoryId", "22")
-        kwargs["defaultLanguage"]          = yt.get("defaultLanguage", "zh-Hant")
-        kwargs["defaultAudioLanguage"]     = yt.get("defaultAudioLanguage", "zh-Hant")
+        kwargs["defaultLanguage"]          = _youtube_language(yt.get("defaultLanguage"))
+        kwargs["defaultAudioLanguage"]     = _youtube_language(yt.get("defaultAudioLanguage"))
         kwargs["containsSyntheticMedia"]   = yt.get("containsSyntheticMedia", True)
         kwargs["selfDeclaredMadeForKids"]  = yt.get("selfDeclaredMadeForKids", False)
         kwargs["embeddable"]               = yt.get("embeddable", True)

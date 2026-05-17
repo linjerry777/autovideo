@@ -278,7 +278,7 @@ class TelegramBot:
               "/run AI科技 — 指定主題\n\n"
               "<b>趨勢模式</b>（YouTube TW 熱門第 1 則）\n"
               "/trending — 預設娛樂策略\n"
-              "/trending tech — 指定策略 (tech|entertainment|finance|pet)\n\n"
+              "/trending tech — 指定策略 (tech|tech_tutorial|quote_analysis|entertainment|finance|pet)\n\n"
               "<b>管理</b>\n"
               "/status — 查看目前狀態\n"
               "/cancel — 取消執行中的 job\n"
@@ -324,8 +324,8 @@ class TelegramBot:
             return
 
         strategy = (strategy or "entertainment").lower()
-        if strategy not in ("tech", "entertainment", "finance", "pet"):
-            _send(self.token, chat, f"❌ 策略必須是 tech/entertainment/finance/pet 之一（你給的：{strategy}）")
+        if strategy not in ("tech", "tech_tutorial", "quote_analysis", "entertainment", "finance", "pet"):
+            _send(self.token, chat, f"❌ 策略必須是 tech/tech_tutorial/quote_analysis/entertainment/finance/pet 之一（你給的：{strategy}）")
             return
 
         _send(self.token, chat, f"📡 抓 YouTube TW 熱門 #1…")

@@ -31,8 +31,8 @@ NEWS_FILE = PIPE_DIR / "news.json"
 DEFAULT_KEYWORD = "AI artificial intelligence technology"
 
 # ── Claude Proxy 設定 ────────────────────────────────────────────────
-_PROXY_URL = os.getenv("CLAUDE_PROXY_URL", "http://localhost:3456")
-_LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-6")
+sys.path.insert(0, str(BASE_DIR))
+from web.claude_client import call_claude, get_llm_status
 
 
 def _google_news_url(keyword: str, days: int = 3) -> str:
@@ -44,17 +44,8 @@ def _google_news_url(keyword: str, days: int = 3) -> str:
 
 def call_llm(prompt: str) -> str:
     """呼叫 Claude proxy（OpenAI-compatible），回傳純文字"""
-    r = requests.post(
-        f"{_PROXY_URL}/v1/chat/completions",
-        json={
-            "model": _LLM_MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 2048,
-        },
-        timeout=180,
-    )
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"].strip()
+    text, _usage = call_claude(prompt, timeout=180)
+    return text
 
 
 import time as _time
@@ -202,7 +193,8 @@ Long 適合 YouTube/X/Pinterest/LinkedIn（有鋪陳、有論點）。
 
 請直接回傳只有 3 則的 JSON 陣列，不要加任何其他文字或 markdown。"""
 
-    print(f"  呼叫 Claude proxy ({_LLM_MODEL}) 整理新聞...")
+    llm = get_llm_status()
+    print(f"  呼叫 LLM ({llm['provider']}/{llm['model']}) 整理新聞...")
     raw = call_llm(prompt)
 
     # 清除可能的 markdown 包裹

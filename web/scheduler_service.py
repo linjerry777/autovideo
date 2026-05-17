@@ -2,11 +2,12 @@
 web/scheduler_service.py — APScheduler (BackgroundScheduler)
 
 Daily autopilot (opt-in via `autopilot_enabled` setting):
-  fires at (schedule_hour, schedule_minute), runs two back-to-back jobs:
+  fires scheduled jobs:
     1. News autopilot (strategy=generic)
     2. Trending autopilot (strategy=entertainment, single YT TW top trend)
+    3. Figure quote autopilot (tech + entertainment source-video analysis)
 
-Both go through job_runner.trigger_job(autopilot=True). The queue inside
+All go through job_runner.trigger_job(autopilot=True). The queue inside
 trigger_job sequences them so only one runs at a time.
 
 Safety: `autopilot_dry_run` defaults to true — publisher prints preview only.
@@ -206,6 +207,38 @@ def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) ->
     )
 
 
+def _fire_figure_autopilot(today: str, group: str, platforms: list[str], dry_run: bool) -> None:
+    """Create one source-video quote-analysis job for tech or entertainment."""
+    if group == "tech":
+        strategy = "figure_tech"
+        profile = get_setting("autopilot_figure_tech_profile", "yt") or "yt"
+        label = "科技大咖"
+    else:
+        strategy = "figure_entertainment"
+        profile = get_setting("autopilot_figure_entertainment_profile", "pet") or "pet"
+        label = "娛樂咖"
+
+    job_id = create_job(
+        date=today,
+        triggered_by=f"autopilot_figure_{group}",
+        topic=label,
+        platforms=",".join(platforms),
+    )
+    log.info("[autopilot] figure job %s group=%s strategy=%s profile=%s dry_run=%s",
+             job_id, group, strategy, profile, dry_run)
+    job_runner.trigger_job(
+        job_id=job_id,
+        date=today,
+        topic=label,
+        platforms=platforms,
+        dry_run=dry_run,
+        pre_news=None,
+        account_profile=profile,
+        strategy=strategy,
+        autopilot=True,
+    )
+
+
 def _read_autopilot_runtime_settings() -> tuple[str, list[str], bool]:
     """Common (date, platforms, dry_run) used by both fire functions."""
     today     = date_cls.today().isoformat()
@@ -242,6 +275,19 @@ def _trending_cron_job() -> None:
     _fire_trending_autopilot(today, platforms, dry_run)
 
 
+def _figure_tech_cron_job() -> None:
+    if not _bool_setting("autopilot_enabled", False):
+        return
+    if not _bool_setting("autopilot_figure_enabled", True):
+        return
+    today, platforms, dry_run = _read_autopilot_runtime_settings()
+    _fire_figure_autopilot(today, "tech", platforms, dry_run)
+
+
+def _figure_entertainment_cron_job() -> None:
+    log.info("[autopilot] figure entertainment lane disabled")
+
+
 def _daily_job() -> None:
     """Manual `run_now()` and legacy callers — fires both back-to-back.
 
@@ -257,6 +303,8 @@ def _daily_job() -> None:
         _fire_news_autopilot(today, platforms, dry_run)
     if _bool_setting("autopilot_trending_enabled", True):
         _fire_trending_autopilot(today, platforms, dry_run)
+    if _bool_setting("autopilot_figure_enabled", True):
+        _fire_figure_autopilot(today, "tech", platforms, dry_run)
 
 
 def _legacy_daily() -> None:
@@ -270,23 +318,44 @@ def _legacy_daily() -> None:
                            platforms=platforms, dry_run=dry_run)
 
 
-def _trending_offset_hours() -> int:
+def _offset_hours_setting(key: str, default: int) -> int:
     try:
-        return max(0, min(20, int(get_setting("autopilot_trending_offset_hours", "4"))))
+        return max(0, min(23, int(get_setting(key, str(default)))))
     except (TypeError, ValueError):
-        return 4
+        return default
+
+
+def _trending_offset_hours() -> int:
+    return _offset_hours_setting("autopilot_trending_offset_hours", 4)
+
+
+def _figure_tech_offset_hours() -> int:
+    return _offset_hours_setting("autopilot_figure_tech_offset_hours", 8)
+
+
+def _figure_entertainment_offset_hours() -> int:
+    return _offset_hours_setting("autopilot_figure_entertainment_offset_hours", 10)
 
 
 def start(hour: int = 8, minute: int = 0) -> None:
-    offset = _trending_offset_hours()
-    trending_hour = (hour + offset) % 24
+    trending_offset = _trending_offset_hours()
+    figure_tech_offset = _figure_tech_offset_hours()
+    trending_hour = (hour + trending_offset) % 24
+    figure_tech_hour = (hour + figure_tech_offset) % 24
     # News at schedule_hour, trending offset hours later (default +4h)
     _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute,
                        id="autopilot_news", replace_existing=True)
     _scheduler.add_job(_trending_cron_job, "cron", hour=trending_hour, minute=minute,
                        id="autopilot_trending", replace_existing=True)
-    log.info("[autopilot] schedule registered news=%02d:%02d trending=%02d:%02d (+%dh)",
-             hour, minute, trending_hour, minute, offset)
+    _scheduler.add_job(_figure_tech_cron_job, "cron", hour=figure_tech_hour, minute=minute,
+                       id="autopilot_figure_tech", replace_existing=True)
+    log.info(
+        "[autopilot] schedule registered news=%02d:%02d trending=%02d:%02d (+%dh) "
+        "figure_tech=%02d:%02d (+%dh)",
+        hour, minute,
+        trending_hour, minute, trending_offset,
+        figure_tech_hour, minute, figure_tech_offset,
+    )
     if not _scheduler.running:
         _scheduler.start()
 
@@ -294,14 +363,25 @@ def start(hour: int = 8, minute: int = 0) -> None:
 def update_schedule(hour: int, minute: int) -> None:
     if not _scheduler.running:
         return
-    offset = _trending_offset_hours()
-    trending_hour = (hour + offset) % 24
-    _scheduler.reschedule_job("autopilot_news", trigger="cron",
-                              hour=hour, minute=minute)
-    _scheduler.reschedule_job("autopilot_trending", trigger="cron",
-                              hour=trending_hour, minute=minute)
-    log.info("[autopilot] reschedule news=%02d:%02d trending=%02d:%02d (+%dh)",
-             hour, minute, trending_hour, minute, offset)
+    trending_offset = _trending_offset_hours()
+    figure_tech_offset = _figure_tech_offset_hours()
+    trending_hour = (hour + trending_offset) % 24
+    figure_tech_hour = (hour + figure_tech_offset) % 24
+    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute,
+                       id="autopilot_news", replace_existing=True)
+    _scheduler.add_job(_trending_cron_job, "cron", hour=trending_hour, minute=minute,
+                       id="autopilot_trending", replace_existing=True)
+    _scheduler.add_job(_figure_tech_cron_job, "cron", hour=figure_tech_hour, minute=minute,
+                       id="autopilot_figure_tech", replace_existing=True)
+    if _scheduler.get_job("autopilot_figure_entertainment"):
+        _scheduler.remove_job("autopilot_figure_entertainment")
+    log.info(
+        "[autopilot] reschedule news=%02d:%02d trending=%02d:%02d (+%dh) "
+        "figure_tech=%02d:%02d (+%dh)",
+        hour, minute,
+        trending_hour, minute, trending_offset,
+        figure_tech_hour, minute, figure_tech_offset,
+    )
 
 
 def run_now() -> None:

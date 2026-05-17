@@ -31,61 +31,105 @@ export interface ArticleLayerProps {
 }
 
 /**
- * Pattern interrupt overlay — frames 0-9 (0.3s) show a jarring black + hook
- * flash before the variant content. 2026 retention data: pattern interrupt
- * in first 5 frames boosts 3s retention by +23% vs static openings.
+ * Hook-slam intro (v2, 2026-05) — replaces the previous black-flash pattern
+ * interrupt. Reasoning: prior version wasted frames 0-9 on chrome (黑→白→
+ * text bounce) before showing actual content. 3s-retention measurements
+ * showed viewers swiping during the loading animation.
+ *
+ * New design:
+ *   frame 0   — hook text already on screen at near-final size, full-bleed
+ *   0-3       — radial flash of `accent` color burst (single beat for SFX sync)
+ *   3-30      — text scales 0.92 → 1.0, gold glow pulse (1s hold)
+ *   30-45     — text scales 1.0 → 0.55 + slides to top edge, fades to bg variant
+ *
+ * Key differences from old version:
+ *   - No black/white screen flicker (no "loading style" frames)
+ *   - Hook text visible from frame 0 (no waiting for spring)
+ *   - Holds full-screen for ~1s instead of 0.3s — gives viewer time to *read*
+ *   - Smooth dissolve into Magazine/Breaking/Flashcard variant layout
  */
-const PatternInterruptIntro: React.FC<{ hook: string; accent: string }> = ({ hook, accent }) => {
+const HookSlamIntro: React.FC<{ hook: string; accent: string }> = ({ hook, accent }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  // Only render for first ~0.35s
-  if (frame >= 10) return null;
+  // Total intro length: 45 frames (1.5s @ 30fps). After that the variant takes over.
+  if (frame >= 45) return null;
 
-  // 3-phase flash: black (0-2) → bright (3-4) → text slam in (5-9)
-  const bgOpacity = interpolate(frame, [0, 2, 4, 9, 10], [1, 1, 1, 0.6, 0], {
+  // Color burst flash: frames 0-3, single saturated wash
+  const burstOp = interpolate(frame, [0, 1, 3], [1, 0.85, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
   });
-  const bgColor = frame < 3 ? "#000000" : (frame < 5 ? "#ffffff" : "#000000");
 
+  // Text: visible at frame 0 (no spring runup), gentle settle to 1.0
   const textSpring = spring({
-    fps, frame: Math.max(0, frame - 4),
-    config: { damping: 6, stiffness: 260, mass: 0.5 },
-    durationInFrames: 6,
+    fps, frame, config: { damping: 14, stiffness: 200, mass: 0.7 },
+    durationInFrames: 12,
   });
-  const textScale = interpolate(textSpring, [0, 0.6, 1], [0.3, 1.4, 1.0]);
-  const textOp = interpolate(frame, [4, 5, 9, 10], [0, 1, 1, 0], {
+  const settleScale = interpolate(textSpring, [0, 1], [0.92, 1.0]);
+
+  // Exit transition: 30-45 = scale down + fade
+  const exitT = Math.max(0, frame - 30) / 15;   // 0 → 1 across last 15 frames
+  const exitScale = interpolate(exitT, [0, 1], [1.0, 0.55]);
+  const exitY     = interpolate(exitT, [0, 1], [0, -380]);
+  const exitOp    = interpolate(exitT, [0, 1], [1, 0]);
+
+  const scale = settleScale * exitScale;
+
+  // Background: dimmed-overlay so viewer focuses on text. Fades out for exit.
+  const bgOp = interpolate(frame, [0, 30, 45], [0.92, 0.88, 0], {
     extrapolateLeft: "clamp", extrapolateRight: "clamp",
   });
 
   return (
-    <AbsoluteFill
-      style={{
-        zIndex: 100,
-        backgroundColor: bgColor,
-        opacity: bgOpacity,
-        display: "flex", alignItems: "center", justifyContent: "center",
-      }}
-    >
-      {frame >= 4 && (
+    <AbsoluteFill style={{ zIndex: 100, pointerEvents: "none" }}>
+      {/* Dim backdrop so text reads even over hero image */}
+      <div
+        style={{
+          position: "absolute", inset: 0,
+          background: `radial-gradient(ellipse at center, rgba(8,12,28,0.96) 0%, rgba(8,12,28,0.82) 70%, rgba(8,12,28,0.55) 100%)`,
+          opacity: bgOp,
+        }}
+      />
+      {/* Color-burst flash — single beat for SFX sync */}
+      <div
+        style={{
+          position: "absolute", inset: 0,
+          background: `radial-gradient(circle at center, ${accent}cc 0%, ${accent}55 40%, transparent 70%)`,
+          opacity: burstOp,
+          mixBlendMode: "screen",
+        }}
+      />
+      {/* Hook text — full bleed, frame 0 visible */}
+      <div
+        style={{
+          position: "absolute", inset: 0,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "0 60px",
+          opacity: exitOp,
+          transform: `translate(0, ${exitY}px) scale(${scale})`,
+          transformOrigin: "center center",
+        }}
+      >
         <div
           style={{
             fontFamily: FONT_CJK,
-            fontSize: 180,
+            fontSize: 220,
             fontWeight: 900,
-            color: frame < 5 ? "#000" : accent,
-            textShadow: frame >= 5 ? `0 0 40px ${accent}aa, 0 6px 20px rgba(0,0,0,0.9)` : "none",
-            transform: `scale(${textScale})`,
-            opacity: textOp,
-            letterSpacing: 8,
+            color: "#fff",
             textAlign: "center",
-            padding: "0 40px",
-            lineHeight: 1.05,
+            letterSpacing: 6,
+            lineHeight: 1.0,
+            textShadow: `0 0 50px ${accent}cc, 0 0 100px ${accent}55, 0 8px 24px rgba(0,0,0,0.9)`,
+            // Gold-tinted text gradient on the accent color word
+            background: `linear-gradient(180deg, #ffffff 0%, ${accent} 100%)`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            filter: `drop-shadow(0 4px 12px ${accent}77)`,
           }}
         >
-          {(hook || "").slice(0, 10)}
+          {(hook || "").slice(0, 12)}
         </div>
-      )}
+      </div>
     </AbsoluteFill>
   );
 };
@@ -150,7 +194,7 @@ export const ArticleLayer: React.FC<ArticleLayerProps> = (props) => {
   return (
     <>
       {variantEl}
-      <PatternInterruptIntro hook={props.hook} accent={props.accent} />
+      <HookSlamIntro hook={props.hook} accent={props.accent} />
       <LoopBackOutro hook={props.hook} accent={props.accent} totalFrames={props.totalFrames} />
     </>
   );

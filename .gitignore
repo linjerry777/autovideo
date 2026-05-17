@@ -1,11 +1,37 @@
 .env
 *.env
-output/
-logs/
-data/*.db
 __pycache__/
 *.pyc
 *.pyo
 .DS_Store
-scraper/node_modules/
+
+# Runtime output and local state
+output/
+logs/
+data/
 pipeline/
+
+# Local agent/browser/runtime scratch
+.claude/settings.local.json
+.claude/worktrees/
+.codex_tmp/
+.dev_logs/
+.playwright-mcp/
+
+# Old standalone Next.js dashboard. Current app is served by web/static.
+frontend/
+
+# Dependencies and build caches
+node_modules/
+scraper/node_modules/
+.next/
+.vercel/
+
+# Generated previews / screenshots kept locally only
+/autovideo-saas-dashboard.png
+/trending-fixed.png
+/video-library*.png
+
+# Locally downloaded music/SFX. Keep .gitkeep and curated tracked assets.
+assets/music/**/*.mp3
+assets/sfx/**/*.mp3

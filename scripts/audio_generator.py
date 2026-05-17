@@ -45,6 +45,9 @@ DEFAULT_VOICE_ID = os.getenv("FISH_AUDIO_VOICE_ID", "")
 # Per-strategy voice mapping (env vars are optional — fall back to default)
 STRATEGY_VOICE_MAP = {
     "tech":          os.getenv("FISH_AUDIO_VOICE_TECH",          "") or DEFAULT_VOICE_ID,
+    "quote_analysis": os.getenv("FISH_AUDIO_VOICE_TECH",         "") or DEFAULT_VOICE_ID,
+    "figure_tech":   os.getenv("FISH_AUDIO_VOICE_TECH",          "") or DEFAULT_VOICE_ID,
+    "figure_entertainment": os.getenv("FISH_AUDIO_VOICE_ENTERTAINMENT", "") or DEFAULT_VOICE_ID,
     "entertainment": os.getenv("FISH_AUDIO_VOICE_ENTERTAINMENT", "") or DEFAULT_VOICE_ID,
     "finance":       os.getenv("FISH_AUDIO_VOICE_FINANCE",       "") or DEFAULT_VOICE_ID,
     "pet":           os.getenv("FISH_AUDIO_VOICE_PET",           "") or DEFAULT_VOICE_ID,

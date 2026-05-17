@@ -1,9 +1,0 @@
-
-[FAILED] Claude 回傳無效 JSON：Invalid control character at: line 6 column 69 (char 178)
-原始內容：[
-  {
-    "hook": "新的對手現身",
-    "title": "微软推出三款AI模型迎戰OpenAI",
-    "summary": "微軟新AI模型在Azure上市，與OpenAI競爭加碼。",
-    "script": "微軟近期在其Azure平台上推出了三個新型的AI模型，從語音轉錄、語音識別到圖像生成全面展開技術競爭。',
-    "source_url": "http://www.bing.com/news/apiclick.aspx?ref=FexRss&aid=&tid=69cfe4607ada42aab3b35952704b3566&url=https%
