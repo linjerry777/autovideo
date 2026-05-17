@@ -2,6 +2,7 @@
 web/app.py — FastAPI application factory
 """
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -46,12 +47,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AutoVideo API", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv("AUTOVIDEO_CORS_ORIGINS", "").split(",")
+    if origin.strip()
+]
+if _cors_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(jobs.router)
 app.include_router(events.router)

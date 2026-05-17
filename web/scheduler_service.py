@@ -1,137 +1,140 @@
+"""APScheduler wiring for AutoVideo autopilot.
+
+The active daily flow is intentionally small:
+1. news autopilot
+2. entertainment/trending autopilot
+3. tech figure source-video analysis
+
+Older strategy metadata such as ``figure_entertainment`` remains available in
+routes and publisher metadata for historical jobs, but the scheduler no longer
+creates entertainment figure jobs automatically.
 """
-web/scheduler_service.py — APScheduler (BackgroundScheduler)
 
-Daily autopilot (opt-in via `autopilot_enabled` setting):
-  fires scheduled jobs:
-    1. News autopilot (strategy=generic)
-    2. Trending autopilot (strategy=entertainment, single YT TW top trend)
-    3. Figure quote autopilot (tech + entertainment source-video analysis)
+from __future__ import annotations
 
-All go through job_runner.trigger_job(autopilot=True). The queue inside
-trigger_job sequences them so only one runs at a time.
-
-Safety: `autopilot_dry_run` defaults to true — publisher prints preview only.
-Flip to false once you trust the pipeline.
-"""
 import logging
-from apscheduler.schedulers.background import BackgroundScheduler
+import re
 from datetime import date as date_cls
 
-from web.db import get_setting, create_job
+from apscheduler.schedulers.background import BackgroundScheduler
+
 from web import job_runner
+from web.db import create_job, get_setting
 
 log = logging.getLogger("scheduler_service")
 
 _scheduler = BackgroundScheduler()
 
-# Defaults applied when autopilot settings are missing. Keep aligned with the
-# settings row documented in web/db.py.
-_DEFAULT_PLATFORMS = "youtube,instagram,facebook,threads,x,tiktok"
+_DEFAULT_PLATFORMS = "youtube,instagram,facebook,threads,x,linkedin"
+_DEFAULT_NEWS_SOURCES = "google,bing,hackernews,ithome,last30days"
+_DEFAULT_NEWS_KEYWORDS = (
+    "AI,ChatGPT,Claude,Gemini,LLM,agent,agents,GPU,Nvidia,OpenAI,"
+    "Anthropic,Meta,Google,Microsoft"
+)
 
 
 def _bool_setting(key: str, default: bool) -> bool:
     return str(get_setting(key, str(default).lower())).lower() == "true"
 
 
-def _pick_news_items(n: int = 3) -> list[dict]:
-    """Multi-source news fetch + AI keyword filter + dedup.
+def _csv_setting(key: str, default: str) -> list[str]:
+    raw = get_setting(key, default) or default
+    return [item.strip() for item in raw.split(",") if item.strip()]
 
-    Pulls from the sources listed in `autopilot_news_sources` setting (default
-    google/bing/hackernews/ithome/last30days/youtube_us — everything except
-    youtube_tw which is reserved for trending autopilot, plus dcard/x which
-    the user flagged as useless for this use case).
 
-    Keeps only items whose title/summary contains at least one AI-related
-    keyword, and excludes URLs already used in past jobs. Returns `n` items
-    in the same shape enrich_news_items expects.
-    """
-    try:
-        from web.routes.news import _fetch_all, _load_used_urls
-    except Exception as e:
-        log.warning("[autopilot] news fetch import failed: %s", e)
-        return []
-
-    sources_csv = get_setting("autopilot_news_sources",
-                              "google,bing,hackernews,ithome,last30days")
-    sources = [s.strip() for s in sources_csv.split(",") if s.strip()]
-    keywords_csv = get_setting("autopilot_news_keywords",
-                               "AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft")
-    keywords = [k.strip() for k in keywords_csv.split(",") if k.strip()]
-    # Send the broadest keyword to RSS-style sources so we get AI-flavored hits
-    kw = keywords[0] if keywords else "AI"
-
-    try:
-        raw = _fetch_all(keyword=kw, lang="zh-TW", sources=sources)
-    except Exception as e:
-        log.warning("[autopilot] _fetch_all failed: %s", e)
-        return []
-    if not raw:
-        return []
-
-    # Word-boundary matcher so short keywords like "AI" don't false-match
-    # English noise words containing "ai" (TRAILER / SPAIN / RAIN / TAIL).
-    # Chinese keywords don't have word boundaries — for those plain `in` is fine.
-    import re as _re
-    en_keywords = [k for k in keywords if _re.fullmatch(r"[A-Za-z0-9]+", k)]
-    cn_keywords = [k for k in keywords if k not in en_keywords]
-    en_pattern  = _re.compile(
-        r"\b(" + "|".join(_re.escape(k) for k in en_keywords) + r")\b",
-        _re.IGNORECASE,
-    ) if en_keywords else None
+def _keyword_matcher(keywords: list[str]):
+    english = [k for k in keywords if re.fullmatch(r"[A-Za-z0-9]+", k)]
+    non_english = [k for k in keywords if k not in english]
+    pattern = (
+        re.compile(r"\b(" + "|".join(re.escape(k) for k in english) + r")\b", re.IGNORECASE)
+        if english
+        else None
+    )
 
     def _matches(text: str) -> bool:
         if not text:
             return False
-        if any(k in text for k in cn_keywords):
+        if any(k in text for k in non_english):
             return True
-        if en_pattern and en_pattern.search(text):
-            return True
-        return False
+        return bool(pattern and pattern.search(text))
 
-    used = _load_used_urls()
-    matched = []
-    seen_urls = set()
-    for it in raw:
-        url = it.get("url", "")
-        if not url or url in used or url in seen_urls:
+    return _matches
+
+
+def _pick_news_items(n: int = 3) -> list[dict]:
+    """Fetch multi-source AI news, filter weak matches, and skip used URLs."""
+    try:
+        from web.routes.news import _fetch_all, _load_used_urls
+    except Exception as exc:
+        log.warning("[autopilot] news fetch import failed: %s", exc)
+        return []
+
+    sources = _csv_setting("autopilot_news_sources", _DEFAULT_NEWS_SOURCES)
+    keywords = _csv_setting("autopilot_news_keywords", _DEFAULT_NEWS_KEYWORDS)
+    keyword = keywords[0] if keywords else "AI"
+
+    try:
+        raw = _fetch_all(keyword=keyword, lang="zh-TW", sources=sources)
+    except Exception as exc:
+        log.warning("[autopilot] _fetch_all failed: %s", exc)
+        return []
+    if not raw:
+        return []
+
+    matches = _keyword_matcher(keywords)
+    used_urls = _load_used_urls()
+    seen_urls: set[str] = set()
+    picked: list[dict] = []
+
+    for item in raw:
+        url = item.get("url", "")
+        if not url or url in used_urls or url in seen_urls:
             continue
-        haystack = f"{it.get('title','')} {it.get('summary','')}"
-        if keywords and not _matches(haystack):
+        haystack = f"{item.get('title', '')} {item.get('summary', '')}"
+        if keywords and not matches(haystack):
             continue
         seen_urls.add(url)
-        matched.append({
-            "title":       it.get("title", ""),
-            "summary":     it.get("summary", "") or it.get("title", ""),
-            "url":         url,
-            "source":      it.get("source", ""),
-            "source_type": it.get("source_type", "google"),
-        })
-        if len(matched) >= n:
+        picked.append(
+            {
+                "title": item.get("title", ""),
+                "summary": item.get("summary", "") or item.get("title", ""),
+                "url": url,
+                "source": item.get("source", ""),
+                "source_type": item.get("source_type", "google"),
+            }
+        )
+        if len(picked) >= n:
             break
-    return matched
+
+    return picked
 
 
 def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
     strategy = get_setting("autopilot_news_strategy", "generic") or "generic"
-    profile  = get_setting("autopilot_news_profile",  "pet")     or "pet"
-    items    = _pick_news_items(n=3)
+    profile = get_setting("autopilot_news_profile", "pet") or "pet"
+    items = _pick_news_items(n=3)
 
-    job_id   = create_job(date=today, triggered_by="autopilot_news",
-                          platforms=",".join(platforms))
-
+    job_id = create_job(date=today, triggered_by="autopilot_news", platforms=",".join(platforms))
     if items:
-        log.info("[autopilot] news job %s multi-source (%d items) strategy=%s profile=%s dry_run=%s",
-                 job_id, len(items), strategy, profile, dry_run)
+        log.info(
+            "[autopilot] news job %s multi-source (%d items) strategy=%s profile=%s dry_run=%s",
+            job_id,
+            len(items),
+            strategy,
+            profile,
+            dry_run,
+        )
         pre_news = items
     else:
-        # Fallback to legacy Google News RSS path if multi-source yielded nothing
-        log.info("[autopilot] news job %s multi-source empty — falling back to news_collector.py",
-                 job_id)
+        log.info("[autopilot] news job %s multi-source empty; falling back to news_collector.py", job_id)
         pre_news = None
 
     job_runner.trigger_job(
-        job_id=job_id, date=today, topic=None,
-        platforms=platforms, dry_run=dry_run,
+        job_id=job_id,
+        date=today,
+        topic=None,
+        platforms=platforms,
+        dry_run=dry_run,
         pre_news=pre_news,
         account_profile=profile,
         strategy=strategy,
@@ -139,67 +142,69 @@ def _fire_news_autopilot(today: str, platforms: list[str], dry_run: bool) -> Non
     )
 
 
-def _pick_trending_items(n: int = 3) -> list[dict]:
-    """Pick top N raw trending items by view_count, merged across configured
-    sources (default YT TW + YT US). Skips URLs already made into videos.
-
-    Source list tunable via the `autopilot_trending_sources` DB setting.
-    Per user 2026-04-22: merge all sources into one pool and rank purely by
-    view count — beat the TW-only bias that was over-indexing on esports.
-    """
+def _pick_trending_items(n: int = 1) -> list[dict]:
+    """Pick top trending items by view count across configured sources."""
     try:
         from web.routes.news import _fetch_all, _load_used_urls
-    except Exception as e:
-        log.warning("[autopilot] trending fetch import failed: %s", e)
+    except Exception as exc:
+        log.warning("[autopilot] trending fetch import failed: %s", exc)
         return []
 
-    sources_csv = get_setting("autopilot_trending_sources", "youtube_tw,youtube_us")
-    sources = [s.strip() for s in sources_csv.split(",") if s.strip()] or ["youtube_tw"]
-
-    used = _load_used_urls()
-    merged: list[dict] = []
+    sources = _csv_setting("autopilot_trending_sources", "youtube_tw,youtube_us") or ["youtube_tw"]
+    used_urls = _load_used_urls()
     seen_urls: set[str] = set()
-    for src in sources:
+    merged: list[dict] = []
+
+    for source in sources:
         try:
-            raw = _fetch_all(keyword="", lang="zh-TW", sources=[src])
-        except Exception as e:
-            log.warning("[autopilot] trending fetch %s failed: %s", src, e)
+            raw = _fetch_all(keyword="", lang="zh-TW", sources=[source])
+        except Exception as exc:
+            log.warning("[autopilot] trending fetch %s failed: %s", source, exc)
             continue
-        for it in (raw or []):
-            url = it.get("url", "")
-            if not url or url in used or url in seen_urls:
+        for item in raw or []:
+            url = item.get("url", "")
+            if not url or url in used_urls or url in seen_urls:
                 continue
             seen_urls.add(url)
-            merged.append(it)
+            merged.append(item)
 
-    # Rank purely by view_count (desc). Missing view_count sinks to 0.
-    merged.sort(key=lambda it: int(it.get("view_count") or 0), reverse=True)
-
-    return [{
-        "title":       it.get("title", ""),
-        "summary":     it.get("summary", "") or it.get("title", ""),
-        "url":         it.get("url", ""),
-        "source":      it.get("source", "YouTube"),
-        "source_type": it.get("source_type", "youtube"),
-        "view_count":  it.get("view_count"),
-    } for it in merged[:n]]
+    merged.sort(key=lambda item: int(item.get("view_count") or 0), reverse=True)
+    return [
+        {
+            "title": item.get("title", ""),
+            "summary": item.get("summary", "") or item.get("title", ""),
+            "url": item.get("url", ""),
+            "source": item.get("source", "YouTube"),
+            "source_type": item.get("source_type", "youtube"),
+            "view_count": item.get("view_count"),
+        }
+        for item in merged[:n]
+    ]
 
 
 def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
-    # Per user preference: 娛樂 autopilot 一次只做 1 則（合輯要手動在 UI 選擇）
     items = _pick_trending_items(n=1)
     if not items:
-        log.info("[autopilot] all YT TW trends already made — skipping trending job")
+        log.info("[autopilot] all configured trends already used; skipping trending job")
         return
+
     strategy = get_setting("autopilot_trending_strategy", "entertainment") or "entertainment"
-    profile  = get_setting("autopilot_trending_profile",  "pet")           or "pet"
-    job_id   = create_job(date=today, triggered_by="autopilot_trending",
-                          platforms=",".join(platforms))
-    log.info("[autopilot] trending job %s single item=%s strategy=%s profile=%s dry_run=%s",
-             job_id, items[0]["title"][:50], strategy, profile, dry_run)
+    profile = get_setting("autopilot_trending_profile", "pet") or "pet"
+    job_id = create_job(date=today, triggered_by="autopilot_trending", platforms=",".join(platforms))
+    log.info(
+        "[autopilot] trending job %s item=%s strategy=%s profile=%s dry_run=%s",
+        job_id,
+        items[0]["title"][:50],
+        strategy,
+        profile,
+        dry_run,
+    )
     job_runner.trigger_job(
-        job_id=job_id, date=today, topic=None,
-        platforms=platforms, dry_run=dry_run,
+        job_id=job_id,
+        date=today,
+        topic=None,
+        platforms=platforms,
+        dry_run=dry_run,
         pre_news=items,
         account_profile=profile,
         strategy=strategy,
@@ -207,29 +212,28 @@ def _fire_trending_autopilot(today: str, platforms: list[str], dry_run: bool) ->
     )
 
 
-def _fire_figure_autopilot(today: str, group: str, platforms: list[str], dry_run: bool) -> None:
-    """Create one source-video quote-analysis job for tech or entertainment."""
-    if group == "tech":
-        strategy = "figure_tech"
-        profile = get_setting("autopilot_figure_tech_profile", "yt") or "yt"
-        label = "科技大咖"
-    else:
-        strategy = "figure_entertainment"
-        profile = get_setting("autopilot_figure_entertainment_profile", "pet") or "pet"
-        label = "娛樂咖"
-
+def _fire_figure_autopilot(today: str, platforms: list[str], dry_run: bool) -> None:
+    """Create one tech figure source-video quote-analysis job."""
+    strategy = "figure_tech"
+    profile = get_setting("autopilot_figure_tech_profile", "yt") or "yt"
+    topic = "科技大咖"
     job_id = create_job(
         date=today,
-        triggered_by=f"autopilot_figure_{group}",
-        topic=label,
+        triggered_by="autopilot_figure_tech",
+        topic=topic,
         platforms=",".join(platforms),
     )
-    log.info("[autopilot] figure job %s group=%s strategy=%s profile=%s dry_run=%s",
-             job_id, group, strategy, profile, dry_run)
+    log.info(
+        "[autopilot] figure job %s strategy=%s profile=%s dry_run=%s",
+        job_id,
+        strategy,
+        profile,
+        dry_run,
+    )
     job_runner.trigger_job(
         job_id=job_id,
         date=today,
-        topic=label,
+        topic=topic,
         platforms=platforms,
         dry_run=dry_run,
         pre_news=None,
@@ -240,17 +244,13 @@ def _fire_figure_autopilot(today: str, group: str, platforms: list[str], dry_run
 
 
 def _read_autopilot_runtime_settings() -> tuple[str, list[str], bool]:
-    """Common (date, platforms, dry_run) used by both fire functions."""
-    today     = date_cls.today().isoformat()
-    platforms = (get_setting("autopilot_platforms", _DEFAULT_PLATFORMS)
-                 or _DEFAULT_PLATFORMS).split(",")
-    platforms = [p.strip() for p in platforms if p.strip()]
-    dry_run   = _bool_setting("autopilot_dry_run", True)
+    today = date_cls.today().isoformat()
+    platforms = _csv_setting("autopilot_platforms", _DEFAULT_PLATFORMS)
+    dry_run = _bool_setting("autopilot_dry_run", True)
     return today, platforms, dry_run
 
 
 def _news_cron_job() -> None:
-    """Fires news autopilot at schedule_hour:schedule_minute."""
     if not _bool_setting("autopilot_enabled", False):
         _legacy_daily()
         return
@@ -261,12 +261,6 @@ def _news_cron_job() -> None:
 
 
 def _trending_cron_job() -> None:
-    """Fires trending autopilot at offset hours after news.
-
-    Reason: cross-account same-minute posting (yt + pet) tripped Meta's
-    cross-account spam detector and dragged IG reach -20-40%. Stagger so
-    the two pipelines hit each platform at different times of day.
-    """
     if not _bool_setting("autopilot_enabled", False):
         return
     if not _bool_setting("autopilot_trending_enabled", True):
@@ -281,41 +275,31 @@ def _figure_tech_cron_job() -> None:
     if not _bool_setting("autopilot_figure_enabled", True):
         return
     today, platforms, dry_run = _read_autopilot_runtime_settings()
-    _fire_figure_autopilot(today, "tech", platforms, dry_run)
-
-
-def _figure_entertainment_cron_job() -> None:
-    log.info("[autopilot] figure entertainment lane disabled")
+    _fire_figure_autopilot(today, platforms, dry_run)
 
 
 def _daily_job() -> None:
-    """Manual `run_now()` and legacy callers — fires both back-to-back.
-
-    The two cron jobs (_news_cron_job + _trending_cron_job) are what fire
-    on a normal autopilot day; this combined version stays for the UI's
-    「立刻跑一次 autopilot」button.
-    """
+    """Manual "run autopilot now" path used by the UI."""
     if not _bool_setting("autopilot_enabled", False):
         _legacy_daily()
         return
+
     today, platforms, dry_run = _read_autopilot_runtime_settings()
     if _bool_setting("autopilot_news_enabled", True):
         _fire_news_autopilot(today, platforms, dry_run)
     if _bool_setting("autopilot_trending_enabled", True):
         _fire_trending_autopilot(today, platforms, dry_run)
     if _bool_setting("autopilot_figure_enabled", True):
-        _fire_figure_autopilot(today, "tech", platforms, dry_run)
+        _fire_figure_autopilot(today, platforms, dry_run)
 
 
 def _legacy_daily() -> None:
-    """Pre-autopilot behavior: create 1 job and let user click through UI."""
-    today     = date_cls.today().isoformat()
-    platforms = get_setting("platforms", "youtube,instagram").split(",")
-    dry_run   = get_setting("dry_run", "false") == "true"
-    job_id    = create_job(date=today, triggered_by="schedule",
-                           platforms=",".join(platforms))
-    job_runner.trigger_job(job_id=job_id, date=today,
-                           platforms=platforms, dry_run=dry_run)
+    """Pre-autopilot behavior: create one job and let the normal pipeline run."""
+    today = date_cls.today().isoformat()
+    platforms = _csv_setting("platforms", "youtube,instagram")
+    dry_run = get_setting("dry_run", "false") == "true"
+    job_id = create_job(date=today, triggered_by="schedule", platforms=",".join(platforms))
+    job_runner.trigger_job(job_id=job_id, date=today, platforms=platforms, dry_run=dry_run)
 
 
 def _offset_hours_setting(key: str, default: int) -> int:
@@ -333,8 +317,10 @@ def _figure_tech_offset_hours() -> int:
     return _offset_hours_setting("autopilot_figure_tech_offset_hours", 8)
 
 
-def _figure_entertainment_offset_hours() -> int:
-    return _offset_hours_setting("autopilot_figure_entertainment_offset_hours", 10)
+def _remove_disabled_jobs() -> None:
+    for job_id in ("autopilot_figure_entertainment",):
+        if _scheduler.get_job(job_id):
+            _scheduler.remove_job(job_id)
 
 
 def start(hour: int = 8, minute: int = 0) -> None:
@@ -342,19 +328,36 @@ def start(hour: int = 8, minute: int = 0) -> None:
     figure_tech_offset = _figure_tech_offset_hours()
     trending_hour = (hour + trending_offset) % 24
     figure_tech_hour = (hour + figure_tech_offset) % 24
-    # News at schedule_hour, trending offset hours later (default +4h)
-    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute,
-                       id="autopilot_news", replace_existing=True)
-    _scheduler.add_job(_trending_cron_job, "cron", hour=trending_hour, minute=minute,
-                       id="autopilot_trending", replace_existing=True)
-    _scheduler.add_job(_figure_tech_cron_job, "cron", hour=figure_tech_hour, minute=minute,
-                       id="autopilot_figure_tech", replace_existing=True)
+
+    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute, id="autopilot_news", replace_existing=True)
+    _scheduler.add_job(
+        _trending_cron_job,
+        "cron",
+        hour=trending_hour,
+        minute=minute,
+        id="autopilot_trending",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _figure_tech_cron_job,
+        "cron",
+        hour=figure_tech_hour,
+        minute=minute,
+        id="autopilot_figure_tech",
+        replace_existing=True,
+    )
+    _remove_disabled_jobs()
     log.info(
         "[autopilot] schedule registered news=%02d:%02d trending=%02d:%02d (+%dh) "
         "figure_tech=%02d:%02d (+%dh)",
-        hour, minute,
-        trending_hour, minute, trending_offset,
-        figure_tech_hour, minute, figure_tech_offset,
+        hour,
+        minute,
+        trending_hour,
+        minute,
+        trending_offset,
+        figure_tech_hour,
+        minute,
+        figure_tech_offset,
     )
     if not _scheduler.running:
         _scheduler.start()
@@ -367,25 +370,40 @@ def update_schedule(hour: int, minute: int) -> None:
     figure_tech_offset = _figure_tech_offset_hours()
     trending_hour = (hour + trending_offset) % 24
     figure_tech_hour = (hour + figure_tech_offset) % 24
-    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute,
-                       id="autopilot_news", replace_existing=True)
-    _scheduler.add_job(_trending_cron_job, "cron", hour=trending_hour, minute=minute,
-                       id="autopilot_trending", replace_existing=True)
-    _scheduler.add_job(_figure_tech_cron_job, "cron", hour=figure_tech_hour, minute=minute,
-                       id="autopilot_figure_tech", replace_existing=True)
-    if _scheduler.get_job("autopilot_figure_entertainment"):
-        _scheduler.remove_job("autopilot_figure_entertainment")
+
+    _scheduler.add_job(_news_cron_job, "cron", hour=hour, minute=minute, id="autopilot_news", replace_existing=True)
+    _scheduler.add_job(
+        _trending_cron_job,
+        "cron",
+        hour=trending_hour,
+        minute=minute,
+        id="autopilot_trending",
+        replace_existing=True,
+    )
+    _scheduler.add_job(
+        _figure_tech_cron_job,
+        "cron",
+        hour=figure_tech_hour,
+        minute=minute,
+        id="autopilot_figure_tech",
+        replace_existing=True,
+    )
+    _remove_disabled_jobs()
     log.info(
         "[autopilot] reschedule news=%02d:%02d trending=%02d:%02d (+%dh) "
         "figure_tech=%02d:%02d (+%dh)",
-        hour, minute,
-        trending_hour, minute, trending_offset,
-        figure_tech_hour, minute, figure_tech_offset,
+        hour,
+        minute,
+        trending_hour,
+        minute,
+        trending_offset,
+        figure_tech_hour,
+        minute,
+        figure_tech_offset,
     )
 
 
 def run_now() -> None:
-    """Manual trigger — used by UI 'run autopilot now' button / API probe."""
     _daily_job()
 
 

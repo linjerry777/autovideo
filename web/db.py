@@ -169,7 +169,6 @@ def init_db():
                 ('autopilot_trending_profile', 'pet'),
                 ('trending_profile_quote_analysis', 'yt'),
                 ('autopilot_figure_tech_profile', 'yt'),
-                ('autopilot_figure_entertainment_profile', 'pet'),
                 -- TikTok 從 default 拿掉：帳號 shadow ban、每多發一支
                 -- 加深 algorithm 的 bot fingerprint。需要 1 個月手機手發 +
                 -- 互動才能慢慢復健。要恢復就手動把 tiktok 加回去。
@@ -179,9 +178,7 @@ def init_db():
                 ('autopilot_news_sources',     'google,bing,hackernews,ithome,last30days'),
                 ('autopilot_news_keywords',    'AI,人工智慧,ChatGPT,Claude,Gemini,LLM,機器學習,生成式,大型語言模型,深度學習,神經網路,科技,半導體,晶片,GPU,輝達,Nvidia,OpenAI,Anthropic,Meta,Google,Microsoft'),
                 ('autopilot_figure_tech_names', '黃仁勳 Jensen Huang,張忠謀 Morris Chang,Sam Altman,Satya Nadella,Lisa Su,Elon Musk AI,Mark Zuckerberg AI'),
-                ('autopilot_figure_entertainment_names', '蔡康永 訪談,小S 訪談,周杰倫 訪談,劉德華 訪談,林志玲 訪談,吳宗憲 訪談'),
                 ('autopilot_figure_tech_offset_hours', '8'),
-                ('autopilot_figure_entertainment_offset_hours', '10'),
                 -- ManyChat-funnel keywords: caption + first_comment 出現「留言『XX』」CTA。
                 -- ManyChat 那邊配對應的 keyword automation → DM 帶 UTM 連結到部落格。
                 -- tech 系（tech / tech_tutorial / finance）走 cta_kw_tech；

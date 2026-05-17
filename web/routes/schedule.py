@@ -3,7 +3,7 @@ web/routes/schedule.py — 📅 排程預覽 API
 
 Aggregates each job's schedule_log.json (written by publisher.py) + predicts
 pending slots for jobs that are still being built. Returns a flat list the
-frontend groups into a 7-day calendar view.
+static UI groups into a 7-day calendar view.
 """
 from datetime import datetime, timedelta
 from pathlib import Path

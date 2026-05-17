@@ -31,7 +31,7 @@ BROLL_DIR = PIPE_DIR / "broll"
 
 # ── Env / DB settings ────────────────────────────────────────────────
 # Values come from environment variables first, then fall back to the
-# SQLite settings table (written by the frontend settings page).
+# SQLite settings table (written by the FastAPI static UI settings page).
 
 def _db_setting(key: str, default: str = "") -> str:
     """Read a value from data/dashboard.db settings table."""
